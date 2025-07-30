@@ -1,6 +1,6 @@
 class AppConstants {
   // API Configuration
-  static const String baseUrl = 'http://10.243.0.187:8080';
+  static const String baseUrl = 'http://192.168.237.147:8080';
   static const String animeEndpoint = '/api/anime/downloads';
   static const String fullApiUrl = '$baseUrl$animeEndpoint';
   

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/anime_provider.dart';
-import '../widgets/anime_card.dart';
+import '../widgets/anime_grid_view.dart';
 import '../widgets/loading_widget.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
@@ -164,25 +164,14 @@ class _AnimeListScreenState extends State<AnimeListScreen>
         await provider.fetchAnimeList(isRefresh: true);
         _refreshController.refreshCompleted();
       },
-      child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: AppConstants.defaultPadding),
-        itemCount: provider.animeList.length,
-        itemBuilder: (context, index) {
-          final anime = provider.animeList[index];
-          final isDownloading = provider.isDownloading(anime.id);
-          final downloadProgress = provider.getDownloadProgress(anime.id);
-
-          return AnimeCard(
-            anime: anime,
-            index: index,
-            isDownloading: isDownloading,
-            isDownloaded: provider.isDownloaded(anime.id),
-            downloadProgress: downloadProgress,
-            onDownload: () => provider.downloadAnime(anime),
-            onDelete: () => provider.deleteDownload(anime),
-            onOpen: () => provider.openDownloadedFile(anime),
-          );
-        },
+      child: AnimeGridView(
+        animeList: provider.animeList,
+        downloadingItems: provider.downloadingItems,
+        downloadedItems: provider.downloadedItems,
+        downloadProgress: provider.downloadProgress,
+        onDownload: (anime) => provider.downloadAnime(anime),
+        onDelete: (anime) => provider.deleteDownload(anime),
+        onOpen: (anime) => provider.openDownloadedFile(anime),
       ),
     );
   }

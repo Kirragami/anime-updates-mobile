@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/anime_item.dart';
 import '../services/api_service.dart';
 import '../services/download_service.dart';
-import '../constants/app_constants.dart';
+import '../services/image_fetcher_service.dart';
 
 class AnimeProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -15,6 +15,7 @@ class AnimeProvider extends ChangeNotifier {
   Map<String, double> _downloadProgress = {};
   Map<String, bool> _downloadingItems = {};
   Map<String, bool> _downloadedItems = {};
+  Map<String, String> _animeImages = {};
 
   // Getters
   List<AnimeItem> get animeList => _animeList;
@@ -27,6 +28,13 @@ class AnimeProvider extends ChangeNotifier {
   double getDownloadProgress(String itemId) => _downloadProgress[itemId] ?? 0.0;
   bool isDownloading(String itemId) => _downloadingItems[itemId] ?? false;
   bool isDownloaded(String itemId) => _downloadedItems[itemId] ?? false;
+  String? getAnimeImage(String itemId) => _animeImages[itemId];
+  
+  // Map getters for grid view
+  Map<String, double> get downloadProgress => _downloadProgress;
+  Map<String, bool> get downloadingItems => _downloadingItems;
+  Map<String, bool> get downloadedItems => _downloadedItems;
+  Map<String, String> get animeImages => _animeImages;
 
   // Methods
   Future<void> fetchAnimeList({bool isRefresh = false}) async {
@@ -45,6 +53,9 @@ class AnimeProvider extends ChangeNotifier {
       
       // Check for existing downloads after fetching the list
       await _checkExistingDownloads();
+      
+      // Fetch images for the anime list
+      await _fetchAnimeImages();
       
       if (kDebugMode) {
         print('Fetched ${animeList.length} anime items');
@@ -74,6 +85,33 @@ class AnimeProvider extends ChangeNotifier {
     } catch (e) {
       if (kDebugMode) {
         print('Error checking existing downloads: $e');
+      }
+    }
+  }
+
+  Future<void> _fetchAnimeImages() async {
+    try {
+      final titles = _animeList.map((anime) => anime.title).toList();
+      final imageUrls = await ImageFetcherService.fetchAnimeImages(titles);
+      
+      // Store the image URLs by anime ID
+      for (final anime in _animeList) {
+        if (imageUrls.containsKey(anime.title)) {
+          _animeImages[anime.id] = imageUrls[anime.title]!;
+        }
+      }
+      
+      notifyListeners();
+      
+      if (kDebugMode) {
+        print('Fetched ${imageUrls.length} anime images');
+        for (final entry in imageUrls.entries) {
+          print('Title: ${entry.key} -> Image: ${entry.value}');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error fetching anime images: $e');
       }
     }
   }
@@ -210,4 +248,4 @@ class AnimeProvider extends ChangeNotifier {
   int get downloadedCount {
     return _downloadedItems.values.where((isDownloaded) => isDownloaded).length;
   }
-} 
+}

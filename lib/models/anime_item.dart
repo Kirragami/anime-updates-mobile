@@ -4,11 +4,15 @@ class AnimeItem {
   final String id;
   final String title;
   final String downloadUrl;
+  final String episode;
+  final DateTime releasedDate;
 
   AnimeItem({
     required this.id,
     required this.title,
     required this.downloadUrl,
+    required this.episode,
+    required this.releasedDate,
   });
 
   factory AnimeItem.fromJson(Map<String, dynamic> json) {
@@ -16,10 +20,22 @@ class AnimeItem {
     _counter++;
     final uniqueId = 'anime_${_counter}_${DateTime.now().millisecondsSinceEpoch}';
     
+    // Parse the releasedDate string to DateTime
+    DateTime parseReleasedDate(String? dateString) {
+      if (dateString == null) return DateTime.now();
+      try {
+        return DateTime.parse(dateString);
+      } catch (e) {
+        return DateTime.now();
+      }
+    }
+    
     return AnimeItem(
       id: json['id']?.toString() ?? uniqueId,
       title: json['title'] ?? '',
       downloadUrl: json['downloadlink'] ?? '',
+      episode: json['episode'] ?? '',
+      releasedDate: parseReleasedDate(json['releasedDate']),
     );
   }
 
@@ -28,6 +44,8 @@ class AnimeItem {
       'id': id,
       'title': title,
       'downloadUrl': downloadUrl,
+      'episode': episode,
+      'releasedDate': releasedDate.toIso8601String(),
     };
   }
 
@@ -35,11 +53,15 @@ class AnimeItem {
     String? id,
     String? title,
     String? downloadUrl,
+    String? episode,
+    DateTime? releasedDate,
   }) {
     return AnimeItem(
       id: id ?? this.id,
       title: title ?? this.title,
       downloadUrl: downloadUrl ?? this.downloadUrl,
+      episode: episode ?? this.episode,
+      releasedDate: releasedDate ?? this.releasedDate,
     );
   }
 
@@ -54,6 +76,6 @@ class AnimeItem {
 
   @override
   String toString() {
-    return 'AnimeItem(id: $id, title: $title, downloadUrl: $downloadUrl)';
+    return 'AnimeItem(id: $id, title: $title, downloadUrl: $downloadUrl, episode: $episode, releasedDate: $releasedDate)';
   }
 } 
