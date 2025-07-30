@@ -23,7 +23,7 @@
     <uses-permission android:name="android.permission.WRITE_MEDIA_AUDIO" />
     
     <application
-        android:label="anime_updates"
+        android:label="Anime Updates"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
