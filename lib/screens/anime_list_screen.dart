@@ -78,18 +78,18 @@ class _AnimeListScreenState extends State<AnimeListScreen>
       padding: const EdgeInsets.all(AppConstants.defaultPadding),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.animation_rounded,
-              color: AppTheme.textPrimary,
-              size: 24,
-            ),
-          ),
+          // Container(
+          //   padding: const EdgeInsets.all(12),
+          //   decoration: BoxDecoration(
+          //     gradient: AppTheme.primaryGradient,
+          //     borderRadius: BorderRadius.circular(12),
+          //   ),
+          //   child: const Icon(
+          //     Icons.animation_rounded,
+          //     color: AppTheme.textPrimary,
+          //     size: 24,
+          //   ),
+          // ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -166,9 +166,6 @@ class _AnimeListScreenState extends State<AnimeListScreen>
       },
       child: AnimeGridView(
         animeList: provider.animeList,
-        downloadingItems: provider.downloadingItems,
-        downloadedItems: provider.downloadedItems,
-        downloadProgress: provider.downloadProgress,
         onDownload: (anime) => provider.downloadAnime(anime),
         onDelete: (anime) => provider.deleteDownload(anime),
         onOpen: (anime) => provider.openDownloadedFile(anime),

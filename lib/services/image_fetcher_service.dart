@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 class ImageFetcherService {
   static const String _baseUrl = 'https://api.imdbapi.dev/search/titles';
@@ -8,6 +9,9 @@ class ImageFetcherService {
   /// Returns the image URL if found, null otherwise
   static Future<String?> fetchAnimeImage(String title) async {
     try {
+      // Add a small delay to prevent overwhelming the API
+      await Future.delayed(const Duration(milliseconds: 100));
+      
       // Encode the title for URL parameter
       final encodedTitle = Uri.encodeComponent(title);
       final url = Uri.parse('$_baseUrl?query=$encodedTitle');
@@ -31,7 +35,9 @@ class ImageFetcherService {
       
       return null;
     } catch (e) {
-      print('Error fetching anime image: $e');
+      if (kDebugMode) {
+        print('Error fetching anime image: $e');
+      }
       return null;
     }
   }

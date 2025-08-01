@@ -58,6 +58,7 @@ dependencies:
   # Modern UI Components
   flutter_slidable: ^3.1.0
   pull_to_refresh: ^2.0.0
+  visibility_detector: ^0.4.0+2
   
   # Icons
   font_awesome_flutter: ^10.7.0
