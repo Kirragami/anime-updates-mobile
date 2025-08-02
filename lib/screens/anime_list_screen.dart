@@ -96,14 +96,14 @@ class _AnimeListScreenState extends State<AnimeListScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AppConstants.appName,
+                  'Newest Releases',
                   style: AppTheme.heading2.copyWith(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  'Download your favorite anime',
+                  'Download latest released episodes',
                   style: AppTheme.body2.copyWith(
                     color: AppTheme.textSecondary,
                   ),
