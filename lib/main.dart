@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'providers/anime_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/anime_list_screen.dart';
 import 'theme/app_theme.dart';
 import 'constants/app_constants.dart';
 
 void main() {
-  runApp(const AnimeUpdatesApp());
+  runApp(const ProviderScope(child: AnimeUpdatesApp()));
 }
 
 class AnimeUpdatesApp extends StatelessWidget {
@@ -14,16 +13,11 @@ class AnimeUpdatesApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AnimeProvider()),
-      ],
-      child: MaterialApp(
-        title: AppConstants.appName,
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
-        home: const AnimeListScreen(),
-      ),
+    return MaterialApp(
+      title: AppConstants.appName,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.darkTheme,
+      home: const AnimeListScreen(),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class AnimeItem {
   static int _counter = 0;
   
@@ -6,6 +8,7 @@ class AnimeItem {
   final String downloadUrl;
   final String episode;
   final DateTime releasedDate;
+  final String fileName;
 
   AnimeItem({
     required this.id,
@@ -13,6 +16,7 @@ class AnimeItem {
     required this.downloadUrl,
     required this.episode,
     required this.releasedDate,
+    required this.fileName,
   });
 
   factory AnimeItem.fromJson(Map<String, dynamic> json) {
@@ -30,12 +34,19 @@ class AnimeItem {
       }
     }
     
+    // Debug logging for JSON structure
+    if (kDebugMode) {
+      print('Parsing JSON item: $json');
+      print('Available keys: ${json.keys.toList()}');
+    }
+    
     return AnimeItem(
       id: json['id']?.toString() ?? uniqueId,
       title: json['title'] ?? '',
       downloadUrl: json['downloadlink'] ?? '',
       episode: json['episode'] ?? '',
       releasedDate: parseReleasedDate(json['releasedDate']),
+      fileName: json['fileName'] ?? '',
     );
   }
 
@@ -55,6 +66,7 @@ class AnimeItem {
     String? downloadUrl,
     String? episode,
     DateTime? releasedDate,
+    String? fileName
   }) {
     return AnimeItem(
       id: id ?? this.id,
@@ -62,6 +74,7 @@ class AnimeItem {
       downloadUrl: downloadUrl ?? this.downloadUrl,
       episode: episode ?? this.episode,
       releasedDate: releasedDate ?? this.releasedDate,
+      fileName: fileName ?? this.fileName,
     );
   }
 
@@ -76,6 +89,6 @@ class AnimeItem {
 
   @override
   String toString() {
-    return 'AnimeItem(id: $id, title: $title, downloadUrl: $downloadUrl, episode: $episode, releasedDate: $releasedDate)';
+    return 'AnimeItem(id: $id, title: $title, downloadUrl: $downloadUrl, episode: $episode, releasedDate: $releasedDate, fileName: $fileName)';
   }
 } 

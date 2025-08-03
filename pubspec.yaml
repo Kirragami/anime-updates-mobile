@@ -39,7 +39,8 @@ dependencies:
   permission_handler: ^11.3.1
   
   # State Management
-  provider: ^6.1.2
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
   
   # UI & Animations
   flutter_animate: ^4.5.0
@@ -77,6 +78,8 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
+  riverpod_generator: ^2.4.0
+  build_runner: ^2.4.8
 
 flutter_icons:
   android: true

@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../providers/anime_provider.dart';
+import '../models/anime_item.dart';
+import '../providers/anime_providers.dart';
 import '../widgets/anime_grid_view.dart';
 import '../widgets/loading_widget.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 
-class AnimeListScreen extends StatefulWidget {
+class AnimeListScreen extends ConsumerStatefulWidget {
   const AnimeListScreen({super.key});
 
   @override
-  State<AnimeListScreen> createState() => _AnimeListScreenState();
+  ConsumerState<AnimeListScreen> createState() => _AnimeListScreenState();
 }
 
-class _AnimeListScreenState extends State<AnimeListScreen>
+class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
     with TickerProviderStateMixin {
   late RefreshController _refreshController;
 
@@ -23,11 +24,6 @@ class _AnimeListScreenState extends State<AnimeListScreen>
   void initState() {
     super.initState();
     _refreshController = RefreshController(initialRefresh: false);
-    
-    // Fetch data when screen loads
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AnimeProvider>().fetchAnimeList();
-    });
   }
 
   @override
@@ -48,21 +44,15 @@ class _AnimeListScreenState extends State<AnimeListScreen>
             children: [
               _buildAppBar(),
               Expanded(
-                child: Consumer<AnimeProvider>(
-                  builder: (context, provider, child) {
-                    if (provider.isLoading) {
-                      return const LoadingWidget();
-                    }
-
-                    if (provider.hasError) {
-                      return _buildErrorWidget(provider);
-                    }
-
-                    if (provider.isEmpty) {
-                      return _buildEmptyWidget();
-                    }
-
-                    return _buildAnimeList(provider);
+                child: Consumer(
+                  builder: (context, ref, child) {
+                    final animeListAsync = ref.watch(animeListNotifierProvider);
+                    
+                    return animeListAsync.when(
+                      data: (animeList) => _buildAnimeList(animeList),
+                      loading: () => const LoadingWidget(),
+                      error: (error, stack) => _buildErrorWidget(error),
+                    );
                   },
                 ),
               ),
@@ -111,10 +101,10 @@ class _AnimeListScreenState extends State<AnimeListScreen>
               ],
             ),
           ),
-          Consumer<AnimeProvider>(
-            builder: (context, provider, child) {
-              final activeDownloads = provider.activeDownloadCount;
-              final downloadedCount = provider.downloadedCount;
+          Consumer(
+            builder: (context, ref, child) {
+              final activeDownloads = ref.watch(activeDownloadCountProvider);
+              final downloadedCount = ref.watch(downloadedCountProvider);
               
               if (activeDownloads > 0 || downloadedCount > 0) {
                 return Container(
@@ -152,7 +142,7 @@ class _AnimeListScreenState extends State<AnimeListScreen>
     );
   }
 
-  Widget _buildAnimeList(AnimeProvider provider) {
+  Widget _buildAnimeList(List<AnimeItem> animeList) {
     return SmartRefresher(
       controller: _refreshController,
       enablePullDown: true,
@@ -161,19 +151,19 @@ class _AnimeListScreenState extends State<AnimeListScreen>
         waterDropColor: AppTheme.primaryColor,
       ),
       onRefresh: () async {
-        await provider.fetchAnimeList(isRefresh: true);
+        await ref.read(animeListNotifierProvider.notifier).refresh();
         _refreshController.refreshCompleted();
       },
       child: AnimeGridView(
-        animeList: provider.animeList,
-        onDownload: (anime) => provider.downloadAnime(anime),
-        onDelete: (anime) => provider.deleteDownload(anime),
-        onOpen: (anime) => provider.openDownloadedFile(anime),
+        animeList: animeList,
+        onDownload: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).downloadAnime(anime),
+        onDelete: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).deleteDownload(anime),
+        onOpen: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).openDownloadedFile(anime),
       ),
     );
   }
 
-  Widget _buildErrorWidget(AnimeProvider provider) {
+  Widget _buildErrorWidget(Object error) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.largePadding),
@@ -202,7 +192,7 @@ class _AnimeListScreenState extends State<AnimeListScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              provider.error ?? 'Unknown error occurred',
+              error.toString(),
               style: AppTheme.body2.copyWith(
                 color: AppTheme.textSecondary,
               ),
@@ -211,8 +201,7 @@ class _AnimeListScreenState extends State<AnimeListScreen>
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () {
-                provider.clearError();
-                provider.fetchAnimeList();
+                ref.invalidate(animeListNotifierProvider);
               },
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Try Again'),
@@ -223,52 +212,5 @@ class _AnimeListScreenState extends State<AnimeListScreen>
     );
   }
 
-  Widget _buildEmptyWidget() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppConstants.largePadding),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(50),
-              ),
-              child: Icon(
-                Icons.animation_rounded,
-                size: 60,
-                color: AppTheme.primaryColor,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Anime Found',
-              style: AppTheme.heading3.copyWith(
-                color: AppTheme.textPrimary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Check your server connection or try refreshing',
-              style: AppTheme.body2.copyWith(
-                color: AppTheme.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                context.read<AnimeProvider>().fetchAnimeList();
-              },
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Refresh'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 } 

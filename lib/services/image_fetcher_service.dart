@@ -3,18 +3,15 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
 class ImageFetcherService {
-  static const String _baseUrl = 'https://api.imdbapi.dev/search/titles';
+  static const String _baseUrl = 'https://api.jikan.moe/v4/anime';
   
   /// Fetches an image URL for the given anime title
   /// Returns the image URL if found, null otherwise
   static Future<String?> fetchAnimeImage(String title) async {
     try {
-      // Add a small delay to prevent overwhelming the API
-      await Future.delayed(const Duration(milliseconds: 100));
-      
       // Encode the title for URL parameter
       final encodedTitle = Uri.encodeComponent(title);
-      final url = Uri.parse('$_baseUrl?query=$encodedTitle');
+      final url = Uri.parse('$_baseUrl?q=$encodedTitle');
       
       final response = await http.get(url);
       
@@ -22,13 +19,13 @@ class ImageFetcherService {
         final data = json.decode(response.body);
         
         // Check if we have titles in the response
-        if (data['titles'] != null && data['titles'].isNotEmpty) {
-          final firstTitle = data['titles'][0];
+        if (data['data'] != null && data['data'].isNotEmpty) {
+          final firstTitle = data['data'][0];
           
           // Check if the title has a primary image
-          if (firstTitle['primaryImage'] != null && 
-              firstTitle['primaryImage']['url'] != null) {
-            return firstTitle['primaryImage']['url'];
+          if (firstTitle['images'] != null && 
+              firstTitle['images']['jpg'] != null) {
+            return firstTitle['images']['jpg']['image_url'];
           }
         }
       }

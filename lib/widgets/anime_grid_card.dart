@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/anime_item.dart';
-import '../providers/anime_provider.dart';
+import '../providers/anime_providers.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import 'package:flutter/foundation.dart';
 
-class AnimeGridCard extends StatelessWidget {
+class AnimeGridCard extends ConsumerWidget {
   final AnimeItem anime;
   final VoidCallback onDownload;
   final VoidCallback? onDelete;
@@ -32,32 +32,34 @@ class AnimeGridCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final imageLoadTriggeredProvider = StateProvider<Map<String, bool>>((ref) => {});
     return VisibilityDetector(
       key: ValueKey('anime_card_${anime.id}'),
-              onVisibilityChanged: (VisibilityInfo info) {
-          if (info.visibleFraction > 0.1) {
-            final animeProvider = Provider.of<AnimeProvider>(context, listen: false);
-            final shouldAttempt = animeProvider.shouldAttemptImageLoad(anime.id);
+      onVisibilityChanged: (VisibilityInfo info) {
+        if (info.visibleFraction > 0.1) {
+          // Trigger image loading when visible
+          if (kDebugMode) {
+            print('Visibility changed for ${anime.title} (ID: ${anime.id})');
+            print('  - Visible fraction: ${info.visibleFraction}');
+          }
 
-            if (kDebugMode) {
-              print('Visibility changed for ${anime.title} (ID: ${anime.id})');
-              print('  - Visible fraction: ${info.visibleFraction}');
-              print('  - Should attempt load: $shouldAttempt');
-            }
-
-            // Only trigger load if the provider says we should attempt it
-            if (shouldAttempt) {
-              if (kDebugMode) {
-                print('Triggering image load for: ${anime.title} (ID: ${anime.id})');
-              }
-              // Use Future.microtask to avoid build-phase side effects
-              Future.microtask(() {
-                animeProvider.loadImageForAnime(anime.id, anime.title);
-              });
+          final triggeredMap = ref.read(imageLoadTriggeredProvider.notifier);
+          final alreadyTriggered = triggeredMap.state[anime.id] ?? false;
+          
+          if (!alreadyTriggered) {
+            triggeredMap.state = {
+              ...triggeredMap.state,
+              anime.id: true,
+            };
+            
+            if(kDebugMode) {
+              print('Triggering image load for ${anime.title} (ID: ${anime.id})');
             }
           }
-        },
+          // The image will be loaded automatically by Riverpod when accessed
+        }
+      },
       child: AnimationConfiguration.staggeredGrid(
         position: index,
         duration: AppConstants.mediumAnimation,
@@ -100,58 +102,112 @@ class AnimeGridCard extends StatelessWidget {
                           // Anime Image
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Consumer<AnimeProvider>(
-                              builder: (context, animeProvider, child) {
-                                final imageUrl = animeProvider.getAnimeImage(anime.id);
-                                if (imageUrl != null) {
-                                  return CachedNetworkImage(
-                                    imageUrl: imageUrl,
+                            child: Consumer(
+                              builder: (context, ref, child) {
+                                final isTriggered = ref.watch(imageLoadTriggeredProvider.select((m) => m[anime.id] ?? false));
+
+                                if(!isTriggered) {
+                                  return Container(
                                     width: double.infinity,
                                     height: 200,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(
-                                      width: double.infinity,
-                                      height: 200,
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [
-                                            AppTheme.primaryColor.withOpacity(0.3),
-                                            AppTheme.primaryColor.withOpacity(0.1),
-                                          ],
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          color: AppTheme.primaryColor,
-                                        ),
-                                      ),
-                                    ),
-                                    errorWidget: (context, url, error) => Container(
-                                      width: double.infinity,
-                                      height: 200,
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [
-                                            AppTheme.primaryColor.withOpacity(0.3),
-                                            AppTheme.primaryColor.withOpacity(0.1),
-                                          ],
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          color: AppTheme.primaryColor,
-                                          size: 40,
-                                        ),
-                                      ),
-                                    ),
+                                    color: Colors.grey[200],
                                   );
-                                } else {
-                                  return Container(
+                                }
+                                final imageAsync = ref.watch(animeImageProvider(anime.id, anime.title));
+                                
+                                return imageAsync.when(
+                                  data: (imageUrl) {
+                                    if (imageUrl != null) {
+                                      return CachedNetworkImage(
+                                        imageUrl: imageUrl,
+                                        width: double.infinity,
+                                        height: 200,
+                                        fit: BoxFit.cover,
+                                        placeholder: (context, url) => Container(
+                                          width: double.infinity,
+                                          height: 200,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                AppTheme.primaryColor.withOpacity(0.3),
+                                                AppTheme.primaryColor.withOpacity(0.1),
+                                              ],
+                                            ),
+                                          ),
+                                          child: Center(
+                                            child: CircularProgressIndicator(
+                                              color: AppTheme.primaryColor,
+                                            ),
+                                          ),
+                                        ),
+                                        errorWidget: (context, url, error) => Container(
+                                          width: double.infinity,
+                                          height: 200,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                AppTheme.primaryColor.withOpacity(0.3),
+                                                AppTheme.primaryColor.withOpacity(0.1),
+                                              ],
+                                            ),
+                                          ),
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.error_outline,
+                                              color: AppTheme.primaryColor,
+                                              size: 40,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      return Container(
+                                        width: double.infinity,
+                                        height: 200,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              AppTheme.primaryColor.withOpacity(0.3),
+                                              AppTheme.primaryColor.withOpacity(0.1),
+                                            ],
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            Icons.image,
+                                            color: AppTheme.primaryColor,
+                                            size: 40,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  loading: () => Container(
+                                    width: double.infinity,
+                                    height: 200,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          AppTheme.primaryColor.withOpacity(0.3),
+                                          AppTheme.primaryColor.withOpacity(0.1),
+                                        ],
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                  error: (error, stack) => Container(
                                     width: double.infinity,
                                     height: 200,
                                     decoration: BoxDecoration(
@@ -166,13 +222,13 @@ class AnimeGridCard extends StatelessWidget {
                                     ),
                                     child: Center(
                                       child: Icon(
-                                        Icons.image,
+                                        Icons.error_outline,
                                         color: AppTheme.primaryColor,
                                         size: 40,
                                       ),
                                     ),
-                                  );
-                                }
+                                  ),
+                                );
                               },
                             ),
                           ),

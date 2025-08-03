@@ -27,7 +27,8 @@ class ApiService {
       if (kDebugMode) {
         print('Response status: ${response.statusCode}');
         print('Response headers: ${response.headers}');
-        print('Response body: ${response.body}');
+        print('Response body length: ${response.body.length}');
+        print('Response body preview: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...');
       }
 
       if (response.statusCode == 200) {
@@ -44,21 +45,58 @@ class ApiService {
         // Parse JSON response
         List<dynamic> jsonData;
         try {
-          jsonData = jsonDecode(responseBody);
+          final Map<String, dynamic> responseJson = jsonDecode(responseBody);
           if (kDebugMode) {
-            print('Successfully parsed JSON: $jsonData');
+            print('Successfully parsed JSON: $responseJson');
+          }
+          
+          // Handle the new response format: { content: [data] }
+          if (responseJson.containsKey('content')) {
+            jsonData = responseJson['content'] as List<dynamic>;
+            if (kDebugMode) {
+              print('Found content array with ${jsonData.length} items');
+            }
+          } else if (responseJson.containsKey('data')) {
+            // Handle alternative format: { data: [data] }
+            jsonData = responseJson['data'] as List<dynamic>;
+            if (kDebugMode) {
+              print('Found data array with ${jsonData.length} items');
+            }
+          } else if (responseJson.containsKey('items')) {
+            // Handle alternative format: { items: [data] }
+            jsonData = responseJson['items'] as List<dynamic>;
+            if (kDebugMode) {
+              print('Found items array with ${jsonData.length} items');
+            }
+          } else {
+            // Fallback to direct array format
+            jsonData = responseJson as List<dynamic>;
+            if (kDebugMode) {
+              print('Using direct array format with ${jsonData.length} items');
+            }
           }
         } catch (e) {
           if (kDebugMode) {
             print('JSON parsing error: $e');
           }
-          // If response is not a valid JSON array, try to handle it
-          if (responseBody.startsWith('[')) {
-            throw Exception('Invalid JSON format');
-          } else {
-            // If it's a single object, wrap it in an array
-            final singleObject = jsonDecode(responseBody);
-            jsonData = [singleObject];
+          // Try to parse as direct array if the object format fails
+          try {
+            jsonData = jsonDecode(responseBody) as List<dynamic>;
+            if (kDebugMode) {
+              print('Parsed as direct array with ${jsonData.length} items');
+            }
+          } catch (e2) {
+            if (kDebugMode) {
+              print('Failed to parse as array: $e2');
+            }
+            throw Exception('Invalid JSON format: $e');
+          }
+        }
+
+        // Validate that jsonData is a list (jsonData is already List<dynamic> from parsing)
+        if (jsonData.isEmpty) {
+          if (kDebugMode) {
+            print('Empty data array received');
           }
         }
 
@@ -68,6 +106,9 @@ class ApiService {
 
         if (kDebugMode) {
           print('Successfully created ${animeList.length} anime items');
+          if (animeList.isNotEmpty) {
+            print('First item: ${animeList.first.title}');
+          }
         }
 
         return animeList;

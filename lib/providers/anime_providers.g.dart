@@ -312,7 +312,7 @@ final downloadStatesNotifierProvider = AutoDisposeNotifierProvider<
 
 typedef _$DownloadStatesNotifier = AutoDisposeNotifier<Map<String, bool>>;
 String _$downloadOperationsNotifierHash() =>
-    r'8f1a89cb3e9f07ed8e8933936a0d8f0149161567';
+    r'62226025ab6e3327a39ddba484cd38836242bee1';
 
 /// Provides download operations for anime items
 ///

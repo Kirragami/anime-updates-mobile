@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/anime_item.dart';
 import '../constants/app_constants.dart';
-import '../providers/anime_provider.dart';
+import '../providers/anime_providers.dart';
 import 'anime_grid_card.dart';
 
-class AnimeGridView extends StatelessWidget {
+class AnimeGridView extends ConsumerWidget {
   final List<AnimeItem> animeList;
   final Function(AnimeItem) onDownload;
   final Function(AnimeItem)? onDelete;
@@ -37,7 +37,7 @@ class AnimeGridView extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return AnimationLimiter(
       child: GridView.builder(
         padding: const EdgeInsets.all(AppConstants.smallPadding),
@@ -52,16 +52,11 @@ class AnimeGridView extends StatelessWidget {
         itemBuilder: (context, index) {
           final anime = animeList[index];
           
-          return Selector<AnimeProvider, Map<String, dynamic>>(
-            selector: (context, provider) => {
-              'isDownloading': provider.isDownloading(anime.id),
-              'isDownloaded': provider.isDownloaded(anime.id),
-              'downloadProgress': provider.getDownloadProgress(anime.id),
-            },
-            builder: (context, downloadState, child) {
-              final isDownloading = downloadState['isDownloading'] as bool;
-              final isDownloaded = downloadState['isDownloaded'] as bool;
-              final progress = downloadState['downloadProgress'] as double;
+          return Consumer(
+            builder: (context, ref, child) {
+              final isDownloading = ref.watch(downloadStatesNotifierProvider)[anime.id] ?? false;
+              final isDownloaded = ref.watch(downloadStatesNotifierProvider)[anime.id] ?? false;
+              final progress = ref.watch(downloadProgressNotifierProvider)[anime.id] ?? 0.0;
 
               return AnimeGridCard(
                 anime: anime,
