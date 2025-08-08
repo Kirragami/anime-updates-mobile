@@ -12,15 +12,64 @@ part 'anime_providers.g.dart';
 /// Provides the list of anime items
 @riverpod
 class AnimeListNotifier extends _$AnimeListNotifier {
+  // Pagination state
+  int _currentPage = 0; // 1-based page index per backend API
+  static const int _pageSize = 10;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+  final List<AnimeItem> _items = [];
+
+  bool get hasMore => _hasMore;
+  bool get isLoadingMore => _isLoadingMore;
+
   @override
   Future<List<AnimeItem>> build() async {
     final apiService = ref.read(apiServiceProvider);
-    return apiService.fetchAnimeList();
+
+    // Reset pagination
+    _items.clear();
+    _currentPage = 1;
+    _hasMore = true;
+    _isLoadingMore = false;
+
+    // Fetch first page
+    final result = await apiService.fetchAnimePage(page: _currentPage, size: _pageSize);
+    final List<AnimeItem> pageItems = (result['items'] as List<AnimeItem>);
+    _hasMore = !(result['last'] as bool);
+    _items.addAll(pageItems);
+    return List<AnimeItem>.from(_items);
   }
 
   /// Refresh the anime list
   Future<void> refresh() async {
     ref.invalidateSelf();
+  }
+
+  /// Load next page and append to current state
+  Future<void> loadMore() async {
+    if (!_hasMore || _isLoadingMore) return;
+
+    _isLoadingMore = true;
+    final apiService = ref.read(apiServiceProvider);
+    final nextPage = _currentPage + 1;
+
+    try {
+      final result = await apiService.fetchAnimePage(page: nextPage, size: _pageSize);
+      final List<AnimeItem> pageItems = (result['items'] as List<AnimeItem>);
+      final bool last = result['last'] as bool;
+
+      _items.addAll(pageItems);
+      _currentPage = nextPage;
+      _hasMore = !last && pageItems.isNotEmpty;
+
+      // Publish new combined list
+      state = AsyncData<List<AnimeItem>>(List<AnimeItem>.from(_items));
+    } catch (e, st) {
+      // Keep previous data, but surface error
+      state = AsyncError<List<AnimeItem>>(e, st);
+    } finally {
+      _isLoadingMore = false;
+    }
   }
 }
 

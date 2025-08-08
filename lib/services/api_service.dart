@@ -139,6 +139,96 @@ class ApiService {
     }
   }
 
+  /// Fetch a paginated page of anime items
+  Future<Map<String, dynamic>> fetchAnimePage({required int page, required int size}) async {
+    try {
+      final uri = Uri.parse(AppConstants.fullApiUrl).replace(
+        queryParameters: {
+          'page': page.toString(),
+          'size': size.toString(),
+        },
+      );
+
+      if (kDebugMode) {
+        print('Making paginated API call to: $uri');
+      }
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'AnimeUpdates/1.0',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+      }
+
+      final String responseBody = response.body;
+      if (responseBody.isEmpty) {
+        return {
+          'items': <AnimeItem>[],
+          'last': true,
+        };
+      }
+
+      final decoded = jsonDecode(responseBody);
+      List<dynamic> jsonData;
+      bool last = false;
+
+      if (decoded is Map<String, dynamic>) {
+        if (decoded.containsKey('content')) {
+          jsonData = decoded['content'] as List<dynamic>;
+        } else if (decoded.containsKey('data')) {
+          jsonData = decoded['data'] as List<dynamic>;
+        } else if (decoded.containsKey('items')) {
+          jsonData = decoded['items'] as List<dynamic>;
+        } else {
+          // Fallback: if server returns array at root unexpectedly
+          jsonData = (decoded as Map<String, dynamic>).values.firstWhere(
+            (v) => v is List,
+            orElse: () => <dynamic>[],
+          ) as List<dynamic>;
+        }
+
+        // Common pagination flags in Spring-like APIs
+        if (decoded.containsKey('last')) {
+          last = decoded['last'] == true;
+        } else if (decoded.containsKey('page') && decoded['page'] is Map) {
+          final pageObj = decoded['page'] as Map;
+          if (pageObj.containsKey('totalPages') && pageObj.containsKey('number')) {
+            final totalPages = int.tryParse(pageObj['totalPages'].toString()) ?? 1;
+            final current = int.tryParse(pageObj['number'].toString()) ?? (page - 1);
+            last = (current + 1) >= totalPages;
+          }
+        }
+      } else if (decoded is List) {
+        jsonData = decoded as List<dynamic>;
+      } else {
+        jsonData = <dynamic>[];
+      }
+
+      final items = jsonData.map((e) => AnimeItem.fromJson(e)).toList();
+
+      // Fallback last-page heuristic
+      if (!last) {
+        last = items.length < size;
+      }
+
+      return {
+        'items': items,
+        'last': last,
+      };
+    } catch (e) {
+      if (kDebugMode) {
+        print('Paginated API call error: $e');
+      }
+      rethrow;
+    }
+  }
+
   Future<bool> testConnection() async {
     try {
       if (kDebugMode) {

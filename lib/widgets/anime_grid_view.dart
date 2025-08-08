@@ -38,8 +38,20 @@ class AnimeGridView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(animeListNotifierProvider.notifier);
+
     return AnimationLimiter(
-      child: GridView.builder(
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.pixels >=
+                  notification.metrics.maxScrollExtent - 200 &&
+              notifier.hasMore &&
+              !notifier.isLoadingMore) {
+            notifier.loadMore();
+          }
+          return false;
+        },
+        child: GridView.builder(
         padding: const EdgeInsets.all(AppConstants.smallPadding),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount(context),
@@ -60,6 +72,7 @@ class AnimeGridView extends ConsumerWidget {
             onOpen: onOpen != null ? () => onOpen!(anime) : null,
           );
         },
+        ),
       ),
     );
   }
