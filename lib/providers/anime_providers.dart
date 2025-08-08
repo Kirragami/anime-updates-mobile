@@ -1,10 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'dart:async';
 import '../models/anime_item.dart';
 import '../services/services.dart';
 import '../services/image_fetcher_service.dart';
 
 part 'anime_providers.g.dart';
+
+
 
 /// Provides the list of anime items
 @riverpod
@@ -21,10 +24,64 @@ class AnimeListNotifier extends _$AnimeListNotifier {
   }
 }
 
+// Cache for image URLs to prevent duplicate requests
+final Map<String, String?> _imageCache = {};
+// Track ongoing requests to prevent duplicates
+final Set<String> _ongoingRequests = {};
+// Track failed requests to allow retries after some time
+final Map<String, DateTime> _failedRequests = {};
+
 /// Provides the image URL for a specific anime
 @riverpod
 Future<String?> animeImage(AnimeImageRef ref, String animeId, String title) async {
-  return ImageFetcherService.fetchAnimeImage(title);
+  // Check cache first (only for successful results)
+  if (_imageCache.containsKey(animeId) && _imageCache[animeId] != null) {
+    if (kDebugMode) {
+      print('Returning cached image for: $title (ID: $animeId)');
+    }
+    return _imageCache[animeId];
+  }
+  
+  // Check if request is already ongoing
+  if (_ongoingRequests.contains(animeId)) {
+    if (kDebugMode) {
+      print('Request already ongoing for: $title (ID: $animeId), waiting...');
+    }
+    // Wait for the ongoing request to complete
+    while (_ongoingRequests.contains(animeId)) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    // Return cached result
+    return _imageCache[animeId];
+  }
+  
+  // Mark request as ongoing
+  _ongoingRequests.add(animeId);
+  
+  try {
+    if (kDebugMode) {
+      print('Starting image fetch for: $title (ID: $animeId)');
+    }
+    
+    final result = await ImageFetcherService.fetchAnimeImage(title);
+    
+    if (result != null) {
+      // Cache successful results
+      _imageCache[animeId] = result;
+      if (kDebugMode) {
+        print('Image fetch SUCCESS for $title: $result');
+      }
+    } else {
+      if (kDebugMode) {
+        print('Image fetch FAILED for $title');
+      }
+    }
+    
+    return result;
+  } finally {
+    // Remove from ongoing requests
+    _ongoingRequests.remove(animeId);
+  }
 }
 
 /// Provides initial image loading for the first few items
@@ -228,5 +285,15 @@ class DownloadOperationsNotifier extends _$DownloadOperationsNotifier {
         print('Error checking existing downloads: $e');
       }
     }
+  }
+}
+
+/// Clear the image cache
+void clearImageCache() {
+  _imageCache.clear();
+  _ongoingRequests.clear();
+  _failedRequests.clear();
+  if (kDebugMode) {
+    print('Image cache cleared');
   }
 } 

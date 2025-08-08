@@ -1,22 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:visibility_detector/visibility_detector.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/anime_item.dart';
 import '../providers/anime_providers.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
-import 'package:flutter/foundation.dart';
 
 class AnimeGridCard extends ConsumerWidget {
   final AnimeItem anime;
   final VoidCallback onDownload;
   final VoidCallback? onDelete;
   final VoidCallback? onOpen;
-  final bool isDownloading;
-  final bool isDownloaded;
-  final double downloadProgress;
   final int index;
 
   const AnimeGridCard({
@@ -25,42 +20,12 @@ class AnimeGridCard extends ConsumerWidget {
     required this.onDownload,
     this.onDelete,
     this.onOpen,
-    this.isDownloading = false,
-    this.isDownloaded = false,
-    this.downloadProgress = 0.0,
     required this.index,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final imageLoadTriggeredProvider = StateProvider<Map<String, bool>>((ref) => {});
-    return VisibilityDetector(
-      key: ValueKey('anime_card_${anime.id}'),
-      onVisibilityChanged: (VisibilityInfo info) {
-        if (info.visibleFraction > 0.1) {
-          // Trigger image loading when visible
-          if (kDebugMode) {
-            print('Visibility changed for ${anime.title} (ID: ${anime.id})');
-            print('  - Visible fraction: ${info.visibleFraction}');
-          }
-
-          final triggeredMap = ref.read(imageLoadTriggeredProvider.notifier);
-          final alreadyTriggered = triggeredMap.state[anime.id] ?? false;
-          
-          if (!alreadyTriggered) {
-            triggeredMap.state = {
-              ...triggeredMap.state,
-              anime.id: true,
-            };
-            
-            if(kDebugMode) {
-              print('Triggering image load for ${anime.title} (ID: ${anime.id})');
-            }
-          }
-          // The image will be loaded automatically by Riverpod when accessed
-        }
-      },
-      child: AnimationConfiguration.staggeredGrid(
+    return AnimationConfiguration.staggeredGrid(
         position: index,
         duration: AppConstants.mediumAnimation,
         columnCount: 2,
@@ -93,145 +58,21 @@ class AnimeGridCard extends ConsumerWidget {
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                    onTap: isDownloading ? null : (isDownloaded ? onOpen : onDownload),
+                    onTap: null, // We'll handle this in the action buttons
                     child: Padding(
                       padding: const EdgeInsets.all(AppConstants.smallPadding),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Anime Image
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Consumer(
-                              builder: (context, ref, child) {
-                                final isTriggered = ref.watch(imageLoadTriggeredProvider.select((m) => m[anime.id] ?? false));
-
-                                if(!isTriggered) {
-                                  return Container(
-                                    width: double.infinity,
-                                    height: 200,
-                                    color: Colors.grey[200],
-                                  );
-                                }
-                                final imageAsync = ref.watch(animeImageProvider(anime.id, anime.title));
-                                
-                                return imageAsync.when(
-                                  data: (imageUrl) {
-                                    if (imageUrl != null) {
-                                      return CachedNetworkImage(
-                                        imageUrl: imageUrl,
-                                        width: double.infinity,
-                                        height: 200,
-                                        fit: BoxFit.cover,
-                                        placeholder: (context, url) => Container(
-                                          width: double.infinity,
-                                          height: 200,
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                AppTheme.primaryColor.withOpacity(0.3),
-                                                AppTheme.primaryColor.withOpacity(0.1),
-                                              ],
-                                            ),
-                                          ),
-                                          child: Center(
-                                            child: CircularProgressIndicator(
-                                              color: AppTheme.primaryColor,
-                                            ),
-                                          ),
-                                        ),
-                                        errorWidget: (context, url, error) => Container(
-                                          width: double.infinity,
-                                          height: 200,
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                AppTheme.primaryColor.withOpacity(0.3),
-                                                AppTheme.primaryColor.withOpacity(0.1),
-                                              ],
-                                            ),
-                                          ),
-                                          child: Center(
-                                            child: Icon(
-                                              Icons.error_outline,
-                                              color: AppTheme.primaryColor,
-                                              size: 40,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    } else {
-                                      return Container(
-                                        width: double.infinity,
-                                        height: 200,
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                            colors: [
-                                              AppTheme.primaryColor.withOpacity(0.3),
-                                              AppTheme.primaryColor.withOpacity(0.1),
-                                            ],
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Icon(
-                                            Icons.image,
-                                            color: AppTheme.primaryColor,
-                                            size: 40,
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  loading: () => Container(
-                                    width: double.infinity,
-                                    height: 200,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          AppTheme.primaryColor.withOpacity(0.3),
-                                          AppTheme.primaryColor.withOpacity(0.1),
-                                        ],
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: CircularProgressIndicator(
-                                        color: AppTheme.primaryColor,
-                                      ),
-                                    ),
-                                  ),
-                                  error: (error, stack) => Container(
-                                    width: double.infinity,
-                                    height: 200,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          AppTheme.primaryColor.withOpacity(0.3),
-                                          AppTheme.primaryColor.withOpacity(0.1),
-                                        ],
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.error_outline,
-                                        color: AppTheme.primaryColor,
-                                        size: 40,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
+                                                     // Anime Image
+                           ClipRRect(
+                             borderRadius: BorderRadius.circular(8),
+                             child: Container(
+                               width: double.infinity,
+                               height: 200,
+                               child: _buildImageWidget(ref),
+                             ),
+                           ),
                           const SizedBox(height: 10),
                           // Episode Badge
                           Container(
@@ -240,8 +81,8 @@ class AnimeGridCard extends ConsumerWidget {
                               color: AppTheme.primaryColor.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(
-                              'EP ${anime.episode}',
+                                                         child: Text(
+                               'EP ${anime.episode}',
                               style: AppTheme.caption.copyWith(
                                 color: AppTheme.primaryColor,
                                 fontWeight: FontWeight.w600,
@@ -251,8 +92,8 @@ class AnimeGridCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           // Title
-                          Text(
-                            anime.title,
+                                                                                                           Text(
+                              anime.title,
                             style: AppTheme.body2.copyWith(
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
@@ -271,8 +112,8 @@ class AnimeGridCard extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          // Action Buttons
-                          _buildActionButtons(),
+                                                     // Action Buttons
+                           _buildActionButtons(ref),
                         ],
                       ),
                     ),
@@ -281,6 +122,151 @@ class AnimeGridCard extends ConsumerWidget {
               ),
             ),
           ),
+        ),
+      );
+  }
+
+  Widget _buildImageWidget(WidgetRef ref) {
+    final imageAsync = ref.watch(animeImageProvider(anime.id, anime.title));
+    
+    return imageAsync.when(
+      data: (imageUrl) {
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          return CachedNetworkImage(
+            imageUrl: imageUrl,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => _buildPlaceholder(),
+            errorWidget: (context, url, error) => _buildErrorPlaceholder(),
+          );
+        } else {
+          return _buildNoImagePlaceholder();
+        }
+      },
+      loading: () => _buildLoadingPlaceholder(),
+      error: (error, stack) => _buildErrorPlaceholder(),
+    );
+  }
+
+  Widget _buildLoadingPlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryColor.withOpacity(0.3),
+            AppTheme.primaryColor.withOpacity(0.1),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: AppTheme.primaryColor,
+              strokeWidth: 2,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Loading...',
+              style: TextStyle(
+                color: AppTheme.primaryColor,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorPlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryColor.withOpacity(0.3),
+            AppTheme.primaryColor.withOpacity(0.1),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: AppTheme.primaryColor,
+              size: 30,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Failed to load',
+              style: TextStyle(
+                color: AppTheme.primaryColor,
+                fontSize: 8,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoImagePlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryColor.withOpacity(0.3),
+            AppTheme.primaryColor.withOpacity(0.1),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.image,
+              color: AppTheme.primaryColor,
+              size: 30,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'No image',
+              style: TextStyle(
+                color: AppTheme.primaryColor,
+                fontSize: 8,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryColor.withOpacity(0.3),
+            AppTheme.primaryColor.withOpacity(0.1),
+          ],
+        ),
+      ),
+      child: Center(
+        child: CircularProgressIndicator(
+          color: AppTheme.primaryColor,
+          strokeWidth: 2,
         ),
       ),
     );
@@ -301,7 +287,11 @@ class AnimeGridCard extends ConsumerWidget {
     }
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(WidgetRef ref) {
+    final isDownloading = ref.watch(downloadStatesNotifierProvider)[anime.id] ?? false;
+    final isDownloaded = ref.watch(downloadStatesNotifierProvider)[anime.id] ?? false;
+    final downloadProgress = ref.watch(downloadProgressNotifierProvider)[anime.id] ?? 0.0;
+    
     if (isDownloading) {
       return Column(
         children: [
@@ -373,7 +363,7 @@ class AnimeGridCard extends ConsumerWidget {
               color: Colors.transparent,
               child: InkWell(
                 borderRadius: BorderRadius.circular(6),
-                onTap: onDelete,
+                                                                     onTap: onDelete,
                 child: Center(
                   child: Icon(
                     Icons.delete_rounded,

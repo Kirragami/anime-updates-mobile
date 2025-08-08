@@ -52,23 +52,12 @@ class AnimeGridView extends ConsumerWidget {
         itemBuilder: (context, index) {
           final anime = animeList[index];
           
-          return Consumer(
-            builder: (context, ref, child) {
-              final isDownloading = ref.watch(downloadStatesNotifierProvider)[anime.id] ?? false;
-              final isDownloaded = ref.watch(downloadStatesNotifierProvider)[anime.id] ?? false;
-              final progress = ref.watch(downloadProgressNotifierProvider)[anime.id] ?? 0.0;
-
-              return AnimeGridCard(
-                anime: anime,
-                index: index,
-                isDownloading: isDownloading,
-                isDownloaded: isDownloaded,
-                downloadProgress: progress,
-                onDownload: () => onDownload(anime),
-                onDelete: onDelete != null ? () => onDelete!(anime) : null,
-                onOpen: onOpen != null ? () => onOpen!(anime) : null,
-              );
-            },
+          return AnimeGridCard(
+            anime: anime,
+            index: index,
+            onDownload: () => onDownload(anime),
+            onDelete: onDelete != null ? () => onDelete!(anime) : null,
+            onOpen: onOpen != null ? () => onOpen!(anime) : null,
           );
         },
       ),
