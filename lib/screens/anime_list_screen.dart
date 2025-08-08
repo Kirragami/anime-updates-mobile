@@ -53,7 +53,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
                     
                     return animeListAsync.when(
                       data: (animeList) => _buildAnimeList(animeList),
-                      loading: () => const LoadingWidget(),
+                      loading: () => const AnimeGridSkeleton(),
                       error: (error, stack) => _buildErrorWidget(error),
                     );
                   },

@@ -6,7 +6,7 @@ part of 'anime_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$animeImageHash() => r'4b061014023d746b4e5ebff2cb33571510fcbc54';
+String _$animeImageHash() => r'9a12f4ed7ced3080cc9a99ce7361727869081932';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -203,7 +203,7 @@ final preloadInitialImagesProvider = AutoDisposeFutureProvider<void>.internal(
 
 typedef PreloadInitialImagesRef = AutoDisposeFutureProviderRef<void>;
 String _$activeDownloadCountHash() =>
-    r'3c1b951c81729b9de2c457f2f4a78b79c94cadea';
+    r'69cc3df0ea8a00efaeb358444de63acf2942c3de';
 
 /// Provides the number of active downloads
 ///
@@ -238,7 +238,7 @@ final hasActiveDownloadsProvider = AutoDisposeProvider<bool>.internal(
 );
 
 typedef HasActiveDownloadsRef = AutoDisposeProviderRef<bool>;
-String _$downloadedCountHash() => r'5669ddf8029cbf2111598f9d373d2d7a1b664c5d';
+String _$downloadedCountHash() => r'df8749c8df6639ad0f10c26e2ab9acdb9e848f23';
 
 /// Provides the number of downloaded items
 ///
@@ -255,7 +255,7 @@ final downloadedCountProvider = AutoDisposeProvider<int>.internal(
 );
 
 typedef DownloadedCountRef = AutoDisposeProviderRef<int>;
-String _$animeListNotifierHash() => r'ee7002c1cfd3063e08dea4f060947f3160b4661b';
+String _$animeListNotifierHash() => r'9d120cd698c5a99174b43aafddbd21dda6389ff7';
 
 /// Provides the list of anime items
 ///
@@ -273,6 +273,24 @@ final animeListNotifierProvider = AutoDisposeAsyncNotifierProvider<
 );
 
 typedef _$AnimeListNotifier = AutoDisposeAsyncNotifier<List<AnimeItem>>;
+String _$listLoadingMoreHash() => r'b5003a7fc198dec746598fa597f691186a07cf77';
+
+/// Exposes whether the list is currently loading the next page (for UI skeletons)
+///
+/// Copied from [ListLoadingMore].
+@ProviderFor(ListLoadingMore)
+final listLoadingMoreProvider =
+    AutoDisposeNotifierProvider<ListLoadingMore, bool>.internal(
+  ListLoadingMore.new,
+  name: r'listLoadingMoreProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$listLoadingMoreHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$ListLoadingMore = AutoDisposeNotifier<bool>;
 String _$downloadProgressNotifierHash() =>
     r'dd5a40a3e0ae8b33cbc78aba7a76365ee487837d';
 
@@ -293,7 +311,7 @@ final downloadProgressNotifierProvider = AutoDisposeNotifierProvider<
 
 typedef _$DownloadProgressNotifier = AutoDisposeNotifier<Map<String, double>>;
 String _$downloadStatesNotifierHash() =>
-    r'1bd3b7ae557d086aaf332b2fd4040a1af0297377';
+    r'8f07fe97a351ab30c08619c9f7c4be781d7e86b2';
 
 /// Provides download states for anime items
 ///
@@ -312,7 +330,7 @@ final downloadStatesNotifierProvider = AutoDisposeNotifierProvider<
 
 typedef _$DownloadStatesNotifier = AutoDisposeNotifier<Map<String, bool>>;
 String _$downloadOperationsNotifierHash() =>
-    r'62226025ab6e3327a39ddba484cd38836242bee1';
+    r'7a814ad08cabd0ff46813da84c8d5b24cc74f700';
 
 /// Provides download operations for anime items
 ///

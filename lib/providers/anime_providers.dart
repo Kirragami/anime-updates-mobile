@@ -21,6 +21,7 @@ class AnimeListNotifier extends _$AnimeListNotifier {
 
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
+  int get pageSize => _pageSize;
 
   @override
   Future<List<AnimeItem>> build() async {
@@ -49,6 +50,8 @@ class AnimeListNotifier extends _$AnimeListNotifier {
   Future<void> loadMore() async {
     if (!_hasMore || _isLoadingMore) return;
 
+    // Notify UI we started loading more
+    ref.read(listLoadingMoreProvider.notifier).setLoading(true);
     _isLoadingMore = true;
     final apiService = ref.read(apiServiceProvider);
     final nextPage = _currentPage + 1;
@@ -69,7 +72,19 @@ class AnimeListNotifier extends _$AnimeListNotifier {
       state = AsyncError<List<AnimeItem>>(e, st);
     } finally {
       _isLoadingMore = false;
+      ref.read(listLoadingMoreProvider.notifier).setLoading(false);
     }
+  }
+}
+
+/// Exposes whether the list is currently loading the next page (for UI skeletons)
+@riverpod
+class ListLoadingMore extends _$ListLoadingMore {
+  @override
+  bool build() => false;
+
+  void setLoading(bool value) {
+    state = value;
   }
 }
 
