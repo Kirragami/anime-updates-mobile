@@ -34,6 +34,9 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Ensure download operations provider initializes to check existing files
+    ref.watch(downloadOperationsNotifierProvider);
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(

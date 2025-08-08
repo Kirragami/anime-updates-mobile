@@ -288,9 +288,22 @@ class AnimeGridCard extends ConsumerWidget {
   }
 
   Widget _buildActionButtons(WidgetRef ref) {
-    final isDownloading = ref.watch(downloadStatesNotifierProvider)[anime.id] ?? false;
-    final isDownloaded = ref.watch(downloadStatesNotifierProvider)[anime.id] ?? false;
-    final downloadProgress = ref.watch(downloadProgressNotifierProvider)[anime.id] ?? 0.0;
+    // Watch state directly so this widget rebuilds when values change
+    final isDownloading = ref.watch(
+      downloadStatesNotifierProvider.select(
+        (state) => state['downloading_${anime.id}'] ?? false,
+      ),
+    );
+    final isDownloaded = ref.watch(
+      downloadStatesNotifierProvider.select(
+        (state) => state['downloaded_${anime.id}'] ?? false,
+      ),
+    );
+    final downloadProgress = ref.watch(
+      downloadProgressNotifierProvider.select(
+        (state) => state[anime.id] ?? 0.0,
+      ),
+    );
     
     if (isDownloading) {
       return Column(

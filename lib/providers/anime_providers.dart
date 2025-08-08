@@ -131,22 +131,30 @@ class DownloadStatesNotifier extends _$DownloadStatesNotifier {
   Map<String, bool> build() => {};
 
   void setDownloading(String animeId, bool isDownloading) {
-    state = {...state, animeId: isDownloading};
+    state = {...state, 'downloading_$animeId': isDownloading};
   }
 
   void setDownloaded(String animeId, bool isDownloaded) {
-    state = {...state, animeId: isDownloaded};
+    state = {...state, 'downloaded_$animeId': isDownloaded};
   }
 
-  bool isDownloading(String animeId) => state[animeId] ?? false;
-  bool isDownloaded(String animeId) => state[animeId] ?? false;
+  bool isDownloading(String animeId) => state['downloading_$animeId'] ?? false;
+  bool isDownloaded(String animeId) => state['downloaded_$animeId'] ?? false;
 }
 
 /// Provides the number of active downloads
 @riverpod
 int activeDownloadCount(ActiveDownloadCountRef ref) {
   final downloadStates = ref.watch(downloadStatesNotifierProvider);
-  return downloadStates.values.where((isDownloading) => isDownloading).length;
+  final notifier = ref.read(downloadStatesNotifierProvider.notifier);
+  
+  // Count all anime items that are currently downloading
+  final animeList = ref.watch(animeListNotifierProvider);
+  return animeList.when(
+    data: (animeList) => animeList.where((anime) => notifier.isDownloading(anime.id)).length,
+    loading: () => 0,
+    error: (_, __) => 0,
+  );
 }
 
 /// Provides whether there are any active downloads
@@ -159,7 +167,15 @@ bool hasActiveDownloads(HasActiveDownloadsRef ref) {
 @riverpod
 int downloadedCount(DownloadedCountRef ref) {
   final downloadStates = ref.watch(downloadStatesNotifierProvider);
-  return downloadStates.values.where((isDownloaded) => isDownloaded).length;
+  final notifier = ref.read(downloadStatesNotifierProvider.notifier);
+  
+  // Count all anime items that are downloaded
+  final animeList = ref.watch(animeListNotifierProvider);
+  return animeList.when(
+    data: (animeList) => animeList.where((anime) => notifier.isDownloaded(anime.id)).length,
+    loading: () => 0,
+    error: (_, __) => 0,
+  );
 }
 
 /// Provides download operations for anime items
@@ -167,12 +183,29 @@ int downloadedCount(DownloadedCountRef ref) {
 class DownloadOperationsNotifier extends _$DownloadOperationsNotifier {
   @override
   Future<void> build() async {
+    if (kDebugMode) {
+      print('DownloadOperationsNotifier: Initializing...');
+    }
+    
     // Check existing downloads when the provider is first created
     final animeList = ref.watch(animeListNotifierProvider);
     await animeList.when(
-      data: (animeList) => checkExistingDownloads(animeList),
-      loading: () async {},
-      error: (_, __) async {},
+      data: (animeList) async {
+        if (kDebugMode) {
+          print('DownloadOperationsNotifier: Checking existing downloads for ${animeList.length} items');
+        }
+        await checkExistingDownloads(animeList);
+      },
+      loading: () async {
+        if (kDebugMode) {
+          print('DownloadOperationsNotifier: Anime list is loading');
+        }
+      },
+      error: (_, __) async {
+        if (kDebugMode) {
+          print('DownloadOperationsNotifier: Anime list has error');
+        }
+      },
     );
   }
 
@@ -196,6 +229,7 @@ class DownloadOperationsNotifier extends _$DownloadOperationsNotifier {
 
     if (kDebugMode) {
       print('Starting download for: ${anime.title} (ID: ${anime.id})');
+      print('Downloading state set to: ${statesNotifier.isDownloading(anime.id)}');
     }
 
     try {
@@ -222,6 +256,8 @@ class DownloadOperationsNotifier extends _$DownloadOperationsNotifier {
 
       if (kDebugMode) {
         print('Download completed for ${anime.id}');
+        print('Downloaded state: ${statesNotifier.isDownloaded(anime.id)}');
+        print('Downloading state: ${statesNotifier.isDownloading(anime.id)}');
       }
 
       // Reset progress after a delay
@@ -245,9 +281,19 @@ class DownloadOperationsNotifier extends _$DownloadOperationsNotifier {
     final downloadService = ref.read(downloadServiceProvider);
     final statesNotifier = ref.read(downloadStatesNotifierProvider.notifier);
 
+    if (kDebugMode) {
+      print('Deleting download for: ${anime.title} (ID: ${anime.id})');
+      print('Current downloaded state: ${statesNotifier.isDownloaded(anime.id)}');
+    }
+
     try {
       await downloadService.deleteFile(anime.title);
       statesNotifier.setDownloaded(anime.id, false);
+      
+      if (kDebugMode) {
+        print('Delete completed for: ${anime.title} (ID: ${anime.id})');
+        print('New downloaded state: ${statesNotifier.isDownloaded(anime.id)}');
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Error deleting download for ${anime.id}: $e');
@@ -275,10 +321,22 @@ class DownloadOperationsNotifier extends _$DownloadOperationsNotifier {
     final downloadService = ref.read(downloadServiceProvider);
     final statesNotifier = ref.read(downloadStatesNotifierProvider.notifier);
 
+    if (kDebugMode) {
+      print('Checking existing downloads for ${animeList.length} items');
+    }
+
     try {
       for (final anime in animeList) {
         final exists = await downloadService.checkFileExists(anime.title);
         statesNotifier.setDownloaded(anime.id, exists);
+        
+        if (kDebugMode) {
+          print('File exists for ${anime.title}: $exists');
+        }
+      }
+      
+      if (kDebugMode) {
+        print('Finished checking existing downloads');
       }
     } catch (e) {
       if (kDebugMode) {
