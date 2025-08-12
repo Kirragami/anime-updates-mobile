@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'screens/anime_list_screen.dart';
+import 'screens/homepage_screen.dart';
 import 'theme/app_theme.dart';
 import 'constants/app_constants.dart';
 
@@ -17,7 +17,7 @@ class AnimeUpdatesApp extends StatelessWidget {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const AnimeListScreen(),
+      home: const HomepageScreen(),
     );
   }
 }
