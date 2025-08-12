@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'dart:ui';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import 'anime_list_screen.dart';
@@ -20,6 +21,21 @@ class HomepageScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // App Title
+                _buildAppTitle(),
+                
+                const SizedBox(height: AppConstants.largePadding),
+                const SizedBox(height: AppConstants.largePadding),
+                const SizedBox(height: AppConstants.largePadding),
+
+                const SizedBox(height: AppConstants.largePadding),
+                const SizedBox(height: AppConstants.largePadding),
+                const SizedBox(height: AppConstants.largePadding),
+
+                const SizedBox(height: AppConstants.largePadding),
+                const SizedBox(height: AppConstants.largePadding),
+                const SizedBox(height: AppConstants.largePadding),
+                
                 // Animated GIF
                 _buildAnimatedGif(),
                 // Navigation Buttons
@@ -34,26 +50,77 @@ class HomepageScreen extends StatelessWidget {
 
 
 
+  Widget _buildAppTitle() {
+    return Column(
+      children: [
+        Text(
+          'ANIME',
+          style: TextStyle(
+            height: 0.5,
+            fontSize: 48,
+            fontWeight: FontWeight.w900,
+            color: AppTheme.primaryColor,
+            letterSpacing: 8,
+            shadows: [
+              Shadow(
+                color: AppTheme.primaryColor.withOpacity(0.3),
+                offset: const Offset(0, 4),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+        ),
+        Text(
+          'UPDATES',
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textSecondary,
+            letterSpacing: 4,
+          ),
+        ),
+      ],
+    ).animate().fadeIn(
+      duration: AppConstants.mediumAnimation,
+    ).slideY(begin: -0.5);
+  }
+
   Widget _buildAnimatedGif() {
     return Container(
       width: 280,
       height: 190,
-      child: Image.asset(
-        'assets/images/choice.png',
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceColor,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.animation_rounded,
-              size: 80,
-              color: AppTheme.textSecondary,
-            ),
-          );
+      child: ShaderMask(
+        shaderCallback: (Rect bounds) {
+          return LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.white,
+              Colors.white,
+              Colors.white.withOpacity(0.4),
+              Colors.transparent,
+            ],
+            stops: [0.0, 0.85, 0.95, 1.0],
+          ).createShader(bounds);
         },
+        blendMode: BlendMode.dstIn,
+        child: Image.asset(
+          'assets/images/choice.png',
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.animation_rounded,
+                size: 80,
+                color: AppTheme.textSecondary,
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -65,31 +132,79 @@ class HomepageScreen extends StatelessWidget {
         Expanded(
           child: Container(
             height: 80,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const AnimeListScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.new_releases_rounded, size: 24),
-              label: const Text(
-                'New Releases',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                textAlign: TextAlign.center,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.primaryColor.withOpacity(0.1),
+                  AppTheme.primaryColor.withOpacity(0.05),
+                ],
               ),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                foregroundColor: AppTheme.textPrimary,
-                side: BorderSide(
-                  color: AppTheme.primaryColor,
-                  width: 2,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppTheme.primaryColor,
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryColor.withOpacity(0.3),
+                  blurRadius: 15,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 5),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AnimeListScreen(),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: AppTheme.primaryGradient,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryColor.withOpacity(0.4),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.new_releases_rounded,
+                          size: 10,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'New Releases',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                          letterSpacing: 0.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
-                padding: const EdgeInsets.all(16),
               ),
             ),
           ),
@@ -104,33 +219,88 @@ class HomepageScreen extends StatelessWidget {
         Expanded(
           child: Container(
             height: 80,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // TODO: Navigate to My Shows screen when implemented
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('My Shows feature coming soon!'),
-                    backgroundColor: AppTheme.secondaryColor,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.favorite_rounded, size: 24),
-              label: const Text(
-                'My Shows',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                textAlign: TextAlign.center,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.secondaryColor.withOpacity(0.1),
+                  AppTheme.secondaryColor.withOpacity(0.05),
+                ],
               ),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                foregroundColor: AppTheme.textPrimary,
-                side: BorderSide(
-                  color: AppTheme.secondaryColor,
-                  width: 2,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppTheme.secondaryColor,
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.secondaryColor.withOpacity(0.3),
+                  blurRadius: 15,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 5),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  // TODO: Navigate to My Shows screen when implemented
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('My Shows feature coming soon!'),
+                      backgroundColor: AppTheme.secondaryColor,
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppTheme.secondaryColor,
+                              AppTheme.accentColor,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.secondaryColor.withOpacity(0.4),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.favorite_rounded,
+                          size: 10,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'My Shows',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                          letterSpacing: 0.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
-                padding: const EdgeInsets.all(16),
               ),
             ),
           ),

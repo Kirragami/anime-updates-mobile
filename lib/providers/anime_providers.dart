@@ -29,7 +29,7 @@ class AnimeListNotifier extends _$AnimeListNotifier {
 
     // Reset pagination
     _items.clear();
-    _currentPage = 1;
+    _currentPage = 0;
     _hasMore = true;
     _isLoadingMore = false;
 
