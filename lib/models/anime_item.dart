@@ -9,6 +9,7 @@ class AnimeItem {
   final String episode;
   final DateTime releasedDate;
   final String fileName;
+  final String imageUrl;
 
   AnimeItem({
     required this.id,
@@ -17,6 +18,7 @@ class AnimeItem {
     required this.episode,
     required this.releasedDate,
     required this.fileName,
+    required this.imageUrl,
   });
 
   factory AnimeItem.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,7 @@ class AnimeItem {
       episode: json['episode'] ?? '',
       releasedDate: parseReleasedDate(json['releasedDate']),
       fileName: json['fileName'] ?? '',
+      imageUrl: json['imageUrl'] ?? '',
     );
   }
 
@@ -57,6 +60,7 @@ class AnimeItem {
       'downloadUrl': downloadUrl,
       'episode': episode,
       'releasedDate': releasedDate.toIso8601String(),
+      'imageUrl': imageUrl,
     };
   }
 
@@ -66,7 +70,8 @@ class AnimeItem {
     String? downloadUrl,
     String? episode,
     DateTime? releasedDate,
-    String? fileName
+    String? fileName,
+    String? imageUrl,
   }) {
     return AnimeItem(
       id: id ?? this.id,
@@ -75,6 +80,7 @@ class AnimeItem {
       episode: episode ?? this.episode,
       releasedDate: releasedDate ?? this.releasedDate,
       fileName: fileName ?? this.fileName,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -89,6 +95,6 @@ class AnimeItem {
 
   @override
   String toString() {
-    return 'AnimeItem(id: $id, title: $title, downloadUrl: $downloadUrl, episode: $episode, releasedDate: $releasedDate, fileName: $fileName)';
+    return 'AnimeItem(id: $id, title: $title, downloadUrl: $downloadUrl, episode: $episode, releasedDate: $releasedDate, fileName: $fileName, imageUrl: $imageUrl)';
   }
 } 

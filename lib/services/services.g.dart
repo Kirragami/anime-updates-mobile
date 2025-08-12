@@ -39,24 +39,21 @@ final downloadServiceProvider = AutoDisposeProvider<DownloadService>.internal(
 );
 
 typedef DownloadServiceRef = AutoDisposeProviderRef<DownloadService>;
-String _$imageFetcherServiceHash() =>
-    r'48b231850811cca4ea1f3b640214e06d5e248721';
+String _$authServiceHash() => r'0dfa6cd7b3d2c42d27d44dbdbba6d3799e31f428';
 
-/// Provides the image fetcher service instance
+/// Provides the auth service instance
 ///
-/// Copied from [imageFetcherService].
-@ProviderFor(imageFetcherService)
-final imageFetcherServiceProvider =
-    AutoDisposeProvider<ImageFetcherService>.internal(
-  imageFetcherService,
-  name: r'imageFetcherServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$imageFetcherServiceHash,
+/// Copied from [authService].
+@ProviderFor(authService)
+final authServiceProvider = AutoDisposeProvider<AuthService>.internal(
+  authService,
+  name: r'authServiceProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$authServiceHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
-typedef ImageFetcherServiceRef = AutoDisposeProviderRef<ImageFetcherService>;
+typedef AuthServiceRef = AutoDisposeProviderRef<AuthService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

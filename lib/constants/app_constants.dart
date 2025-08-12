@@ -4,6 +4,13 @@ class AppConstants {
   static const String animeEndpoint = '/api/anime/downloads';
   static const String fullApiUrl = '$baseUrl$animeEndpoint';
   
+  // Auth Endpoints (easily configurable)
+  static const String loginEndpoint = '/api/auth/login';
+  static const String registerEndpoint = '/api/auth/register';
+  static const String logoutEndpoint = '/api/auth/logout';
+  static const String refreshEndpoint = '/api/auth/refresh';
+  static const String profileEndpoint = '/api/auth/profile';
+  
   // Animation Durations
   static const Duration shortAnimation = Duration(milliseconds: 200);
   static const Duration mediumAnimation = Duration(milliseconds: 400);

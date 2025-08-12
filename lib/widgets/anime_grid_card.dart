@@ -127,59 +127,20 @@ class AnimeGridCard extends ConsumerWidget {
   }
 
   Widget _buildImageWidget(WidgetRef ref) {
-    final imageAsync = ref.watch(animeImageProvider(anime.id, anime.title));
-    
-    return imageAsync.when(
-      data: (imageUrl) {
-        if (imageUrl != null && imageUrl.isNotEmpty) {
-          return CachedNetworkImage(
-            imageUrl: imageUrl,
-            fit: BoxFit.cover,
-            placeholder: (context, url) => _buildPlaceholder(),
-            errorWidget: (context, url, error) => _buildErrorPlaceholder(),
-          );
-        } else {
-          return _buildNoImagePlaceholder();
-        }
-      },
-      loading: () => _buildLoadingPlaceholder(),
-      error: (error, stack) => _buildErrorPlaceholder(),
-    );
+    // Use imageUrl directly from the anime item
+    if (anime.imageUrl.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: anime.imageUrl,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => _buildPlaceholder(),
+        errorWidget: (context, url, error) => _buildErrorPlaceholder(),
+      );
+    } else {
+      return _buildNoImagePlaceholder();
+    }
   }
 
-  Widget _buildLoadingPlaceholder() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.primaryColor.withOpacity(0.3),
-            AppTheme.primaryColor.withOpacity(0.1),
-          ],
-        ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              color: AppTheme.primaryColor,
-              strokeWidth: 2,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Loading...',
-              style: TextStyle(
-                color: AppTheme.primaryColor,
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildErrorPlaceholder() {
     return Container(

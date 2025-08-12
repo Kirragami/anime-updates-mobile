@@ -1,7 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'api_service.dart';
+import 'auth_service.dart';
 import 'download_service.dart';
-import 'image_fetcher_service.dart';
 
 part 'services.g.dart';
 
@@ -13,6 +13,6 @@ ApiService apiService(ApiServiceRef ref) => ApiService();
 @riverpod
 DownloadService downloadService(DownloadServiceRef ref) => DownloadService();
 
-/// Provides the image fetcher service instance
+/// Provides the auth service instance
 @riverpod
-ImageFetcherService imageFetcherService(ImageFetcherServiceRef ref) => ImageFetcherService(); 
+AuthService authService(AuthServiceRef ref) => AuthService(); 

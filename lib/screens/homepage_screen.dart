@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'dart:ui';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
+import '../providers/auth_provider.dart';
+import '../services/auth_service.dart';
+import '../utils/page_transitions.dart';
 import 'anime_list_screen.dart';
+import 'my_shows_screen.dart';
+import 'login_screen.dart';
 
-class HomepageScreen extends StatelessWidget {
+class HomepageScreen extends ConsumerWidget {
   const HomepageScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -161,9 +166,7 @@ class HomepageScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const AnimeListScreen(),
-                    ),
+                    CustomPageTransitions.slideFromRight(const AnimeListScreen()),
                   );
                 },
                 child: Container(
@@ -209,9 +212,9 @@ class HomepageScreen extends StatelessWidget {
             ),
           ),
         ).animate().fadeIn(
-          duration: AppConstants.mediumAnimation,
-          delay: const Duration(milliseconds: 600),
-        ).slideX(begin: -0.3),
+          duration: AppConstants.shortAnimation,
+          delay: const Duration(milliseconds: 0),
+        ).slideX(begin: -0.1),
         
         const SizedBox(width: 2),
         
@@ -247,13 +250,17 @@ class HomepageScreen extends StatelessWidget {
               child: InkWell(
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
-                  // TODO: Navigate to My Shows screen when implemented
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('My Shows feature coming soon!'),
-                      backgroundColor: AppTheme.secondaryColor,
-                    ),
-                  );
+                  // Check if user is logged in
+                  final isLoggedIn = AuthService.isLoggedIn;
+                  if (isLoggedIn) {
+                    Navigator.of(context).push(
+                      CustomPageTransitions.slideFromBottom(const MyShowsScreen()),
+                    );
+                  } else {
+                    Navigator.of(context).push(
+                      CustomPageTransitions.slideFromBottom(const LoginScreen()),
+                    );
+                  }
                 },
                 child: Container(
                   padding: const EdgeInsets.all(16),
@@ -305,9 +312,9 @@ class HomepageScreen extends StatelessWidget {
             ),
           ),
         ).animate().fadeIn(
-          duration: AppConstants.mediumAnimation,
-          delay: const Duration(milliseconds: 900),
-        ).slideX(begin: 0.3),
+          duration: AppConstants.shortAnimation,
+          delay: const Duration(milliseconds: 0),
+        ).slideX(begin: 0.1),
       ],
     );
   }

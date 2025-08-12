@@ -8,6 +8,7 @@ import '../widgets/anime_grid_view.dart';
 import '../widgets/loading_widget.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
+import '../utils/page_transitions.dart';
 
 class AnimeListScreen extends ConsumerStatefulWidget {
   const AnimeListScreen({super.key});
@@ -67,81 +68,116 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
   }
 
   Widget _buildAppBar() {
-    return Container(
-      padding: const EdgeInsets.all(AppConstants.defaultPadding),
-      child: Row(
-        children: [
-          // Container(
-          //   padding: const EdgeInsets.all(12),
-          //   decoration: BoxDecoration(
-          //     gradient: AppTheme.primaryGradient,
-          //     borderRadius: BorderRadius.circular(12),
-          //   ),
-          //   child: const Icon(
-          //     Icons.animation_rounded,
-          //     color: AppTheme.textPrimary,
-          //     size: 24,
-          //   ),
-          // ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Newest Releases',
-                  style: AppTheme.heading2.copyWith(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  'Download latest released episodes',
-                  style: AppTheme.body2.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Consumer(
-            builder: (context, ref, child) {
-              final activeDownloads = ref.watch(activeDownloadCountProvider);
-              final downloadedCount = ref.watch(downloadedCountProvider);
-              
-              if (activeDownloads > 0 || downloadedCount > 0) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    return Stack(
+      children: [
+        // Main app bar content
+        Container(
+          padding: const EdgeInsets.all(AppConstants.defaultPadding),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
+                    color: AppTheme.surfaceColor,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.download_rounded,
-                        color: AppTheme.primaryColor,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        activeDownloads > 0 ? '$activeDownloads' : '$downloadedCount',
-                        style: AppTheme.body2.copyWith(
-                          color: activeDownloads > 0 ? AppTheme.primaryColor : AppTheme.successColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: AppTheme.textPrimary,
+                    size: 24,
                   ),
-                ).animate(onPlay: (controller) => controller.repeat())
-                    .shimmer(duration: const Duration(seconds: 2));
-              }
-              return const SizedBox.shrink();
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Newest Releases',
+                      style: AppTheme.heading2.copyWith(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Download latest released episodes',
+                      style: AppTheme.body2.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Consumer(
+                builder: (context, ref, child) {
+                  final activeDownloads = ref.watch(activeDownloadCountProvider);
+                  final downloadedCount = ref.watch(downloadedCountProvider);
+                  
+                  if (activeDownloads > 0 || downloadedCount > 0) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.download_rounded,
+                            color: AppTheme.primaryColor,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            activeDownloads > 0 ? '$activeDownloads' : '$downloadedCount',
+                            style: AppTheme.body2.copyWith(
+                              color: activeDownloads > 0 ? AppTheme.primaryColor : AppTheme.successColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ).animate(onPlay: (controller) => controller.repeat())
+                        .shimmer(duration: const Duration(seconds: 2));
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ],
+          ),
+        ),
+        
+        // Sasha swinging GIF positioned at top right
+        Positioned(
+          top: 0, // Stick to the very top
+          right: 20,
+          child: Image.asset(
+            'assets/gifs/sasha-swing.gif',
+            width: 80,
+            height: 80,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(40),
+                ),
+                child: const Icon(
+                  Icons.animation_rounded,
+                  color: AppTheme.primaryColor,
+                  size: 40,
+                ),
+              );
             },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
