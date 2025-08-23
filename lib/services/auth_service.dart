@@ -205,10 +205,10 @@ class AuthService {
 
       final response = await http.post(
         Uri.parse(refreshUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'refreshToken': _refreshToken,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_refreshToken',
+        },
       );
 
       if (response.statusCode == 200) {
