@@ -57,9 +57,9 @@ class AuthService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
 
-        // New response: { token, success, message, code }
-        _accessToken = data['token'];
-        _refreshToken = null;
+        // New response: { accessToken, refreshToken }
+        _accessToken = data['accessToken'];
+        _refreshToken = data['refreshToken'];
 
         // Try to derive username from JWT if possible
         String derivedUsername = username;
@@ -95,9 +95,9 @@ class AuthService {
         FcmRegistrationService.checkAndUpdateFcmToken();
 
         return {
-          'success': data['success'] == true,
-          'message': data['message'] ?? 'Login successful',
-          'code': data['code'] ?? response.statusCode,
+          'success': true,
+          'message': 'Login successful',
+          'code': response.statusCode,
           'user': _currentUser,
         };
       } else {
@@ -135,11 +135,11 @@ class AuthService {
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        // New response does not return token or user; do not auto-login
+        // Response only contains success indicator
         return {
-          'success': data['success'] == true,
+          'success': true,
           'message': data['message'] ?? 'Registration successful',
-          'code': data['code'] ?? response.statusCode,
+          'code': response.statusCode,
         };
       } else {
         final errorData = jsonDecode(response.body);
@@ -207,13 +207,18 @@ class AuthService {
         Uri.parse(refreshUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'refresh_token': _refreshToken,
+          'refreshToken': _refreshToken,
         }),
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        _accessToken = data['access_token'];
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        _accessToken = data['accessToken'];
+        _refreshToken = data['refreshToken'];
+        
+        // Save the new tokens
+        await AuthStorage.saveAccessToken(_accessToken!);
+        await AuthStorage.saveRefreshToken(_refreshToken);
         
         return {
           'success': true,
@@ -324,10 +329,26 @@ class AuthService {
     }
   }
 
-  // Check if token is expired (simple check)
+  // Check if token is expired (JWT validation)
   static bool get isTokenExpired {
-    // Simple check — consider decoding JWT and checking exp in a real app
-    return _accessToken == null;
+    if (_accessToken == null) return true;
+    
+    try {
+      final payload = decodeJwtPayload(_accessToken!);
+      if (payload == null) return true;
+      
+      // Check if 'exp' claim exists and is valid
+      final exp = payload['exp'];
+      if (exp is int) {
+        final expirationTime = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+        // Consider token expired if it's within 5 minutes of actual expiration
+        return DateTime.now().isAfter(expirationTime.subtract(const Duration(minutes: 5)));
+      }
+      
+      return true;
+    } catch (_) {
+      return true;
+    }
   }
 
   // Clear all data (for testing or reset)
