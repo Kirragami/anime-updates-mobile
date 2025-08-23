@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import '../constants/app_constants.dart';
 import '../services/device_id_service.dart';
 import '../services/auth_service.dart'; // For access token
 import '../services/auth_storage.dart'; // For FCM token storage
+import 'dio_client.dart';
 
 class FcmRegistrationService {
   static const String _fcmRegisterEndpoint = '/api/fcm/register';
@@ -43,26 +44,28 @@ class FcmRegistrationService {
       };
       
       // Make the HTTP request
-      final url = Uri.parse('$_baseUrl$_fcmRegisterEndpoint');
-      final response = await http.post(
+      final url = '$_baseUrl$_fcmRegisterEndpoint';
+      final response = await dioClient.post(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-          // Include auth token if available (required for backend)
-          if (AuthService.accessToken != null)
-            'Authorization': 'Bearer ${AuthService.accessToken}',
-        },
-        body: jsonEncode(payload),
+        data: jsonEncode(payload),
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            // Include auth token if available (required for backend)
+            if (AuthService.accessToken != null)
+              'Authorization': 'Bearer ${AuthService.accessToken}',
+          },
+        ),
       );
       
-      if (response.statusCode >= 200 && response.statusCode < 300) {
+      if ((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300) {
         print('FCM token registered successfully');
         // Save the token after successful registration
         await AuthStorage.saveFcmToken(fcmToken);
         return true;
       } else {
         print('Failed to register FCM token. Status: ${response.statusCode}');
-        print('Response body: ${response.body}');
+        print('Response body: ${response.data}');
         return false;
       }
     } catch (e) {

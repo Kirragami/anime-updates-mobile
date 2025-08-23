@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import '../models/anime_item.dart';
 import '../constants/app_constants.dart';
 import 'auth_service.dart';
+import 'dio_client.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -16,24 +17,26 @@ class ApiService {
         print('Making API call to: ${AppConstants.fullApiUrl}');
       }
 
-      final response = await http.get(
-        Uri.parse(AppConstants.fullApiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'User-Agent': 'AnimeUpdates/1.0',
-        },
+      final response = await dioClient.get(
+        AppConstants.fullApiUrl,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'AnimeUpdates/1.0',
+          },
+        ),
       ).timeout(const Duration(seconds: 30));
 
       if (kDebugMode) {
         print('Response status: ${response.statusCode}');
         print('Response headers: ${response.headers}');
-        print('Response body length: ${response.body.length}');
-        print('Response body preview: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...');
+        print('Response body length: ${response.data.toString().length}');
+        print('Response body preview: ${response.data.toString().substring(0, response.data.toString().length > 200 ? 200 : response.data.toString().length)}...');
       }
 
       if (response.statusCode == 200) {
-        final String responseBody = response.body;
+        final String responseBody = response.data.toString();
         
         // Handle empty response
         if (responseBody.isEmpty) {
@@ -46,7 +49,7 @@ class ApiService {
         // Parse JSON response
         List<dynamic> jsonData;
         try {
-          final Map<String, dynamic> responseJson = jsonDecode(responseBody);
+          final Map<String, dynamic> responseJson = response.data as Map<String, dynamic>;
           if (kDebugMode) {
             print('Successfully parsed JSON: $responseJson');
           }
@@ -117,7 +120,7 @@ class ApiService {
           }
           // Try to parse as direct array if the object format fails
           try {
-            jsonData = jsonDecode(responseBody) as List<dynamic>;
+            jsonData = response.data as List<dynamic>;
             if (kDebugMode) {
               print('Parsed as direct array with ${jsonData.length} items');
             }
@@ -150,10 +153,10 @@ class ApiService {
         return animeList;
       } else {
         if (kDebugMode) {
-          print('HTTP Error: ${response.statusCode} - ${response.reasonPhrase}');
-          print('Response body: ${response.body}');
+          print('HTTP Error: ${response.statusCode} - ${response.statusMessage}');
+          print('Response body: ${response.data}');
         }
-        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+        throw Exception('HTTP ${response.statusCode}: ${response.statusMessage}');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -189,20 +192,22 @@ class ApiService {
         print('Making paginated API call to: $uri');
       }
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'User-Agent': 'AnimeUpdates/1.0',
-        },
+      final response = await dioClient.get(
+        uri.toString(),
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'AnimeUpdates/1.0',
+          },
+        ),
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+        throw Exception('HTTP ${response.statusCode}: ${response.statusMessage}');
       }
 
-      final String responseBody = response.body;
+      final String responseBody = response.data.toString();
       if (responseBody.isEmpty) {
         return {
           'items': <AnimeItem>[],
@@ -210,7 +215,7 @@ class ApiService {
         };
       }
 
-      final decoded = jsonDecode(responseBody);
+      final decoded = response.data;
       List<dynamic> jsonData;
       bool last = false;
 
@@ -320,19 +325,25 @@ class ApiService {
         headers['Authorization'] = 'Bearer $token';
       }
 
-      final response = await http.get(
-        uri,
-        headers: headers,
+      final response = await dioClient.get(
+        uri.toString(),
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'AnimeUpdates/1.0',
+          },
+        ),
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 401) {
         throw Exception('Unauthorized. Please log in.');
       }
       if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+        throw Exception('HTTP ${response.statusCode}: ${response.statusMessage}');
       }
 
-      final String responseBody = response.body;
+      final String responseBody = response.data.toString();
       if (responseBody.isEmpty) {
         return {
           'items': <AnimeItem>[],
@@ -340,7 +351,7 @@ class ApiService {
         };
       }
 
-      final decoded = jsonDecode(responseBody);
+      final decoded = response.data;
       List<dynamic> jsonData;
       bool last = false;
 
@@ -427,12 +438,14 @@ class ApiService {
         print('Testing connection to: ${AppConstants.baseUrl}');
       }
 
-      final response = await http.get(
-        Uri.parse(AppConstants.baseUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'AnimeUpdates/1.0',
-        },
+      final response = await dioClient.get(
+        AppConstants.baseUrl,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'AnimeUpdates/1.0',
+          },
+        ),
       ).timeout(const Duration(seconds: 10));
 
       if (kDebugMode) {
@@ -454,13 +467,15 @@ class ApiService {
         print('Testing anime endpoint: ${AppConstants.fullApiUrl}');
       }
 
-      final response = await http.get(
-        Uri.parse(AppConstants.fullApiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'User-Agent': 'AnimeUpdates/1.0',
-        },
+      final response = await dioClient.get(
+        AppConstants.fullApiUrl,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'AnimeUpdates/1.0',
+          },
+        ),
       ).timeout(const Duration(seconds: 10));
 
       if (kDebugMode) {
@@ -500,22 +515,24 @@ class ApiService {
         headers['Authorization'] = 'Bearer $accessToken';
       }
 
-      final response = await http.post(
-        uri,
-        headers: headers,
-        body: jsonEncode({
+      final response = await dioClient.post(
+        uri.toString(),
+        data: jsonEncode({
           'animeShowId': animeShowId,
           'timestamp': DateTime.now().toIso8601String(),
         }),
+        options: Options(
+          headers: headers,
+        ),
       ).timeout(const Duration(seconds: 30));
 
       if (kDebugMode) {
         print('Track anime response status: ${response.statusCode}');
-        print('Track anime response body: ${response.body}');
+        print('Track anime response body: ${response.data}');
       }
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
+        final responseData = response.data;
         return {
           'success': true,
           'message': 'Anime tracked successfully',
@@ -525,7 +542,7 @@ class ApiService {
         return {
           'success': false,
           'message': 'Failed to track anime',
-          'error': 'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+          'error': 'HTTP ${response.statusCode}: ${response.statusMessage}',
         };
       }
     } catch (e) {

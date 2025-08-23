@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import '../models/user.dart';
 import '../constants/app_constants.dart';
 import 'auth_storage.dart';
 import 'fcm_registration_service.dart';
+import 'dio_client.dart';
 
 class AuthService {
   // Configurable endpoints - change these easily
@@ -44,18 +45,20 @@ class AuthService {
     required String password,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse(loginUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final response = await dioClient.post(
+        loginUrl,
+        data: jsonEncode({
           // API expects these exact keys
           'userName': username,
           'password': password,
         }),
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+        ),
       );
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if ((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300) {
+        final data = response.data as Map<String, dynamic>;
 
         // New response: { accessToken, refreshToken }
         _accessToken = data['accessToken'];
@@ -101,7 +104,7 @@ class AuthService {
           'user': _currentUser,
         };
       } else {
-        final errorData = jsonDecode(response.body);
+        final errorData = response.data;
         return {
           'success': false,
           'message': errorData['message'] ?? 'Login failed',
@@ -123,18 +126,20 @@ class AuthService {
     required String password,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse(registerUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final response = await dioClient.post(
+        registerUrl,
+        data: jsonEncode({
           // Only username and password are required
           'userName': username,
           'password': password,
         }),
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+        ),
       );
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if ((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300) {
+        final data = response.data as Map<String, dynamic>;
         // Response only contains success indicator
         return {
           'success': true,
@@ -142,7 +147,7 @@ class AuthService {
           'code': response.statusCode,
         };
       } else {
-        final errorData = jsonDecode(response.body);
+        final errorData = response.data;
         return {
           'success': false,
           'message': errorData['message'] ?? 'Registration failed',
@@ -162,9 +167,11 @@ class AuthService {
   static Future<Map<String, dynamic>> logout() async {
     try {
       if (_accessToken != null) {
-        await http.post(
-          Uri.parse(logoutUrl),
-          headers: _authHeaders,
+        await dioClient.post(
+          logoutUrl,
+          options: Options(
+            headers: _authHeaders,
+          ),
         );
       }
       
@@ -203,16 +210,18 @@ class AuthService {
         };
       }
 
-      final response = await http.post(
-        Uri.parse(refreshUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_refreshToken',
-        },
+      final response = await dioClient.post(
+        refreshUrl,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_refreshToken',
+          },
+        ),
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final data = response.data as Map<String, dynamic>;
         _accessToken = data['accessToken'];
         _refreshToken = data['refreshToken'];
         
@@ -248,13 +257,15 @@ class AuthService {
   // Get user profile
   static Future<Map<String, dynamic>> getProfile() async {
     try {
-      final response = await http.get(
-        Uri.parse(profileUrl),
-        headers: _authHeaders,
+      final response = await dioClient.get(
+        profileUrl,
+        options: Options(
+          headers: _authHeaders,
+        ),
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = response.data;
         if (data is Map<String, dynamic> && data.containsKey('user')) {
           _currentUser = User.fromJson(data['user']);
         }
