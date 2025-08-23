@@ -314,17 +314,6 @@ class ApiService {
         print('Making paginated tracked releases API call to: $uri');
       }
 
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'AnimeUpdates/1.0',
-      };
-
-      final token = AuthService.accessToken;
-      if (token != null && token.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $token';
-      }
-
       final response = await dioClient.get(
         uri.toString(),
         options: Options(

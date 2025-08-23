@@ -55,7 +55,7 @@ class AuthService {
         options: Options(
           headers: {'Content-Type': 'application/json'},
         ),
-      );
+      ).timeout(Duration(seconds: 30));
 
       if ((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300) {
         final data = response.data as Map<String, dynamic>;
@@ -136,7 +136,7 @@ class AuthService {
         options: Options(
           headers: {'Content-Type': 'application/json'},
         ),
-      );
+      ).timeout(Duration(seconds: 30));
 
       if ((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300) {
         final data = response.data as Map<String, dynamic>;
@@ -172,7 +172,7 @@ class AuthService {
           options: Options(
             headers: _authHeaders,
           ),
-        );
+        ).timeout(Duration(seconds: 10));
       }
       
       // Clear local data
@@ -210,7 +210,10 @@ class AuthService {
         };
       }
 
-      final response = await dioClient.post(
+      // Create a new Dio instance for refresh to avoid interceptors
+      final refreshDio = Dio();
+      
+      final response = await refreshDio.post(
         refreshUrl,
         options: Options(
           headers: {
@@ -218,7 +221,7 @@ class AuthService {
             'Authorization': 'Bearer $_refreshToken',
           },
         ),
-      );
+      ).timeout(Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
@@ -262,7 +265,7 @@ class AuthService {
         options: Options(
           headers: _authHeaders,
         ),
-      );
+      ).timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = response.data;
