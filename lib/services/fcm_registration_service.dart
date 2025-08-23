@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:firebase_messaging/firebase_messaging.dart';
 import '../constants/app_constants.dart';
 import '../services/device_id_service.dart';
 import '../services/auth_service.dart'; // For access token
@@ -74,6 +73,35 @@ class FcmRegistrationService {
     }
   }
   
+  /// Register FCM token without checking if it's different
+  /// Only registers if user is logged in
+  static Future<bool> registerStoredFcmToken() async {
+    // Only register if user is logged in
+    if (!AuthService.isLoggedIn) {
+      print('User not logged in, skipping FCM token registration');
+      return false;
+    }
+    
+    try {
+      // Get the stored FCM token
+      final storedFcmToken = await AuthStorage.getFcmToken();
+      
+      if (storedFcmToken == null) {
+        print('No stored FCM token found');
+        return false;
+      }
+      
+      print('Registering stored FCM token with backend...');
+      print('Token: $storedFcmToken');
+      
+      // Register the stored token
+      return await registerFcmToken(storedFcmToken);
+    } catch (e) {
+      print('Error registering stored FCM token: $e');
+      return false;
+    }
+  }
+  
   /// Register FCM token with retry logic
   /// Only registers if user is logged in
   static Future<bool> registerFcmTokenWithRetry(String fcmToken, int maxRetries) async {
@@ -99,45 +127,5 @@ class FcmRegistrationService {
     
     print('Failed to register FCM token after $maxRetries retries');
     return false;
-  }
-  
-  /// Check and update FCM token on app launch
-  /// Gets the current FCM token and compares with stored one
-  /// If different and user is logged in, registers the new token with backend
-  static Future<String?> checkAndUpdateFcmToken() async {
-    try {
-      // Get the current FCM token
-      final currentFcmToken = await FirebaseMessaging.instance.getToken();
-      
-      if (currentFcmToken == null) {
-        print('Current FCM token is null');
-        return null;
-      }
-      
-      // Get the stored FCM token
-      final storedFcmToken = await AuthStorage.getFcmToken();
-      
-      // Save the current token locally regardless of login status
-      await AuthStorage.saveFcmToken(currentFcmToken);
-      
-      // If tokens are different or no stored token, and user is logged in, register the new one
-      if ((storedFcmToken != currentFcmToken) && AuthService.isLoggedIn) {
-        print('FCM token has changed or is new, and user is logged in. Registering with backend...');
-        print('Old token: $storedFcmToken');
-        print('New token: $currentFcmToken');
-        
-        // Register the new token
-        await registerFcmTokenWithRetry(currentFcmToken, 3);
-      } else if (storedFcmToken != currentFcmToken) {
-        print('FCM token has changed but user is not logged in. Saved locally for future registration.');
-      } else {
-        print('FCM token is unchanged');
-      }
-      
-      return currentFcmToken;
-    } catch (e) {
-      print('Error checking FCM token: $e');
-      return null;
-    }
   }
 }

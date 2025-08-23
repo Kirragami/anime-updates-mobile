@@ -6,6 +6,7 @@ import 'constants/app_constants.dart';
 import 'services/auth_service.dart';
 import 'services/device_id_service.dart';
 import 'services/fcm_registration_service.dart';
+import 'services/auth_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'config/firebase_config.dart';
@@ -67,12 +68,17 @@ class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> {
 
     print('User granted permission: ${settings.authorizationStatus}');
 
-    // Check and update FCM token on app launch
-    await FcmRegistrationService.checkAndUpdateFcmToken();
-
     // Get the FCM token for display
     String? token = await messaging.getToken();
     print("Current FCM Token: $token");
+
+    // Save the current token locally
+    if (token != null) {
+      await AuthStorage.saveFcmToken(token);
+    }
+
+    // Register the stored FCM token with backend (only if user is logged in)
+    await FcmRegistrationService.registerStoredFcmToken();
 
     setState(() {
       _firebaseToken = token;
@@ -81,6 +87,8 @@ class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> {
     // Listen for token refreshes
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       print("FCM Token refreshed: $newToken");
+      // Save the new token locally
+      await AuthStorage.saveFcmToken(newToken);
       // Re-register with backend when token refreshes (only if user is logged in)
       await FcmRegistrationService.registerFcmTokenWithRetry(newToken, 3);
     }).onError((err) {

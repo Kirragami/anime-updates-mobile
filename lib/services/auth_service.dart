@@ -91,8 +91,8 @@ class AuthService {
 
         // Register FCM token with backend
         // Run in background, don't block login
-        // Check and update FCM token
-        FcmRegistrationService.checkAndUpdateFcmToken();
+        // Register the stored FCM token
+        FcmRegistrationService.registerStoredFcmToken();
 
         return {
           'success': true,
