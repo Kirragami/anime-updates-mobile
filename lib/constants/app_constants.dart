@@ -17,6 +17,9 @@ class AppConstants {
   static const String trackShowEndpoint = '/api/tracking/track';
   static const String untrackShowEndpoint = '/api/tracking/untrack';
   
+  // Anime Show Endpoints
+  static const String animeShowEpisodesEndpoint = '/api/anime-show';
+  
   // Animation Durations
   static const Duration shortAnimation = Duration(milliseconds: 200);
   static const Duration mediumAnimation = Duration(milliseconds: 400);

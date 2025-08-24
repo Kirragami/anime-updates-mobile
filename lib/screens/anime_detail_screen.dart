@@ -5,6 +5,7 @@ import '../models/anime_item.dart';
 import '../providers/auth_provider.dart';
 import '../providers/tracking_provider.dart';
 import '../providers/anime_providers.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_heart_button.dart';
 
@@ -495,54 +496,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                           ],
                         ),
                         
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 50),
                         
-                        // Additional Info Section
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceColor.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: AppTheme.cardColor.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.accentColor.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(
-                                      Icons.info_outline,
-                                      color: AppTheme.accentColor,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    'File Information',
-                                    style: AppTheme.heading3.copyWith(
-                                      fontSize: 18,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              _buildInfoRow('File Name', widget.anime.fileName),
-                              _buildInfoRow('Release Date', DateFormat('EEEE, MMMM dd, yyyy').format(widget.anime.releasedDate)),
-                              _buildInfoRow('Episode', widget.anime.episode),
-                            ],
-                          ),
-                        ),
-                        
-                        const SizedBox(height: 100), // Bottom padding
+                        // Episodes Section
+                        _buildEpisodesSection(),
                       ],
                     ),
                   ),
@@ -581,6 +538,295 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEpisodesHeader(List<AnimeItem> episodes) {
+    return Text(
+      'All Episodes',
+      style: AppTheme.heading2,
+    );
+  }
+
+  Widget _buildEpisodesSection() {
+    return FutureBuilder<List<AnimeItem>>(
+      future: ApiService().fetchAnimeShowEpisodes(widget.anime.animeShowId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildEpisodesHeader([]),
+              const SizedBox(height: 16),
+              const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                ),
+              ),
+            ],
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildEpisodesHeader([]),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: AppTheme.errorColor,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Failed to load episodes',
+                      style: AppTheme.heading3.copyWith(
+                        color: AppTheme.errorColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot.error.toString(),
+                      style: AppTheme.body2.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildEpisodesHeader([]),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.movie_outlined,
+                      color: AppTheme.textSecondary,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No episodes available',
+                      style: AppTheme.heading3.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+
+        final episodes = snapshot.data!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildEpisodesHeader(episodes),
+            const SizedBox(height: 16),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: episodes.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final episode = episodes[index];
+                return _buildEpisodeItem(episode);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildEpisodeItem(AnimeItem episode) {
+    return Consumer(
+      builder: (context, ref, child) {
+        // Watch download states for this specific episode
+        final isDownloading = ref.watch(
+          downloadStatesNotifierProvider.select(
+            (state) => state['downloading_${episode.id}'] ?? false,
+          ),
+        );
+        final isDownloaded = ref.watch(
+          downloadStatesNotifierProvider.select(
+            (state) => state['downloaded_${episode.id}'] ?? false,
+          ),
+        );
+        final downloadProgress = ref.watch(
+          downloadProgressNotifierProvider.select(
+            (state) => state[episode.id] ?? 0.0,
+          ),
+        );
+
+        return Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceColor.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppTheme.primaryColor.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(12),
+            title: Text(
+              episode.title,
+              style: AppTheme.heading3.copyWith(
+                fontSize: 14,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                'Episode ${episode.episode} • ${_formatReleaseDate(episode.releasedDate)}',
+                style: AppTheme.body2.copyWith(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            trailing: SizedBox(
+              width: 40,
+              height: 40,
+              child: isDownloading
+                  ? Stack(
+                      children: [
+                        // Progress background
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceColor,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        // Progress indicator
+                        CircularProgressIndicator(
+                          value: downloadProgress,
+                          strokeWidth: 2,
+                          backgroundColor: AppTheme.surfaceColor,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppTheme.primaryColor,
+                          ),
+                        ),
+                        // Percentage text
+                        Center(
+                          child: Text(
+                            '${(downloadProgress * 100).toInt()}%',
+                            style: AppTheme.body2.copyWith(
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 6,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : isDownloaded
+                      ? Container(
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.primaryGradient,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            onPressed: () async {
+                              try {
+                                final success = await ref
+                                    .read(downloadOperationsNotifierProvider.notifier)
+                                    .openDownloadedFile(episode);
+                                if (!success) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Failed to open the downloaded file'),
+                                        backgroundColor: AppTheme.errorColor,
+                                      ),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          'Error opening file: ${e.toString()}'),
+                                      backgroundColor: AppTheme.errorColor,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            padding: EdgeInsets.zero,
+                          ),
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.primaryGradient,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.download_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            onPressed: () async {
+                              try {
+                                await ref
+                                    .read(downloadOperationsNotifierProvider.notifier)
+                                    .downloadAnime(episode);
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          'Download failed: ${e.toString()}'),
+                                      backgroundColor: AppTheme.errorColor,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+            ),
+          ),
+        );
+      },
     );
   }
 } 

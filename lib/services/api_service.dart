@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../models/anime_item.dart';
 import '../constants/app_constants.dart';
+import '../theme/app_theme.dart';
 import 'auth_service.dart';
 import 'dio_client.dart';
 
@@ -477,6 +478,173 @@ class ApiService {
         print('Anime endpoint test failed: $e');
       }
       return false;
+    }
+  }
+
+  /// Fetch all episodes for a specific anime show
+  Future<List<AnimeItem>> fetchAnimeShowEpisodes(String animeShowId) async {
+    try {
+      final endpoint = '${AppConstants.baseUrl}${AppConstants.animeShowEpisodesEndpoint}/$animeShowId/get-releases';
+      
+      if (kDebugMode) {
+        print('Making API call to fetch episodes: $endpoint');
+      }
+
+      final response = await dioClient.get(
+        endpoint,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'AnimeUpdates/1.0',
+          },
+        ),
+      ).timeout(const Duration(seconds: 30));
+
+      if (kDebugMode) {
+        print('Episodes response status: ${response.statusCode}');
+      }
+
+      if (response.statusCode == 200) {
+        final String responseBody = response.data.toString();
+        
+        // Handle empty response
+        if (responseBody.isEmpty) {
+          if (kDebugMode) {
+            print('Empty episodes response received');
+          }
+          return [];
+        }
+
+        // Parse JSON response
+        List<dynamic> jsonData;
+        try {
+          final Map<String, dynamic> responseJson = response.data as Map<String, dynamic>;
+          if (kDebugMode) {
+            print('Successfully parsed JSON: $responseJson');
+          }
+
+          // New format: { success, message, code, data: { content: [...] } }
+          if (responseJson.containsKey('data')) {
+            final dynamic dataNode = responseJson['data'];
+            if (dataNode is Map<String, dynamic>) {
+              if (dataNode.containsKey('content') && dataNode['content'] is List) {
+                jsonData = dataNode['content'] as List<dynamic>;
+                if (kDebugMode) {
+                  print('Found data.content array with ${jsonData.length} items');
+                }
+              } else if (dataNode.containsKey('items') && dataNode['items'] is List) {
+                jsonData = dataNode['items'] as List<dynamic>;
+                if (kDebugMode) {
+                  print('Found data.items array with ${jsonData.length} items');
+                }
+              } else {
+                // Try to find the first list within data map
+                final dynamic firstList = (dataNode.values).firstWhere(
+                  (v) => v is List,
+                  orElse: () => <dynamic>[],
+                );
+                jsonData = (firstList is List) ? firstList as List<dynamic> : <dynamic>[];
+                if (kDebugMode) {
+                  print('Used first list in data map, length: ${jsonData.length}');
+                }
+              }
+            } else if (dataNode is List) {
+              jsonData = dataNode as List<dynamic>;
+              if (kDebugMode) {
+                print('Found data as array with ${jsonData.length} items');
+              }
+            } else {
+              jsonData = <dynamic>[];
+            }
+          } else if (responseJson.containsKey('content')) {
+            jsonData = responseJson['content'] as List<dynamic>;
+            if (kDebugMode) {
+              print('Found top-level content array with ${jsonData.length} items');
+            }
+          } else if (responseJson.containsKey('items')) {
+            jsonData = responseJson['items'] as List<dynamic>;
+            if (kDebugMode) {
+              print('Found top-level items array with ${jsonData.length} items');
+            }
+          } else if (responseJson is Map<String, dynamic>) {
+            // Fallback: find first list in the map
+            final dynamic firstList = (responseJson.values).firstWhere(
+              (v) => v is List,
+              orElse: () => <dynamic>[],
+            );
+            jsonData = (firstList is List) ? firstList as List<dynamic> : <dynamic>[];
+            if (kDebugMode) {
+              print('Used first list in response map, length: ${jsonData.length}');
+            }
+          } else {
+            // Fallback to direct array format
+            jsonData = responseJson as List<dynamic>;
+            if (kDebugMode) {
+              print('Using direct array format with ${jsonData.length} items');
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('JSON parsing error: $e');
+          }
+          // Try to parse as direct array if the object format fails
+          try {
+            jsonData = response.data as List<dynamic>;
+            if (kDebugMode) {
+              print('Parsed as direct array with ${jsonData.length} items');
+            }
+          } catch (e2) {
+            if (kDebugMode) {
+              print('Failed to parse as array: $e2');
+            }
+            throw Exception('Invalid JSON format: $e');
+          }
+        }
+
+        // Validate that jsonData is a list (jsonData is already List<dynamic> from parsing)
+        if (jsonData.isEmpty) {
+          if (kDebugMode) {
+            print('Empty data array received');
+          }
+        }
+
+        final episodesList = jsonData
+            .map((jsonItem) => AnimeItem.fromJson(jsonItem))
+            .toList();
+
+        if (kDebugMode) {
+          print('Successfully created ${episodesList.length} episode items');
+          if (episodesList.isNotEmpty) {
+            print('First episode: ${episodesList.first.title}');
+          }
+        }
+
+        return episodesList;
+      } else {
+        if (kDebugMode) {
+          print('HTTP Error: ${response.statusCode} - ${response.statusMessage}');
+          print('Response body: ${response.data}');
+        }
+        throw Exception('HTTP ${response.statusCode}: ${response.statusMessage}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('API call error: $e');
+        print('Error type: ${e.runtimeType}');
+      }
+      
+      if (e.toString().contains('SocketException') || 
+          e.toString().contains('Connection refused') ||
+          e.toString().contains('Failed host lookup')) {
+        throw Exception('${AppConstants.networkError}\n\nDetails: $e');
+      } else if (e.toString().contains('TimeoutException')) {
+        throw Exception('Request timeout. Please try again.\n\nDetails: $e');
+      } else if (e.toString().contains('HandshakeException')) {
+        throw Exception('SSL/TLS error. Please check your server configuration.\n\nDetails: $e');
+      } else {
+        throw Exception('Failed to fetch anime episodes: $e');
+      }
     }
   }
 

@@ -319,13 +319,13 @@ class AnimeGridCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            '${(downloadProgress * 100).toInt()}%',
-            style: AppTheme.caption.copyWith(
-              color: AppTheme.primaryColor,
-              fontSize: 8,
-            ),
-          ),
+          // Text(
+          //   '${(downloadProgress * 100).toInt()}%',
+          //   style: AppTheme.caption.copyWith(
+          //     color: AppTheme.primaryColor,
+          //     fontSize: 8,
+          //   ),
+          // ),
         ],
       );
     }

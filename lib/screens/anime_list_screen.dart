@@ -111,70 +111,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
                   ],
                 ),
               ),
-              Consumer(
-                builder: (context, ref, child) {
-                  final activeDownloads = ref.watch(activeDownloadCountProvider);
-                  final downloadedCount = ref.watch(downloadedCountProvider);
-                  
-                  if (activeDownloads > 0 || downloadedCount > 0) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.download_rounded,
-                            color: AppTheme.primaryColor,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            activeDownloads > 0 ? '$activeDownloads' : '$downloadedCount',
-                            style: AppTheme.body2.copyWith(
-                              color: activeDownloads > 0 ? AppTheme.primaryColor : AppTheme.successColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ).animate(onPlay: (controller) => controller.repeat())
-                        .shimmer(duration: const Duration(seconds: 2));
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
             ],
-          ),
-        ),
-        
-        // Sasha swinging GIF positioned at top right
-        Positioned(
-          top: 0, // Stick to the very top
-          right: 20,
-          child: Image.asset(
-            'assets/gifs/sasha-swing.gif',
-            width: 80,
-            height: 80,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceColor.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(40),
-                ),
-                child: const Icon(
-                  Icons.animation_rounded,
-                  color: AppTheme.primaryColor,
-                  size: 40,
-                ),
-              );
-            },
           ),
         ),
       ],
