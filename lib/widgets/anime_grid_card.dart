@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/anime_item.dart';
 import '../providers/anime_providers.dart';
+import '../providers/tracking_provider.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../screens/anime_detail_screen.dart';
@@ -14,6 +15,7 @@ class AnimeGridCard extends ConsumerWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onOpen;
   final int index;
+  final bool showTrackingIndicator;
 
   const AnimeGridCard({
     super.key,
@@ -22,6 +24,7 @@ class AnimeGridCard extends ConsumerWidget {
     this.onDelete,
     this.onOpen,
     required this.index,
+    this.showTrackingIndicator = true,
   });
 
   @override
@@ -72,14 +75,14 @@ class AnimeGridCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                                                      // Anime Image
-                           ClipRRect(
-                             borderRadius: BorderRadius.circular(8),
-                             child: Container(
-                               width: double.infinity,
-                               height: 200,
-                               child: _buildImageWidget(ref),
-                             ),
-                           ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: double.infinity,
+                              height: 200,
+                              child: _buildImageWidget(ref),
+                            ),
+                          ),
                           const SizedBox(height: 10),
                           // Episode Badge
                           Container(
@@ -179,6 +182,35 @@ class AnimeGridCard extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrackingIndicator(WidgetRef ref) {
+    // Watch the tracking state for this anime item
+    final isTracked = ref.watch(animeTrackingProvider(anime));
+    
+    if (!isTracked) {
+      return const SizedBox.shrink();
+    }
+    
+    return Positioned(
+      bottom: 24, // Position above the 24px tall action buttons
+      right: 0,
+      child: Container(
+        width: 20,
+        height: 20,
+        decoration: const BoxDecoration(
+          color: Colors.red,
+          shape: BoxShape.circle,
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.favorite,
+            color: Colors.white,
+            size: 12,
+          ),
         ),
       ),
     );

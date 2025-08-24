@@ -253,12 +253,15 @@ class DownloadOperationsNotifier extends _$DownloadOperationsNotifier {
       print('DownloadOperationsNotifier: Initializing...');
     }
     
-    // Check existing downloads when the provider is first created
+    // Check existing downloads for both regular anime list and tracked releases
     final animeList = ref.watch(animeListNotifierProvider);
+    final trackedReleases = ref.watch(trackedReleasesNotifierProvider);
+    
+    // Check regular anime list
     await animeList.when(
       data: (animeList) async {
         if (kDebugMode) {
-          print('DownloadOperationsNotifier: Checking existing downloads for ${animeList.length} items');
+          print('DownloadOperationsNotifier: Checking existing downloads for ${animeList.length} anime items');
         }
         await checkExistingDownloads(animeList);
       },
@@ -270,6 +273,26 @@ class DownloadOperationsNotifier extends _$DownloadOperationsNotifier {
       error: (_, __) async {
         if (kDebugMode) {
           print('DownloadOperationsNotifier: Anime list has error');
+        }
+      },
+    );
+    
+    // Check tracked releases
+    await trackedReleases.when(
+      data: (trackedList) async {
+        if (kDebugMode) {
+          print('DownloadOperationsNotifier: Checking existing downloads for ${trackedList.length} tracked items');
+        }
+        await checkExistingDownloads(trackedList);
+      },
+      loading: () async {
+        if (kDebugMode) {
+          print('DownloadOperationsNotifier: Tracked releases list is loading');
+        }
+      },
+      error: (_, __) async {
+        if (kDebugMode) {
+          print('DownloadOperationsNotifier: Tracked releases list has error');
         }
       },
     );
@@ -409,6 +432,33 @@ class DownloadOperationsNotifier extends _$DownloadOperationsNotifier {
         print('Error checking existing downloads: $e');
       }
     }
+  }
+  
+  /// Recheck existing downloads for tracked releases
+  Future<void> recheckTrackedDownloads() async {
+    if (kDebugMode) {
+      print('Rechecking existing downloads for tracked releases');
+    }
+    
+    final trackedReleases = ref.watch(trackedReleasesNotifierProvider);
+    await trackedReleases.when(
+      data: (trackedList) async {
+        if (kDebugMode) {
+          print('Rechecking existing downloads for ${trackedList.length} tracked items');
+        }
+        await checkExistingDownloads(trackedList);
+      },
+      loading: () async {
+        if (kDebugMode) {
+          print('Tracked releases list is loading, cannot recheck');
+        }
+      },
+      error: (_, __) async {
+        if (kDebugMode) {
+          print('Tracked releases list has error, cannot recheck');
+        }
+      },
+    );
   }
 }
 

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../providers/auth_provider.dart';
 import '../providers/anime_providers.dart';
-import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../widgets/anime_grid_view.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
@@ -26,6 +26,11 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
   void initState() {
     super.initState();
     _refreshController = RefreshController(initialRefresh: false);
+    
+    // Recheck existing downloads for tracked releases when the screen is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(downloadOperationsNotifierProvider.notifier).recheckTrackedDownloads();
+    });
   }
 
   @override
@@ -36,6 +41,9 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Ensure download operations provider initializes to check existing files
+    ref.watch(downloadOperationsNotifierProvider);
+    
     final userAsync = ref.watch(authProvider);
 
     return Scaffold(
@@ -47,6 +55,13 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
           child: Column(
             children: [
               _buildAppBar(context, ref),
+              // Ensure download operations provider initializes to check existing files
+              Consumer(
+                builder: (context, ref, child) {
+                  ref.watch(downloadOperationsNotifierProvider);
+                  return const SizedBox.shrink();
+                },
+              ),
               Expanded(
                 child: userAsync.when(
                   data: (user) => _buildTrackedReleasesList(),

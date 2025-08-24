@@ -92,6 +92,7 @@ class AnimeGridView extends ConsumerWidget {
                 onDownload: () => onDownload(anime),
                 onDelete: onDelete != null ? () => onDelete!(anime) : null,
                 onOpen: onOpen != null ? () => onOpen!(anime) : null,
+                showTrackingIndicator: !useTrackedProviders,
               );
             } else {
               // Skeleton tile for loading more

@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/anime_item.dart';
 import '../providers/auth_provider.dart';
 import '../providers/tracking_provider.dart';
-import '../services/download_service.dart';
+import '../providers/anime_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_heart_button.dart';
 
@@ -26,9 +26,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  
-  bool _isDownloading = false;
-  double _downloadProgress = 0.0;
 
   @override
   void initState() {
@@ -69,64 +66,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
-  }
-
-  Future<void> _downloadAnime() async {
-    if (_isDownloading) return;
-    
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0.0;
-    });
-
-    try {
-      final downloadService = DownloadService();
-      
-      await downloadService.downloadFile(
-        url: widget.anime.downloadUrl,
-        filename: widget.anime.fileName,
-        onProgress: (received, total) {
-          if (total > 0) {
-            setState(() {
-              _downloadProgress = received / total;
-            });
-          }
-        },
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Download completed successfully!'),
-            backgroundColor: AppTheme.successColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Download failed: ${e.toString()}'),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isDownloading = false;
-          _downloadProgress = 0.0;
-        });
-      }
-    }
   }
 
   String _formatReleaseDate(DateTime date) {
@@ -334,56 +273,207 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                           children: [
                             // Download Button
                             Expanded(
-                              child: Container(
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  gradient: AppTheme.primaryGradient,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppTheme.primaryColor.withOpacity(0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 6),
+                              child: Consumer(
+                                builder: (context, ref, child) {
+                                  // Watch state directly so this widget rebuilds when values change
+                                  final isDownloading = ref.watch(
+                                    downloadStatesNotifierProvider.select(
+                                      (state) => state['downloading_${widget.anime.id}'] ?? false,
                                     ),
-                                  ],
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: _isDownloading ? null : _downloadAnime,
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        if (_isDownloading)
-                                          LinearProgressIndicator(
-                                            value: _downloadProgress,
-                                            backgroundColor: Colors.white24,
-                                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                  );
+                                  final isDownloaded = ref.watch(
+                                    downloadStatesNotifierProvider.select(
+                                      (state) => state['downloaded_${widget.anime.id}'] ?? false,
+                                    ),
+                                  );
+                                  final downloadProgress = ref.watch(
+                                    downloadProgressNotifierProvider.select(
+                                      (state) => state[widget.anime.id] ?? 0.0,
+                                    ),
+                                  );
+                                  
+                                  if (isDownloading) {
+                                    return Container(
+                                      height: 56,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.surfaceColor,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppTheme.primaryColor.withOpacity(0.3),
+                                            blurRadius: 12,
+                                            offset: const Offset(0, 6),
                                           ),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              _isDownloading ? Icons.downloading : Icons.download,
-                                              color: Colors.white,
-                                              size: 24,
+                                        ],
+                                      ),
+                                      child: Stack(
+                                        children: [
+                                          // Progress bar background
+                                          Container(
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.surfaceColor,
+                                              borderRadius: BorderRadius.circular(16),
                                             ),
-                                            const SizedBox(width: 12),
-                                            Text(
-                                              _isDownloading ? 'Downloading...' : 'Download',
+                                          ),
+                                          // Progress bar fill
+                                          FractionallySizedBox(
+                                            alignment: Alignment.centerLeft,
+                                            widthFactor: downloadProgress,
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                gradient: AppTheme.primaryGradient,
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                            ),
+                                          ),
+                                          // Percentage text
+                                          Center(
+                                            child: Text(
+                                              '${(downloadProgress * 100).toInt()}%',
                                               style: const TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w600,
                                               ),
                                             ),
-                                          ],
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+
+                                  if (isDownloaded) {
+                                    return Row(
+                                      children: [
+                                        Expanded(
+                                          child: Container(
+                                            height: 56,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [AppTheme.primaryColor, AppTheme.primaryColor.withOpacity(0.8)],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              borderRadius: BorderRadius.circular(16),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: AppTheme.primaryColor.withOpacity(0.3),
+                                                  blurRadius: 12,
+                                                  offset: const Offset(0, 6),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Material(
+                                              color: Colors.transparent,
+                                              child: InkWell(
+                                                borderRadius: BorderRadius.circular(16),
+                                                onTap: () => ref.read(downloadOperationsNotifierProvider.notifier).openDownloadedFile(widget.anime),
+                                                child: Center(
+                                                  child: Row(
+                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.play_arrow_rounded,
+                                                        color: Colors.white,
+                                                        size: 24,
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Text(
+                                                        'Open',
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 16,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Container(
+                                          height: 56,
+                                          width: 56,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [AppTheme.errorColor, AppTheme.errorColor.withOpacity(0.8)],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius: BorderRadius.circular(16),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: AppTheme.errorColor.withOpacity(0.3),
+                                                blurRadius: 12,
+                                                offset: const Offset(0, 6),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              borderRadius: BorderRadius.circular(16),
+                                              onTap: () => ref.read(downloadOperationsNotifierProvider.notifier).deleteDownload(widget.anime),
+                                              child: Center(
+                                                child: Icon(
+                                                  Icons.delete_rounded,
+                                                  color: Colors.white,
+                                                  size: 24,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }
+
+                                  return Container(
+                                    height: 56,
+                                    decoration: BoxDecoration(
+                                      gradient: AppTheme.primaryGradient,
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppTheme.primaryColor.withOpacity(0.3),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 6),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: () => ref.read(downloadOperationsNotifierProvider.notifier).downloadAnime(widget.anime),
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Center(
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.download_rounded,
+                                                color: Colors.white,
+                                                size: 24,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Text(
+                                                'Download',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                             
