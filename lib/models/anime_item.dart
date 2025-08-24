@@ -34,6 +34,13 @@ class AnimeItem {
       }
     }
     
+    // Parse bool values that might come as strings
+    bool parseBool(dynamic value) {
+      if (value is bool) return value;
+      if (value is String) return value.toLowerCase() == 'true';
+      return false;
+    }
+    
     // Debug logging for JSON structure
     if (kDebugMode) {
       print('Parsing JSON item: $json');
@@ -49,7 +56,7 @@ class AnimeItem {
       releasedDate: parseReleasedDate(json['releasedDate']),
       fileName: json['fileName'] ?? '',
       imageUrl: json['imgUrl'] ?? '',
-      tracked: json['tracked'] ?? false
+      tracked: parseBool(json['tracked'])
     );
   }
 

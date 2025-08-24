@@ -7,6 +7,7 @@ import 'services/auth_service.dart';
 import 'services/device_id_service.dart';
 import 'services/fcm_registration_service.dart';
 import 'services/auth_storage.dart';
+import 'services/notification_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'config/firebase_config.dart';
@@ -15,6 +16,7 @@ import 'config/firebase_config.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   print("Handling a background message: ${message.messageId}");
+  print(message.data);
 }
 
 Future<void> main() async {
@@ -55,6 +57,7 @@ class AnimeUpdatesApp extends StatefulWidget {
 
 class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> {
   String? _firebaseToken;
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -104,17 +107,41 @@ class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> {
     // Foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print("Got a message in foreground: ${message.notification?.title}");
+      print(message.data);
     });
 
     // When user taps notification
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print("User tapped notification: ${message.notification?.title}");
+      print(message.data);
+      
+      // Handle navigation to anime detail screen
+      if (_navigatorKey.currentContext != null) {
+        print('Attempting to navigate to anime detail from opened app');
+        NotificationService.handleAnimeNotification(_navigatorKey.currentContext!, message.data);
+      } else {
+        print('Navigator context is null, cannot navigate');
+      }
     });
+
+    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      print('App launched from notification: ${initialMessage.data}');
+      
+      // Handle navigation to anime detail screen when app is launched from notification
+      if (_navigatorKey.currentContext != null) {
+        print('Attempting to navigate to anime detail from initial message');
+        NotificationService.handleAnimeNotification(_navigatorKey.currentContext!, initialMessage.data);
+      } else {
+        print('Navigator context is null, cannot navigate');
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
