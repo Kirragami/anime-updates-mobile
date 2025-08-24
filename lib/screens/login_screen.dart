@@ -167,7 +167,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Column(
       children: [
         Text(
-          'Welcome Back!',
+          'Okaerinasai!',
           style: AppTheme.heading1.copyWith(
             fontSize: 32,
             fontWeight: FontWeight.bold,
@@ -175,9 +175,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Sign in to track your anime',
+          'How long are you going to just stand there? Sign in',
           style: AppTheme.body2.copyWith(
-            fontSize: 16,
+            fontSize: 13,
             color: AppTheme.textSecondary,
           ),
           textAlign: TextAlign.center,
@@ -224,7 +224,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Please enter your username';
+                return 'Nanashibito san? Enter your name!';
               }
               return null;
             },
@@ -253,10 +253,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               hintText: 'Password',
               prefixIcon: const Icon(Icons.lock_rounded, color: AppTheme.primaryColor),
               suffixIcon: IconButton(
-                icon: Icon(
-                  _isPasswordVisible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                  color: AppTheme.textSecondary,
+                icon: Image.asset(
+                  _isPasswordVisible 
+                      ? 'assets/images/gojo-eye-open.png' 
+                      : 'assets/images/gojo-eye-closed.png',
+                  width: 34,
+                  height: 34,
                 ),
+                padding: const EdgeInsets.all(8),
                 onPressed: () {
                   setState(() {
                     _isPasswordVisible = !_isPasswordVisible;
@@ -276,10 +280,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Please enter your password';
+                return 'How do you plan to sign in without a password?';
               }
               if (value.length < 6) {
-                return 'Password must be at least 6 characters';
+                return 'You are suspicious. Passwords are at least 6';
               }
               return null;
             },
@@ -335,7 +339,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          "Don't have an account? ",
+          "What? you don't have an account?",
           style: AppTheme.body2.copyWith(color: AppTheme.textSecondary),
         ),
         TextButton(
@@ -347,7 +351,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             );
           },
           child: Text(
-            'Sign Up',
+            'Here here',
             style: AppTheme.body2.copyWith(
               color: AppTheme.primaryColor,
               fontWeight: FontWeight.w600,

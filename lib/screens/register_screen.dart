@@ -195,7 +195,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return Column(
       children: [
         Text(
-          'Create Account',
+          'Join us',
           style: AppTheme.heading1.copyWith(
             fontSize: 32,
             fontWeight: FontWeight.bold,
@@ -203,9 +203,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Start your anime adventure today',
+          'Its not like we want you to make an account, Baka~',
           style: AppTheme.body2.copyWith(
-            fontSize: 16,
+            fontSize: 13,
             color: AppTheme.textSecondary,
           ),
           textAlign: TextAlign.center,
@@ -251,10 +251,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Please enter a username';
+                return 'Nanashibito san? Enter a name!';
               }
               if (value.length < 3) {
-                return 'Username must be at least 3 characters';
+                return 'Thats quite a short name, oi';
               }
               return null;
             },
@@ -283,10 +283,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               hintText: 'Password',
               prefixIcon: const Icon(Icons.lock_rounded, color: AppTheme.secondaryColor),
               suffixIcon: IconButton(
-                icon: Icon(
-                  _isPasswordVisible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                  color: AppTheme.textSecondary,
+                icon: Image.asset(
+                  _isPasswordVisible 
+                      ? 'assets/images/gojo-eye-open.png' 
+                      : 'assets/images/gojo-eye-closed.png',
+                  width: 34,
+                  height: 34,
                 ),
+                padding: const EdgeInsets.all(8),
                 onPressed: () {
                   setState(() {
                     _isPasswordVisible = !_isPasswordVisible;
@@ -306,10 +310,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Please enter a password';
+                return 'Never made an account before? Add a password';
               }
               if (value.length < 6) {
-                return 'Password must be at least 6 characters';
+                return 'At least 6, are you an idiot?';
               }
               return null;
             },
@@ -367,7 +371,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Already have an account? ',
+          'What do you mean you have an account?',
           style: AppTheme.body2.copyWith(color: AppTheme.textSecondary),
         ),
         TextButton(
@@ -379,7 +383,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             );
           },
           child: Text(
-            'Sign In',
+            'Get out',
             style: AppTheme.body2.copyWith(
               color: AppTheme.secondaryColor,
               fontWeight: FontWeight.w600,
