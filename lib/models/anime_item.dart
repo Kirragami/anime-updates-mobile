@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 class AnimeItem {
   final String id;
@@ -24,13 +25,14 @@ class AnimeItem {
   });
 
   factory AnimeItem.fromJson(Map<String, dynamic> json) {
-    // Parse the releasedDate string to DateTime
+    // Parse the releasedDate string to DateTime and convert from UTC to local time
     DateTime parseReleasedDate(String? dateString) {
-      if (dateString == null) return DateTime.now();
+      if (dateString == null) return DateTime.now().toLocal();
       try {
-        return DateTime.parse(dateString);
+        // Parse as UTC and then convert to local time
+        return DateTime.parse("${dateString}Z").toUtc().toLocal();
       } catch (e) {
-        return DateTime.now();
+        return DateTime.now().toLocal();
       }
     }
     
@@ -67,7 +69,7 @@ class AnimeItem {
       'animeShowId': animeShowId,
       'downloadUrl': downloadUrl,
       'episode': episode,
-      'releasedDate': releasedDate.toIso8601String(),
+      'releasedDate': releasedDate.toUtc().toIso8601String(),
       'imageUrl': imageUrl,
       'tracked': tracked,
     };
@@ -109,5 +111,14 @@ class AnimeItem {
   @override
   String toString() {
     return 'AnimeItem(id: $id, title: $title, animeShowId: $animeShowId, downloadUrl: $downloadUrl, episode: $episode, releasedDate: $releasedDate, fileName: $fileName, imageUrl: $imageUrl, tracked: $tracked)';
+  }
+
+  /// Formats the releasedDate for display in the user's local time zone
+  String formatReleasedDate([String pattern = 'yyyy-MM-dd HH:mm']) {
+    try {
+      return DateFormat(pattern).format(releasedDate);
+    } catch (e) {
+      return 'Invalid Date';
+    }
   }
 } 
