@@ -34,13 +34,13 @@ class FcmRegistrationService {
     _isRegistering = true;
     
     try {
-      // Get the device ID
-      final deviceId = await DeviceIdService.getDeviceId();
+      // Get the device ID (non-blocking)
+      final deviceIdFuture = DeviceIdService.getDeviceId();
       
       // Prepare the request payload
       final payload = {
         'token': fcmToken,
-        'deviceId': deviceId,
+        'deviceId': await deviceIdFuture,
       };
       
       // Make the HTTP request
@@ -78,30 +78,37 @@ class FcmRegistrationService {
   
   /// Register FCM token without checking if it's different
   /// Only registers if user is logged in
-  static Future<bool> registerStoredFcmToken() async {
+  static void registerStoredFcmToken() {
     // Only register if user is logged in
     if (!AuthService.isLoggedIn) {
       print('User not logged in, skipping FCM token registration');
-      return false;
+      return;
     }
     
+    // Run registration in background without blocking
+    _registerStoredFcmTokenImpl().catchError((error) {
+      print('Error registering stored FCM token: $error');
+    });
+  }
+  
+  /// Internal implementation of registerStoredFcmToken
+  static Future<void> _registerStoredFcmTokenImpl() async {
     try {
       // Get the stored FCM token
       final storedFcmToken = await AuthStorage.getFcmToken();
       
       if (storedFcmToken == null) {
         print('No stored FCM token found');
-        return false;
+        return;
       }
       
       print('Registering stored FCM token with backend...');
       print('Token: $storedFcmToken');
       
       // Register the stored token
-      return await registerFcmToken(storedFcmToken);
+      await registerFcmToken(storedFcmToken);
     } catch (e) {
-      print('Error registering stored FCM token: $e');
-      return false;
+      print('Error in _registerStoredFcmTokenImpl: $e');
     }
   }
   

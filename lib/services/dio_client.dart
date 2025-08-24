@@ -4,8 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'auth_service.dart';
 
 class AuthInterceptor extends Interceptor {
-  bool _isRefreshing = false;
-  final List<RequestOptions> _requests = [];
+  Future<Map<String, dynamic>>? _refreshFuture;
   final Dio _dio = Dio();
 
   @override
@@ -30,46 +29,9 @@ class AuthInterceptor extends Interceptor {
     if (err.response?.statusCode == 401 && 
         err.requestOptions.headers.containsKey('Authorization')) {
       
-      // If we're already refreshing, queue the request
-      if (_isRefreshing) {
-        _requests.add(err.requestOptions);
-        // Instead of returning, we'll resolve with a special error that indicates retry
-        return handler.next(err);
-      }
-      
-      _isRefreshing = true;
-      
       try {
-        // Refresh the access token with a reasonable timeout
-        final refreshCompleter = Completer<Map<String, dynamic>>();
-        final refreshTimeout = Duration(seconds: 10);
-        
-        // Start refresh in background
-        AuthService.refreshAccessToken().then((result) {
-          if (!refreshCompleter.isCompleted) {
-            refreshCompleter.complete(result);
-          }
-        }).catchError((error) {
-          if (!refreshCompleter.isCompleted) {
-            refreshCompleter.complete({
-              'success': false,
-              'message': 'Refresh failed',
-              'error': error.toString(),
-            });
-          }
-        });
-        
-        // Wait for refresh with timeout
-        final refreshResult = await refreshCompleter.future.timeout(
-          refreshTimeout,
-          onTimeout: () {
-            return {
-              'success': false,
-              'message': 'Refresh timeout',
-              'error': 'Token refresh timed out',
-            };
-          },
-        );
+        // Get or create the refresh future
+        final refreshResult = await (_refreshFuture ??= _refreshToken());
         
         if (refreshResult['success'] == true) {
           // Update the token in the failed request
@@ -101,83 +63,67 @@ class AuthInterceptor extends Interceptor {
               ),
             ).timeout(Duration(seconds: 30));
             
-            // Process queued requests
-            await _processQueuedRequests(token);
-            
             return handler.resolve(retryResponse);
           } catch (retryError) {
             // If retry fails, continue with original error
-            await _processQueuedRequests(token);
             return handler.next(err);
           }
         } else {
           // If refresh fails, logout user
           await AuthService.logout();
-          // Process queued requests with null token (they'll likely fail but we tried)
-          await _processQueuedRequests(null);
         }
       } catch (e) {
         // If refresh fails, logout user
         await AuthService.logout();
-        // Process queued requests with null token
-        await _processQueuedRequests(null);
       } finally {
-        _isRefreshing = false;
+        // Clear the refresh future so next 401 will trigger a new refresh
+        _refreshFuture = null;
       }
     }
     
     handler.next(err);
   }
   
-  Future<void> _processQueuedRequests(String? newToken) async {
-    if (_requests.isNotEmpty) {
-      final requests = List<RequestOptions>.from(_requests);
-      _requests.clear();
+  Future<Map<String, dynamic>> _refreshToken() async {
+    try {
+      // Refresh the access token with a reasonable timeout
+      final refreshCompleter = Completer<Map<String, dynamic>>();
+      final refreshTimeout = Duration(seconds: 10);
       
-      // Process queued requests concurrently with better error handling
-      await Future.wait(
-        requests.map((request) async {
-          if (newToken != null) {
-            request.headers['Authorization'] = 'Bearer $newToken';
-          }
-          
-          try {
-            // Create a new Dio instance without this interceptor for queued requests
-            final queueDio = Dio()
-              ..options = _dio.options
-              ..interceptors.addAll(
-                _dio.interceptors.where((interceptor) => interceptor != this),
-              );
-            
-            await queueDio.request(
-              request.path,
-              data: request.data,
-              queryParameters: request.queryParameters,
-              options: Options(
-                method: request.method,
-                headers: request.headers,
-              ),
-            ).timeout(Duration(seconds: 30));
-          } catch (e) {
-            // Log the error but don't let it stop processing other requests
-            if (kDebugMode) {
-              print('Error processing queued request: $e');
-            }
-            // Ignore errors in queued requests to prevent cascading failures
-          }
-        }),
-        // Limit concurrent requests to avoid overwhelming the server
-        eagerError: false,
-        cleanUp: null,
-      ).timeout(
-        Duration(seconds: 60), // Overall timeout for processing all queued requests
+      // Start refresh in background
+      AuthService.refreshAccessToken().then((result) {
+        if (!refreshCompleter.isCompleted) {
+          refreshCompleter.complete(result);
+        }
+      }).catchError((error) {
+        if (!refreshCompleter.isCompleted) {
+          refreshCompleter.complete({
+            'success': false,
+            'message': 'Refresh failed',
+            'error': error.toString(),
+          });
+        }
+      });
+      
+      // Wait for refresh with timeout
+      final refreshResult = await refreshCompleter.future.timeout(
+        refreshTimeout,
         onTimeout: () {
-          if (kDebugMode) {
-            print('Timeout processing queued requests');
-          }
-          return [];
+          return {
+            'success': false,
+            'message': 'Refresh timeout',
+            'error': 'Token refresh timed out',
+          };
         },
       );
+      
+      return refreshResult;
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Network error during refresh',
+        'error': e.toString(),
+      };
     }
   }
 }

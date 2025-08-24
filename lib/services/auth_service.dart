@@ -214,8 +214,27 @@ class AuthService {
     }
   }
 
+  // Shared Future for token refresh to prevent multiple concurrent refreshes
+  static Future<Map<String, dynamic>>? _refreshFuture;
+
   // Refresh token method
-  static Future<Map<String, dynamic>> refreshAccessToken() async {
+  static Future<Map<String, dynamic>> refreshAccessToken() {
+    // Return existing refresh future if one is already in progress
+    if (_refreshFuture != null) {
+      return _refreshFuture!;
+    }
+
+    // Create and store the refresh future
+    _refreshFuture = _performTokenRefresh().whenComplete(() {
+      // Clear the future when refresh is complete
+      _refreshFuture = null;
+    });
+
+    return _refreshFuture!;
+  }
+
+  // Internal method that performs the actual token refresh
+  static Future<Map<String, dynamic>> _performTokenRefresh() async {
     try {
       if (_refreshToken == null) {
         return {
@@ -386,4 +405,4 @@ class AuthService {
     _refreshToken = null;
     _currentUser = null;
   }
-} 
+}

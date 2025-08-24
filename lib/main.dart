@@ -30,12 +30,18 @@ Future<void> main() async {
   await AuthService.restoreSession();
   print("session restore done");
   
-  // Get device ID
-  final deviceId = await DeviceIdService.getDeviceId();
-  print("Device ID: $deviceId");
-
   // Setup background FCM handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Get device ID in background (don't await)
+  DeviceIdService.getDeviceId().then((deviceId) {
+    print("Device ID: $deviceId");
+  }).catchError((error) {
+    print("Error getting device ID: $error");
+  });
+
+  // Register stored FCM token in background
+  FcmRegistrationService.registerStoredFcmToken();
 
   runApp(const ProviderScope(child: AnimeUpdatesApp()));
 }
@@ -78,7 +84,7 @@ class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> {
     }
 
     // Register the stored FCM token with backend (only if user is logged in)
-    await FcmRegistrationService.registerStoredFcmToken();
+    FcmRegistrationService.registerStoredFcmToken();
 
     setState(() {
       _firebaseToken = token;
