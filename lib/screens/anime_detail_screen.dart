@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/anime_item.dart';
 import '../providers/auth_provider.dart';
+import '../providers/tracking_provider.dart';
 import '../services/download_service.dart';
-import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/animated_heart_button.dart';
 
 class AnimeDetailScreen extends ConsumerStatefulWidget {
   final AnimeItem anime;
@@ -27,7 +28,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   late Animation<Offset> _slideAnimation;
   
   bool _isDownloading = false;
-  bool _isTracking = false;
   double _downloadProgress = 0.0;
 
   @override
@@ -124,73 +124,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
         setState(() {
           _isDownloading = false;
           _downloadProgress = 0.0;
-        });
-      }
-    }
-  }
-
-  Future<void> _trackAnime() async {
-    if (_isTracking) return;
-    
-    setState(() {
-      _isTracking = true;
-    });
-
-    try {
-      // TODO: Replace with actual animeShowId when implemented
-      // For now, using the anime item ID as a placeholder
-      const String animeShowId = 'placeholder_id'; // TODO: Implement actual animeShowId
-      
-      final apiService = ApiService();
-      final accessToken = ref.read(authNotifierProvider).accessToken;
-      
-      final response = await apiService.trackAnime(
-        animeShowId: animeShowId,
-        accessToken: accessToken,
-      );
-      
-      if (mounted) {
-        if (response['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response['message'] ?? 'Anime added to tracking list!'),
-              backgroundColor: AppTheme.successColor,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response['message'] ?? 'Failed to track anime'),
-              backgroundColor: AppTheme.errorColor,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to track anime: ${e.toString()}'),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isTracking = false;
         });
       }
     }
@@ -457,32 +390,16 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             if (isLoggedIn) ...[
                               const SizedBox(width: 16),
                               // Track Button
-                              Container(
-                                height: 56,
-                                width: 56,
-                                decoration: BoxDecoration(
-                                  gradient: AppTheme.secondaryGradient,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppTheme.secondaryColor.withOpacity(0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 6),
-                                    ),
-                                  ],
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: _isTracking ? null : _trackAnime,
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Icon(
-                                      _isTracking ? Icons.check : Icons.bookmark_add,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
-                                  ),
-                                ),
+                              Consumer(
+                                builder: (context, ref, child) {
+                                  final isTracked = ref.watch(animeTrackingProvider(widget.anime));
+                                  final trackingNotifier = ref.read(animeTrackingProvider(widget.anime).notifier);
+                                  
+                                  return AnimatedHeartButton(
+                                    isTracked: isTracked,
+                                    onPressed: trackingNotifier.toggleTracking,
+                                  );
+                                }
                               ),
                             ],
                           ],

@@ -12,7 +12,7 @@ class AppConstants {
   static const String profileEndpoint = '/api/auth/profile';
 
   //Tracking Endpoints
-  static const String trackedReleasesEndpoint = '/api/tracking/releases';
+  static const String trackedReleasesEndpoint = '/api/tracking/get-releases';
   static const String trackedShowsEndpoint = '/api/tracking/shows';
   static const String trackShowEndpoint = '/api/tracking/track';
   static const String untrackShowEndpoint = '/api/tracking/untrack';

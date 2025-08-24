@@ -490,8 +490,7 @@ class ApiService {
         print('Tracking anime with ID: $animeShowId');
       }
 
-      // TODO: Replace with actual tracking endpoint
-      final uri = Uri.parse('${AppConstants.baseUrl}/api/anime/track');
+      final uri = Uri.parse('${AppConstants.baseUrl}${AppConstants.trackShowEndpoint}');
       
       final headers = <String, String>{
         'Content-Type': 'application/json',
@@ -508,7 +507,6 @@ class ApiService {
         uri.toString(),
         data: jsonEncode({
           'animeShowId': animeShowId,
-          'timestamp': DateTime.now().toIso8601String(),
         }),
         options: Options(
           headers: headers,

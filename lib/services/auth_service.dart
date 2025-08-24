@@ -166,9 +166,23 @@ class AuthService {
   // Logout method
   static Future<Map<String, dynamic>> logout() async {
     try {
+      // Get tokens before clearing them
+      final refreshToken = _refreshToken;
+      final fcmToken = await AuthStorage.getFcmToken();
+      
       if (_accessToken != null) {
+        // Send tokens in request body
+        final requestBody = <String, dynamic>{};
+        if (refreshToken != null) {
+          requestBody['refreshToken'] = refreshToken;
+        }
+        if (fcmToken != null) {
+          requestBody['fcmToken'] = fcmToken;
+        }
+        
         await dioClient.post(
           logoutUrl,
+          data: jsonEncode(requestBody),
           options: Options(
             headers: _authHeaders,
           ),
@@ -190,6 +204,7 @@ class AuthService {
       _accessToken = null;
       _refreshToken = null;
       _currentUser = null;
+      await AuthStorage.clear();
       
       return {
         'success': true,
