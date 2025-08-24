@@ -54,7 +54,11 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
         child: SafeArea(
           child: Column(
             children: [
-              _buildAppBar(context, ref),
+              userAsync.when(
+                data: (user) => _buildAppBar(context, ref, user),
+                loading: () => _buildAppBar(context, ref, null),
+                error: (error, stack) => _buildAppBar(context, ref, null),
+              ),
               // Ensure download operations provider initializes to check existing files
               Consumer(
                 builder: (context, ref, child) {
@@ -76,7 +80,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
     );
   }
 
-  Widget _buildAppBar(BuildContext context, WidgetRef ref) {
+  Widget _buildAppBar(BuildContext context, WidgetRef ref, dynamic user) {
     return Container(
       padding: const EdgeInsets.all(AppConstants.defaultPadding),
       child: Row(
@@ -104,12 +108,14 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
                 Text(
                   'My Shows',
                   style: AppTheme.heading2.copyWith(
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  'Your favorite anime collection',
+                  user != null 
+                      ? 'These are your favorite, ${user.username[0].toUpperCase()}${user.username.substring(1)}-sama'
+                      : 'These are your favorite,',
                   style: AppTheme.body2.copyWith(
                     color: AppTheme.textSecondary,
                   ),

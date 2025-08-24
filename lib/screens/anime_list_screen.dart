@@ -142,12 +142,12 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
                     Text(
                       'Newest Releases',
                       style: AppTheme.heading2.copyWith(
-                        fontSize: 24,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      'Download latest released episodes',
+                      'What do you wanna watch?',
                       style: AppTheme.body2.copyWith(
                         color: AppTheme.textSecondary,
                       ),
