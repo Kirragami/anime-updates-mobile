@@ -157,7 +157,7 @@ Widget build(BuildContext context, WidgetRef ref) {
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
                   Navigator.of(context).push(
-                    CustomPageTransitions.slideFromRight(const AnimeListScreen()),
+                    CustomPageTransitions.slideFromLeft(const AnimeListScreen()),
                   );
                 },
                 child: Container(
@@ -245,11 +245,13 @@ Widget build(BuildContext context, WidgetRef ref) {
                   final isLoggedIn = AuthService.isLoggedIn;
                   if (isLoggedIn) {
                     Navigator.of(context).push(
-                      CustomPageTransitions.slideFromBottom(const MyShowsScreen()),
+                      CustomPageTransitions.slideFromRight(const MyShowsScreen()),
                     );
                   } else {
                     Navigator.of(context).push(
-                      CustomPageTransitions.slideFromBottom(const LoginScreen()),
+                      CustomPageTransitions.slideFromBottom(
+                        LoginScreen(destination: const MyShowsScreen()),
+                      ),
                     );
                   }
                 },

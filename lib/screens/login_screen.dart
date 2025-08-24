@@ -9,7 +9,8 @@ import 'register_screen.dart';
 import 'homepage_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  final Widget? destination;
+  const LoginScreen({super.key, this.destination});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -42,10 +43,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       if (result['success']) {
         if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            CustomPageTransitions.fadeWithScale(const HomepageScreen()),
-            (route) => false,
-          );
+          if (widget.destination != null) {
+            // Navigate to destination, with homepage as the previous route
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => widget.destination!),
+              (route) => route.isFirst,
+            );
+          } else {
+            Navigator.of(context).pushAndRemoveUntil(
+              CustomPageTransitions.fadeWithScale(const HomepageScreen()),
+              (route) => route.isFirst,
+            );
+          }
         }
       } else {
         if (mounted) {
@@ -331,8 +340,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         TextButton(
           onPressed: () {
-            Navigator.of(context).push(
-              CustomPageTransitions.slideFromRight(const RegisterScreen()),
+            Navigator.of(context).pushReplacement(
+              CustomPageTransitions.slideFromRight(
+                RegisterScreen(destination: widget.destination),
+              ),
             );
           },
           child: Text(

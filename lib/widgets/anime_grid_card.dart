@@ -8,6 +8,7 @@ import '../providers/tracking_provider.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../screens/anime_detail_screen.dart';
+import '../utils/page_transitions.dart';
 
 class AnimeGridCard extends ConsumerWidget {
   final AnimeItem anime;
@@ -64,8 +65,8 @@ class AnimeGridCard extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(AppConstants.borderRadius),
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => AnimeDetailScreen(anime: anime),
+                        CustomPageTransitions.slideFromRight(
+                          AnimeDetailScreen(anime: anime),
                         ),
                       );
                     },

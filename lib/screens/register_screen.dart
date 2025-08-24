@@ -9,7 +9,8 @@ import 'login_screen.dart';
 import 'homepage_screen.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({super.key});
+  final Widget? destination;
+  const RegisterScreen({super.key, this.destination});
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -372,7 +373,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         TextButton(
           onPressed: () {
             Navigator.of(context).pushReplacement(
-              CustomPageTransitions.slideFromLeft(const LoginScreen()),
+              CustomPageTransitions.slideFromLeft(
+                LoginScreen(destination: widget.destination),
+              ),
             );
           },
           child: Text(
