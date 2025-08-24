@@ -323,7 +323,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
   Future<void> _showLogoutDialog(BuildContext context, WidgetRef ref) async {
     return showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           backgroundColor: AppTheme.surfaceColor,
           shape: RoundedRectangleBorder(
@@ -339,7 +339,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text(
                 'Cancel',
                 style: AppTheme.body1.copyWith(color: AppTheme.textSecondary),
@@ -347,11 +347,12 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
             ),
             ElevatedButton(
               onPressed: () async {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
                 await ref.read(authNotifierProvider).logout();
+                // Use the main context for navigation
                 if (context.mounted) {
                   Navigator.of(context).pushAndRemoveUntil(
-                    CustomPageTransitions.elasticBounce(const HomepageScreen()),
+                    MaterialPageRoute(builder: (context) => const HomepageScreen()),
                     (route) => false,
                   );
                 }
