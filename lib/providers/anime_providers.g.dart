@@ -59,7 +59,7 @@ final downloadedCountProvider = AutoDisposeProvider<int>.internal(
 );
 
 typedef DownloadedCountRef = AutoDisposeProviderRef<int>;
-String _$animeListNotifierHash() => r'54d69ff0c40e067d9e05ca55a595fa7d6b721d3d';
+String _$animeListNotifierHash() => r'045f2be4b73bdb13dbbebce45dcdd835e2ed05e3';
 
 /// Provides the list of anime items
 ///
@@ -172,7 +172,7 @@ final downloadStatesNotifierProvider = AutoDisposeNotifierProvider<
 
 typedef _$DownloadStatesNotifier = AutoDisposeNotifier<Map<String, bool>>;
 String _$downloadOperationsNotifierHash() =>
-    r'7a814ad08cabd0ff46813da84c8d5b24cc74f700';
+    r'1fb047f56bf0ad7e7b5be482067a7a226642edef';
 
 /// Provides download operations for anime items
 ///

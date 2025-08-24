@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../models/anime_item.dart';
 import '../providers/anime_providers.dart';
 import '../widgets/anime_grid_view.dart';
@@ -20,17 +20,56 @@ class AnimeListScreen extends ConsumerStatefulWidget {
 class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
     with TickerProviderStateMixin {
   late RefreshController _refreshController;
+  late AnimationController _searchBarAnimationController;
+  late TextEditingController _searchController;
+  bool _isSearchBarVisible = false;
+  Timer? _debounceTimer;
+  final GlobalKey<SmartRefresherState> _refreshKey = GlobalKey<SmartRefresherState>();
 
   @override
   void initState() {
     super.initState();
     _refreshController = RefreshController(initialRefresh: false);
+    _searchBarAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 100), // Very fast animation
+      vsync: this,
+    );
+    _searchController = TextEditingController();
   }
 
   @override
   void dispose() {
     _refreshController.dispose();
+    _searchBarAnimationController.dispose();
+    _searchController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  void _toggleSearchBar() {
+    setState(() {
+      _isSearchBarVisible = !_isSearchBarVisible;
+      if (_isSearchBarVisible) {
+        _searchBarAnimationController.forward();
+      } else {
+        _searchBarAnimationController.reverse();
+        _searchController.clear();
+        // Reset to show all items without resetting scroll position
+        ref.read(animeListNotifierProvider.notifier).refresh();
+      }
+    });
+  }
+
+  void _onSearchChanged(String query) {
+    // Cancel previous timer
+    _debounceTimer?.cancel();
+    
+    // Very fast debounce for more responsive search
+    _debounceTimer = Timer(const Duration(milliseconds: 100), () {
+      if (query == _searchController.text) {
+        ref.read(animeListNotifierProvider.notifier).searchAnime(query);
+      }
+    });
   }
 
   @override
@@ -47,6 +86,11 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
           child: Column(
             children: [
               _buildAppBar(),
+              SizeTransition(
+                sizeFactor: _searchBarAnimationController,
+                axisAlignment: -1.0,
+                child: _buildSearchBar(),
+              ),
               Expanded(
                 child: Consumer(
                   builder: (context, ref, child) {
@@ -111,6 +155,21 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
                   ],
                 ),
               ),
+              IconButton(
+                onPressed: _toggleSearchBar,
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    _isSearchBarVisible ? Icons.close_rounded : Icons.search_rounded,
+                    color: AppTheme.textPrimary,
+                    size: 24,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -118,8 +177,49 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
     );
   }
 
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppConstants.defaultPadding,
+        vertical: AppConstants.smallPadding,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _searchController,
+          onChanged: _onSearchChanged,
+          style: AppTheme.body1.copyWith(color: AppTheme.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'Search anime...',
+            hintStyle: AppTheme.body2.copyWith(color: AppTheme.textSecondary),
+            border: InputBorder.none,
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: AppTheme.textSecondary,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAnimeList(List<AnimeItem> animeList) {
     return SmartRefresher(
+      key: _refreshKey, // Preserve state
       controller: _refreshController,
       enablePullDown: true,
       enablePullUp: false,
@@ -187,6 +287,4 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
       ),
     );
   }
-
-
 } 

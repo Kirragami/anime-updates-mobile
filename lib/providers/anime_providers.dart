@@ -18,10 +18,12 @@ class AnimeListNotifier extends _$AnimeListNotifier {
   bool _hasMore = true;
   bool _isLoadingMore = false;
   final List<AnimeItem> _items = [];
+  String _currentSearchQuery = '';
 
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
   int get pageSize => _pageSize;
+  String get currentSearchQuery => _currentSearchQuery;
 
   @override
   Future<List<AnimeItem>> build() async {
@@ -32,6 +34,7 @@ class AnimeListNotifier extends _$AnimeListNotifier {
     _currentPage = 0;
     _hasMore = true;
     _isLoadingMore = false;
+    _currentSearchQuery = '';
 
     // Fetch first page
     final result = await apiService.fetchAnimePage(page: _currentPage, size: _pageSize);
@@ -73,6 +76,33 @@ class AnimeListNotifier extends _$AnimeListNotifier {
     } finally {
       _isLoadingMore = false;
       ref.read(listLoadingMoreProvider.notifier).setLoading(false);
+    }
+  }
+
+  /// Search for anime by title
+  Future<void> searchAnime(String query) async {
+    // Don't search if query is empty or the same as current query
+    if (query.isEmpty) {
+      // If query is empty, refresh to show all items
+      refresh();
+      return;
+    }
+
+    if (_currentSearchQuery == query) {
+      return;
+    }
+
+    _currentSearchQuery = query;
+    
+    try {
+      final apiService = ref.read(apiServiceProvider);
+      final searchResults = await apiService.searchAnime(query);
+      
+      // Update state with search results
+      state = AsyncData<List<AnimeItem>>(searchResults);
+    } catch (e, st) {
+      // Surface error
+      state = AsyncError<List<AnimeItem>>(e, st);
     }
   }
 }
