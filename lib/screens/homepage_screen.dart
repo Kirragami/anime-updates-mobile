@@ -15,46 +15,35 @@ class HomepageScreen extends ConsumerWidget {
   const HomepageScreen({super.key, this.fcmToken});
   
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.backgroundGradient,
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(AppConstants.largePadding),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // App Title
-                _buildAppTitle(),
-                
-                
-                const SizedBox(height: AppConstants.largePadding),
-                const SizedBox(height: AppConstants.largePadding),
-                const SizedBox(height: AppConstants.largePadding),
-
-                const SizedBox(height: AppConstants.largePadding),
-                const SizedBox(height: AppConstants.largePadding),
-                const SizedBox(height: AppConstants.largePadding),
-
-                const SizedBox(height: AppConstants.largePadding),
-                const SizedBox(height: AppConstants.largePadding),
-                const SizedBox(height: AppConstants.largePadding),
-                
-                // Animated GIF
-                _buildAnimatedGif(),
-                // Navigation Buttons
-                _buildNavigationButtons(context),
-              ],
-            ),
+Widget build(BuildContext context, WidgetRef ref) {
+  return Scaffold(
+    body: Container(
+      decoration: const BoxDecoration(
+        gradient: AppTheme.backgroundGradient,
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppConstants.largePadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Spacer(),
+              _buildAppTitle(),
+              const Spacer(),
+              Column(
+                children: [
+                  _buildAnimatedGif(),
+                  _buildNavigationButtons(context),
+                ],
+              ),
+              const Spacer()
+            ],
           ),
         ),
       ),
-    );
-  }
-
+    ),
+  );
+}
 
 
   Widget _buildAppTitle() {
