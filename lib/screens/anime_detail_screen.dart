@@ -8,6 +8,7 @@ import '../providers/anime_providers.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_heart_button.dart';
+import '../widgets/top_toast.dart';
 
 class AnimeDetailScreen extends ConsumerStatefulWidget {
   final AnimeItem anime;
@@ -488,7 +489,25 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                   
                                   return AnimatedHeartButton(
                                     isTracked: isTracked,
-                                    onPressed: trackingNotifier.toggleTracking,
+                                    onPressed: () async {
+                                      final willBeTracked = !isTracked;
+                                      await trackingNotifier.toggleTracking();
+                                      if (!mounted) return;
+                                      await showTopToast(
+                                        context,
+                                        willBeTracked
+                                            ? 'You have tracked this show!'
+                                            : 'Removed from tracking.',
+                                        icon: willBeTracked
+                                            ? Icons.check_circle_rounded
+                                            : Icons.favorite_border_rounded,
+                                        background: willBeTracked
+                                            ? AppTheme.successColor
+                                            : AppTheme.surfaceColor,
+                                        foreground: Colors.white,
+                                        duration: const Duration(seconds: 2),
+                                      );
+                                    },
                                   );
                                 }
                               ),
