@@ -69,3 +69,9 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // jlibtorrent
+    implementation fileTree(dir: "libs", include: ["*.jar"])
+}
+

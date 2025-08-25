@@ -72,6 +72,10 @@ dependencies:
   firebase_core: ^4.0.0
   firebase_messaging: ^16.0.0
   device_info_plus: ^10.1.0
+  
+  # Torrent Support
+  dtorrent_parser: ^1.0.4
+  dtorrent_task: '>= 0.2.1 < 2.0.0'
 
 dev_dependencies:
   flutter_test:
