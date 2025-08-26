@@ -9,12 +9,14 @@ import com.frostwire.jlibtorrent.alerts.Alert;
 import com.frostwire.jlibtorrent.alerts.AlertType;
 import com.frostwire.jlibtorrent.alerts.BlockFinishedAlert;
 import com.frostwire.jlibtorrent.swig.torrent_flags_t;
+import com.frostwire.jlibtorrent.TorrentFlags
 import java.io.File
 import android.util.Log
 
 class MainActivity : FlutterActivity() {    
     private val CHANNEL = "torrent"
     private var torrentHandle: TorrentHandle? = null
+    private var lastProgress: Double = 0.0
 
     private val sessionManager: SessionManager? by lazy {
         try {
@@ -25,8 +27,6 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-
-    
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         Log.w("Kirra's Log: ", "configureFlutterEngine called")
         super.configureFlutterEngine(flutterEngine)
@@ -42,18 +42,20 @@ class MainActivity : FlutterActivity() {
                     Log.w("Kirra's Log: ", "Started torrent onKotlin side.")
                     result.success("Started")
                 }
+                "pauseTorrent" -> {
+                    pauseTorrent()
+                    result.success("Paused")
+                }
+                "resumeTorrent" -> {
+                    resumeTorrent()
+                    result.success("Resumed")
+                }
                 "stopTorrent" -> {
                     stopTorrent()
                     result.success("Stopped")
                 }
                 "getProgress" -> {
-                    val progress = try {
-                        torrentHandle?.status()?.progress() ?: 0f
-                    } catch (e: Throwable) {
-                        e.printStackTrace()
-                        0f
-                    }
-                    result.success((progress * 100).toInt())
+                    result.success(lastProgress)
                 }
                 else -> result.notImplemented()
             }
@@ -71,9 +73,8 @@ class MainActivity : FlutterActivity() {
                         torrentHandle?.resume()
                     }
                     com.frostwire.jlibtorrent.alerts.AlertType.BLOCK_FINISHED -> {
-                        val a = alert as BlockFinishedAlert
-                        val p = (a.handle().status().progress() * 100).toInt()
-                        println("Progress: $p% for torrent: ${a.torrentName()}")
+                        val a = (alert as com.frostwire.jlibtorrent.alerts.BlockFinishedAlert)
+                        lastProgress = (a.handle().status().progress() * 100).toDouble()
                     }
                     com.frostwire.jlibtorrent.alerts.AlertType.TORRENT_FINISHED -> {
                         println("Torrent finished")
@@ -91,8 +92,19 @@ class MainActivity : FlutterActivity() {
         sessionManager?.download(ti, saveDir)
     }
 
+    
+
+    private fun pauseTorrent() {
+        sessionManager?.pause()
+    }
+
+
+
+    private fun resumeTorrent() {
+        sessionManager?.resume()
+    }
+
     private fun stopTorrent() {
-        torrentHandle?.pause()
         sessionManager?.stop()
     }
 }
