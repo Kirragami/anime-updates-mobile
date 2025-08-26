@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/homepage_screen.dart';
+import 'screens/torrent_test_screen.dart'; // Added import for torrent test screen
 import 'theme/app_theme.dart';
 import 'constants/app_constants.dart';
 import 'services/auth_service.dart';
@@ -148,6 +149,9 @@ class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> {
       home: HomepageScreen(
         fcmToken: _firebaseToken, // pass token if you want to show/debug it
       ),
+      routes: {
+        '/torrent-test': (context) => const TorrentTestScreen(), // Added route for torrent test screen
+      },
     );
   }
 }

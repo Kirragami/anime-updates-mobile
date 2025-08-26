@@ -3,74 +3,96 @@ package com.aura.anime_updates
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import com.frostwire.jlibtorrent.SessionManager
-import com.frostwire.jlibtorrent.TorrentHandle
-import com.frostwire.jlibtorrent.TorrentInfo
-import com.frostwire.jlibtorrent.AddTorrentParams
-
+import com.frostwire.jlibtorrent.*;
+import com.frostwire.jlibtorrent.alerts.AddTorrentAlert;
+import com.frostwire.jlibtorrent.alerts.Alert;
+import com.frostwire.jlibtorrent.alerts.AlertType;
+import com.frostwire.jlibtorrent.alerts.BlockFinishedAlert;
+import com.frostwire.jlibtorrent.swig.torrent_flags_t;
 import java.io.File
+import android.util.Log
 
-class MainActivity: FlutterActivity() {
-
+class MainActivity : FlutterActivity() {    
     private val CHANNEL = "torrent"
-    private var sessionManager: SessionManager? = null
-    private var handle: TorrentHandle? = null
+    private var torrentHandle: TorrentHandle? = null
 
+    private val sessionManager: SessionManager? by lazy {
+        try {
+            SessionManager()
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+
+    
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        Log.w("Kirra's Log: ", "configureFlutterEngine called")
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "startTorrent" -> {
-                        val torrentPath: String? = call.argument("torrentPath")
-                        val savePath: String? = call.argument("savePath")
-                        if (torrentPath != null && savePath != null) {
-                            startTorrent(torrentPath, savePath)
-                            result.success(null)
-                        } else {
-                            result.error("INVALID_ARGS", "Missing torrentPath or savePath", null)
-                        }
-                    }
-                    "getProgress" -> {
-                        // Note: progress() is now a function
-                        result.success(handle?.status()?.progress() ?: 0.0)
-                    }
-                    "stopTorrent" -> {
-                        stopTorrent()
-                        result.success(null)
-                    }
-                    else -> result.notImplemented()
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startTorrent" -> {
+                    Log.w("Kirra's Log: ", "Entered into startTorrent event in Kotlin.")
+                    val torrentPath = call.argument<String>("torrentPath") ?: return@setMethodCallHandler
+                    val savePath = call.argument<String>("savePath") ?: filesDir.absolutePath
+
+                    startTorrent(torrentPath, savePath)
+                    Log.w("Kirra's Log: ", "Started torrent onKotlin side.")
+                    result.success("Started")
                 }
+                "stopTorrent" -> {
+                    stopTorrent()
+                    result.success("Stopped")
+                }
+                "getProgress" -> {
+                    val progress = try {
+                        torrentHandle?.status()?.progress() ?: 0f
+                    } catch (e: Throwable) {
+                        e.printStackTrace()
+                        0f
+                    }
+                    result.success((progress * 100).toInt())
+                }
+                else -> result.notImplemented()
             }
+        }
     }
 
     private fun startTorrent(torrentPath: String, savePath: String) {
-        sessionManager = SessionManager()
+        sessionManager?.addListener(object : AlertListener {
+            override fun types(): IntArray? = null
 
-        sessionManager!!.start()
+            override fun alert(alert: Alert<*>) {
+                when (alert.type()) {
+                    com.frostwire.jlibtorrent.alerts.AlertType.ADD_TORRENT -> {
+                        torrentHandle = (alert as AddTorrentAlert).handle()
+                        torrentHandle?.resume()
+                    }
+                    com.frostwire.jlibtorrent.alerts.AlertType.BLOCK_FINISHED -> {
+                        val a = alert as BlockFinishedAlert
+                        val p = (a.handle().status().progress() * 100).toInt()
+                        println("Progress: $p% for torrent: ${a.torrentName()}")
+                    }
+                    com.frostwire.jlibtorrent.alerts.AlertType.TORRENT_FINISHED -> {
+                        println("Torrent finished")
+                    }
+                    else -> { /* ignore */ }
+                }
+            }
+        })
+
+        sessionManager?.start()
 
         val ti = TorrentInfo(File(torrentPath))
         val saveDir = File(savePath)
 
-        // Add listener to get the TorrentHandle when ready
-        sessionManager!!.addListener(object : SessionManager.Listener {
-            override fun onAddTorrent(t: TorrentHandle) {
-                handle = t
-            }
-        })
-
-        // Start the download (no return value)
-        sessionManager!!.download(ti, saveDir)
+        sessionManager?.download(ti, saveDir)
     }
 
-
-
     private fun stopTorrent() {
-        handle?.let {
-            if (!it.isValid) return
-            it.pause()
-            sessionManager?.stop()
-        }
+        torrentHandle?.pause()
+        sessionManager?.stop()
     }
 }
