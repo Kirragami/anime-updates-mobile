@@ -370,7 +370,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                               child: InkWell(
                                                 borderRadius: BorderRadius.circular(16),
                                                 onTap: () => ref.read(downloadOperationsNotifierProvider.notifier).openDownloadedFile(widget.anime),
-                                                child: Center(
+                                                child: const Center(
                                                   child: Row(
                                                     mainAxisAlignment: MainAxisAlignment.center,
                                                     children: [
@@ -379,7 +379,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                                         color: Colors.white,
                                                         size: 24,
                                                       ),
-                                                      const SizedBox(width: 8),
+                                                       SizedBox(width: 8),
                                                       Text(
                                                         'Open',
                                                         style: TextStyle(
@@ -419,7 +419,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                             child: InkWell(
                                               borderRadius: BorderRadius.circular(16),
                                               onTap: () => ref.read(downloadOperationsNotifierProvider.notifier).deleteDownload(widget.anime),
-                                              child: Center(
+                                              child:const Center(
                                                 child: Icon(
                                                   Icons.delete_rounded,
                                                   color: Colors.white,
@@ -451,7 +451,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                       child: InkWell(
                                         onTap: () => ref.read(downloadOperationsNotifierProvider.notifier).downloadAnime(widget.anime),
                                         borderRadius: BorderRadius.circular(16),
-                                        child: Center(
+                                        child:const Center(
                                           child: Row(
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
@@ -460,10 +460,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                                 color: Colors.white,
                                                 size: 24,
                                               ),
-                                              const SizedBox(width: 12),
+                                               SizedBox(width: 12),
                                               Text(
                                                 'Download',
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   color: Colors.white,
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w600,
@@ -561,7 +561,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   }
 
   Widget _buildEpisodesHeader(List<AnimeItem> episodes) {
-    return Text(
+    return const Text(
       'All Episodes',
       style: AppTheme.heading2,
     );

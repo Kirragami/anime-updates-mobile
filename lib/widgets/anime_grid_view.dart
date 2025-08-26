@@ -74,13 +74,16 @@ class AnimeGridView extends ConsumerWidget {
           return false;
         },
         child: GridView.builder(
-        padding: const EdgeInsets.all(AppConstants.smallPadding),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 4
+        ),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount(context),
           // childAspectRatio: 0.525,
           mainAxisExtent: 360,
-          crossAxisSpacing: AppConstants.smallPadding,
-          mainAxisSpacing: AppConstants.smallPadding,
+          crossAxisSpacing: 2,
+          mainAxisSpacing: 2,
         ),
           itemCount: animeList.length + (isLoadingMore ? pageSize : 0),
         itemBuilder: (context, index) {

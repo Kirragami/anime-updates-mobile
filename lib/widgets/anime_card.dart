@@ -103,7 +103,7 @@ class AnimeCard extends StatelessWidget {
                           _buildActionButton(),
                         ],
                       ),
-                      
+
                       // Progress indicator
                       if (isDownloading) ...[
                         const SizedBox(height: 12),
@@ -149,7 +149,7 @@ class AnimeCard extends StatelessWidget {
           color: AppTheme.primaryColor.withOpacity(0.2),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Center(
+        child: const Center(
           child: SizedBox(
             width: 24,
             height: 24,
@@ -170,7 +170,10 @@ class AnimeCard extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppTheme.primaryColor, AppTheme.primaryColor.withOpacity(0.8)],
+                colors: [
+                  AppTheme.primaryColor,
+                  AppTheme.primaryColor.withOpacity(0.8)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -189,11 +192,12 @@ class AnimeCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 onTap: onOpen,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.play_arrow_rounded,
                         color: AppTheme.textPrimary,
                         size: 18,
@@ -217,7 +221,10 @@ class AnimeCard extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppTheme.errorColor, AppTheme.errorColor.withOpacity(0.8)],
+                colors: [
+                  AppTheme.errorColor,
+                  AppTheme.errorColor.withOpacity(0.8)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -236,11 +243,12 @@ class AnimeCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 onTap: onDelete,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.delete_rounded,
                         color: AppTheme.textPrimary,
                         size: 18,
@@ -285,7 +293,7 @@ class AnimeCard extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.download_rounded,
                   color: AppTheme.textPrimary,
                   size: 20,
@@ -332,10 +340,11 @@ class AnimeCard extends StatelessWidget {
         LinearProgressIndicator(
           value: downloadProgress,
           backgroundColor: AppTheme.surfaceColor,
-          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+          valueColor:
+              const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
           borderRadius: BorderRadius.circular(4),
         ),
       ],
     );
   }
-} 
+}

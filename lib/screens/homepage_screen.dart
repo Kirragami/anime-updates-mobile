@@ -128,6 +128,7 @@ Widget build(BuildContext context, WidgetRef ref) {
         Expanded(
           child: Container(
             height: 80,
+            margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -213,6 +214,7 @@ Widget build(BuildContext context, WidgetRef ref) {
         Expanded(
           child: Container(
             height: 80,
+            margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,

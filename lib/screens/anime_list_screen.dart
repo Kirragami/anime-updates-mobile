@@ -18,75 +18,65 @@ class AnimeListScreen extends ConsumerStatefulWidget {
   ConsumerState<AnimeListScreen> createState() => _AnimeListScreenState();
 }
 
-class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
-    with TickerProviderStateMixin {
+class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
   late RefreshController _refreshController;
-  late AnimationController _placeholderAnimationController;
   late TextEditingController _searchController;
   Timer? _debounceTimer;
-  final GlobalKey<SmartRefresherState> _refreshKey = GlobalKey<SmartRefresherState>();
-  
-  // Animated placeholder texts
-  final List<String> _placeholderTexts = [
-    'Search for anime...',
-    'Find your favorite shows...',
-    'Discover new releases...',
-    'Look for specific episodes...',
-    'Browse anime collection...',
+  final GlobalKey<SmartRefresherState> _refreshKey =
+      GlobalKey<SmartRefresherState>();
+
+  // Search focus state
+  bool _isSearchFocused = false;
+  final FocusNode _searchFocusNode = FocusNode();
+
+  final List<String> _placeholders = [
+    "Search for anime",
+    "Find your favorite shows",
+    "Discover new releases",
+    "Look for specific episodes",
+    "Browse anime collection"
   ];
-  int _currentPlaceholderIndex = 0;
-  late Animation<double> _scrollAnimation;
-  late Animation<double> _fadeAnimation;
+
+  int _currentPlaceholder = 0;
+  late Timer _placeholderTimer;
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize controllers
     _refreshController = RefreshController(initialRefresh: false);
-    _placeholderAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    );
     _searchController = TextEditingController();
-    
-    // Setup scroll and fade animations
-    _scrollAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _placeholderAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _fadeAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _placeholderAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    // Start placeholder animation
-    _startPlaceholderAnimation();
+
+    //change placeholder every 2 seconds;
+    _placeholderTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (!_isSearchFocused) {
+        setState(() {
+          _currentPlaceholder =
+              (_currentPlaceholder + 1) % _placeholders.length;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _refreshController.dispose();
-    _placeholderAnimationController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _debounceTimer?.cancel();
+    _placeholderTimer.cancel();
     super.dispose();
   }
 
-  void _startPlaceholderAnimation() {
-    Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (mounted) {
-        _placeholderAnimationController.forward().then((_) {
-          setState(() {
-            _currentPlaceholderIndex = (_currentPlaceholderIndex + 1) % _placeholderTexts.length;
-          });
-          _placeholderAnimationController.reset();
-        });
+  void _toggleSearch() {
+    setState(() {
+      _isSearchFocused = !_isSearchFocused;
+      if (!_isSearchFocused) {
+        _searchController.clear();
+        FocusScope.of(context).unfocus();
+      } else {
+        _searchFocusNode.requestFocus();
       }
     });
   }
@@ -94,7 +84,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
   void _onSearchChanged(String query) {
     // Cancel previous timer
     _debounceTimer?.cancel();
-    
+
     // Very fast debounce for more responsive search
     _debounceTimer = Timer(const Duration(milliseconds: 100), () {
       if (query == _searchController.text) {
@@ -116,13 +106,16 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
         child: SafeArea(
           child: Column(
             children: [
-              _buildModernHeader(),
-              _buildAlwaysVisibleSearchBar(),
+              Container(
+                margin:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: _buildModernHeader(),
+              ),
               Expanded(
                 child: Consumer(
                   builder: (context, ref, child) {
                     final animeListAsync = ref.watch(animeListNotifierProvider);
-                    
+
                     return animeListAsync.when(
                       data: (animeList) => _buildAnimeList(animeList),
                       loading: () => const AnimeGridSkeleton(),
@@ -140,156 +133,176 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
 
   Widget _buildModernHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 24,
-        vertical: 20,
-      ),
+      padding: const EdgeInsets.fromLTRB(0, 12, 16, 16),
+      // Remove background decoration to make it transparent
       child: Row(
         children: [
-          // Modern back button
-          Container(
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceColor.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.1),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => Navigator.of(context).pop(),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  child: const Icon(
-                    Icons.arrow_back_ios_rounded,
-                    color: Colors.white,
-                    size: 20,
+          // Profile section (Back button + Title)
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: _isSearchFocused ? 0.0 : 1.0,
+            child: Row(
+              children: [
+                // Back button
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceColor.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.1),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_ios_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                 ),
-              ),
+
+                const SizedBox(width: 16),
+
+                // Title text
+                const Text(
+                  "New Releases",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
-          
-          const SizedBox(width: 20),
-          
-          // Modern title section
+
+          // Search bar
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Newest Releases',
-                  style: AppTheme.heading1.copyWith(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              height: 40,
+              child: GestureDetector(
+                onTap: () {
+                  if (!_isSearchFocused) {
+                    _toggleSearch();
+                  }
+                },
+                child: Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppTheme.primaryColor.withOpacity(0.3),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 12),
+                      const Icon(
+                       Icons.search,
+                        color: AppTheme.primaryColor,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Search input or placeholder
+                      Expanded(
+                        child: _isSearchFocused
+                            ? TextField(
+                                controller: _searchController,
+                                focusNode: _searchFocusNode,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: _placeholders[_currentPlaceholder],
+                                  hintStyle: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                    fontSize: 14,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onChanged: _onSearchChanged,
+                              )
+                            : AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 600),
+                                transitionBuilder: (child, animation) =>
+                                    SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 1),
+                                    end: Offset.zero,
+                                  ).animate(CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeInOut,
+                                  )),
+                                  child: FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  ),
+                                ),
+                                child: Container(
+                                  key: ValueKey<int>(_currentPlaceholder),
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    _placeholders[_currentPlaceholder],
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.6),
+                                      fontSize: 14,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                      ),
+
+                      // Close button when searching
+                      if (_isSearchFocused) ...[
+                        GestureDetector(
+                          onTap: _toggleSearch,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        const SizedBox(width: 12),
+                      ],
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'What do you wanna watch?',
-                  style: AppTheme.body1.copyWith(
-                    color: AppTheme.textSecondary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildAlwaysVisibleSearchBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceColor.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.1),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              style: AppTheme.body1.copyWith(
-                color: AppTheme.textPrimary,
-                fontSize: 16,
-              ),
-              decoration: InputDecoration(
-                hintText: '',
-                border: InputBorder.none,
-                prefixIcon: Container(
-                  margin: const EdgeInsets.only(left: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.search_rounded,
-                      color: AppTheme.primaryColor,
-                      size: 20,
-                    ),
-                  ),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 18,
-                ),
-              ),
-            ),
-            // Animated placeholder overlay
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 60, top: 18, bottom: 18),
-                child: AnimatedBuilder(
-                  animation: _placeholderAnimationController,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _fadeAnimation.value,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          _placeholderTexts[_currentPlaceholderIndex],
-                          style: AppTheme.body1.copyWith(
-                            color: AppTheme.textSecondary.withOpacity(0.7),
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -309,9 +322,15 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
       },
       child: AnimeGridView(
         animeList: animeList,
-        onDownload: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).downloadAnime(anime),
-        onDelete: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).deleteDownload(anime),
-        onOpen: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).openDownloadedFile(anime),
+        onDownload: (anime) => ref
+            .read(downloadOperationsNotifierProvider.notifier)
+            .downloadAnime(anime),
+        onDelete: (anime) => ref
+            .read(downloadOperationsNotifierProvider.notifier)
+            .deleteDownload(anime),
+        onOpen: (anime) => ref
+            .read(downloadOperationsNotifierProvider.notifier)
+            .openDownloadedFile(anime),
       ),
     );
   }
@@ -329,7 +348,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
                 color: AppTheme.errorColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(50),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.error_outline_rounded,
                 size: 60,
                 color: AppTheme.errorColor,
@@ -364,4 +383,4 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
       ),
     );
   }
-} 
+}

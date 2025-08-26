@@ -339,7 +339,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          "What? you don't have an account?",
+          "Join us today - it's free",
           style: AppTheme.body2.copyWith(color: AppTheme.textSecondary),
         ),
         TextButton(
@@ -351,7 +351,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             );
           },
           child: Text(
-            'Here here',
+            'Sign Up',
             style: AppTheme.body2.copyWith(
               color: AppTheme.primaryColor,
               fontWeight: FontWeight.w600,
