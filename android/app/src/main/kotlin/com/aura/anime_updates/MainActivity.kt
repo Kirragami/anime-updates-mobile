@@ -3,108 +3,75 @@ package com.aura.anime_updates
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import com.frostwire.jlibtorrent.*;
-import com.frostwire.jlibtorrent.alerts.AddTorrentAlert;
-import com.frostwire.jlibtorrent.alerts.Alert;
-import com.frostwire.jlibtorrent.alerts.AlertType;
-import com.frostwire.jlibtorrent.alerts.BlockFinishedAlert;
-import com.frostwire.jlibtorrent.swig.torrent_flags_t;
-import com.frostwire.jlibtorrent.TorrentFlags
 import java.io.File
-import android.util.Log
 
-class MainActivity : FlutterActivity() {    
-    private val CHANNEL = "torrent"
-    private var torrentHandle: TorrentHandle? = null
-    private var lastProgress: Double = 0.0
+class MainActivity : FlutterActivity() {
+    private val CHANNEL = "com.aura.anime_updates/torrent"
 
-    private val sessionManager: SessionManager? by lazy {
-        try {
-            SessionManager()
-        } catch (e: Throwable) {
-            e.printStackTrace()
-            null
-        }
-    }
+    private lateinit var torrentManager: TorrentManager
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        Log.w("Kirra's Log: ", "configureFlutterEngine called")
         super.configureFlutterEngine(flutterEngine)
+
+        torrentManager = TorrentManager(this)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
-                "startTorrent" -> {
-                    Log.w("Kirra's Log: ", "Entered into startTorrent event in Kotlin.")
-                    val torrentPath = call.argument<String>("torrentPath") ?: return@setMethodCallHandler
-                    val savePath = call.argument<String>("savePath") ?: filesDir.absolutePath
-
-                    startTorrent(torrentPath, savePath)
-                    Log.w("Kirra's Log: ", "Started torrent onKotlin side.")
-                    result.success("Started")
+                "startSession" -> {
+                    // val savedSessionState = torrentManager.loadSessionState() // <-- load from disk
+                    torrentManager.startSession()
+                    result.success(null)
+                }
+                "addTorrent" -> {
+                    val releaseId = call.argument<String>("releaseId")!!
+                    val magnetUrl = call.argument<String>("magnetUrl")!!
+                    val savePath = call.argument<String>("savePath")!!
+                    val fileName = call.argument<String>("fileName")!!
+                    torrentManager.addTorrent(releaseId, magnetUrl, savePath, fileName)
+                    result.success(null)
                 }
                 "pauseTorrent" -> {
-                    pauseTorrent()
-                    result.success("Paused")
+                    val releaseId = call.argument<String>("releaseId")!!
+                    torrentManager.pauseTorrent(releaseId)
+                    result.success(null)
                 }
                 "resumeTorrent" -> {
-                    resumeTorrent()
-                    result.success("Resumed")
+                    val releaseId = call.argument<String>("releaseId")!!
+                    torrentManager.resumeTorrent(releaseId)
+                    result.success(null)
                 }
-                "stopTorrent" -> {
-                    stopTorrent()
-                    result.success("Stopped")
+                "pauseAllTorrents" -> {
+                    torrentManager.pauseAll()
+                    result.success(null)
+                }
+                "resumeAllTorrents" -> {
+                    torrentManager.resumeAll()
+                    result.success(null)
                 }
                 "getProgress" -> {
-                    result.success(lastProgress)
+                    val releaseId = call.argument<String>("releaseId")!!
+                    val progress = torrentManager.getProgress(releaseId)
+                    result.success(progress)
                 }
+                "getDownloadSpeed" -> {
+                    val releaseId = call.argument<String>("releaseId")!!
+                    // ishowspeed
+                    result.success(null)
+                }
+                "getStatus" -> {
+                    // Load conc hash map metadata from json to memory and return that | or nvm, this can only return strings
+                    // platform channels suck, man
+                    torrentManager.loadManagedTorrentsSaveFile()
+                    result.success("null")
+                }
+
                 else -> result.notImplemented()
             }
         }
     }
 
-    private fun startTorrent(torrentPath: String, savePath: String) {
-        sessionManager?.addListener(object : AlertListener {
-            override fun types(): IntArray? = null
-
-            override fun alert(alert: Alert<*>) {
-                when (alert.type()) {
-                    com.frostwire.jlibtorrent.alerts.AlertType.ADD_TORRENT -> {
-                        torrentHandle = (alert as AddTorrentAlert).handle()
-                        torrentHandle?.resume()
-                    }
-                    com.frostwire.jlibtorrent.alerts.AlertType.BLOCK_FINISHED -> {
-                        val a = (alert as com.frostwire.jlibtorrent.alerts.BlockFinishedAlert)
-                        lastProgress = (a.handle().status().progress() * 100).toDouble()
-                    }
-                    com.frostwire.jlibtorrent.alerts.AlertType.TORRENT_FINISHED -> {
-                        println("Torrent finished")
-                    }
-                    else -> { /* ignore */ }
-                }
-            }
-        })
-
-        sessionManager?.start()
-
-        val ti = TorrentInfo(File(torrentPath))
-        val saveDir = File(savePath)
-
-        sessionManager?.download(ti, saveDir)
-    }
-
-    
-
-    private fun pauseTorrent() {
-        sessionManager?.pause()
-    }
-
-
-
-    private fun resumeTorrent() {
-        sessionManager?.resume()
-    }
-
-    private fun stopTorrent() {
-        sessionManager?.stop()
+    override fun onStop() {
+        super.onStop()
+        torrentManager.persistSessionState()
     }
 }
