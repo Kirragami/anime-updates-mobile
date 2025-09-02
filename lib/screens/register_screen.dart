@@ -371,7 +371,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'What do you mean you have an account?',
+          'Already have an account?',
           style: AppTheme.body2.copyWith(color: AppTheme.textSecondary),
         ),
         TextButton(
@@ -383,7 +383,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             );
           },
           child: Text(
-            'Get out',
+            'Sign In',
             style: AppTheme.body2.copyWith(
               color: AppTheme.secondaryColor,
               fontWeight: FontWeight.w600,

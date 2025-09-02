@@ -133,59 +133,39 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
 
   Widget _buildModernHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(0, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
       // Remove background decoration to make it transparent
       child: Row(
         children: [
-          // Profile section (Back button + Title)
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 300),
-            opacity: _isSearchFocused ? 0.0 : 1.0,
-            child: Row(
-              children: [
-                // Back button
-                GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceColor.withOpacity(0.8),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.1),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.arrow_back_ios_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
+          // Back button and optional title
+          // Title is removed when searching so the search bar shifts left
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: const SizedBox(
+              width: 8,
+              height: 32,
+              child: Center(
+                child: Icon(
+                  Icons.arrow_back_ios_rounded,
+                  color: Colors.white,
+                  size: 18,
                 ),
-
-                const SizedBox(width: 16),
-
-                // Title text
-                const Text(
-                  "New Releases",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
+          if (!_isSearchFocused) ...[
+            const SizedBox(width: 16),
+            const Text(
+              "New Releases",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          // Margin between title (when visible) and search input
+          const SizedBox(width: 12),
 
           // Search bar
           Expanded(
@@ -199,28 +179,40 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
                     _toggleSearch();
                   }
                 },
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
                   height: 40,
                   decoration: BoxDecoration(
                     color: AppTheme.surfaceColor.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: AppTheme.primaryColor.withOpacity(0.3),
+                      color: AppTheme.primaryColor
+                          .withOpacity(_isSearchFocused ? 0.6 : 0.3),
                       width: 1,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 8,
+                        color: Colors.black
+                            .withOpacity(_isSearchFocused ? 0.25 : 0.15),
+                        blurRadius: _isSearchFocused ? 12 : 8,
                         offset: const Offset(0, 2),
                       ),
+                      if (_isSearchFocused)
+                        BoxShadow(
+                          color: AppTheme.primaryColor.withOpacity(0.18),
+                          blurRadius: 16,
+                          spreadRadius: 0.5,
+                          offset: const Offset(0, 0),
+                        ),
                     ],
                   ),
+                  clipBehavior: Clip.hardEdge,
                   child: Row(
                     children: [
                       const SizedBox(width: 12),
                       const Icon(
-                       Icons.search,
+                        Icons.search,
                         color: AppTheme.primaryColor,
                         size: 18,
                       ),
@@ -243,41 +235,15 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
                                     fontSize: 14,
                                   ),
                                   border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
                                   isDense: true,
                                   contentPadding: EdgeInsets.zero,
                                 ),
                                 onChanged: _onSearchChanged,
                               )
-                            : AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 600),
-                                transitionBuilder: (child, animation) =>
-                                    SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: const Offset(0, 1),
-                                    end: Offset.zero,
-                                  ).animate(CurvedAnimation(
-                                    parent: animation,
-                                    curve: Curves.easeInOut,
-                                  )),
-                                  child: FadeTransition(
-                                    opacity: animation,
-                                    child: child,
-                                  ),
-                                ),
-                                child: Container(
-                                  key: ValueKey<int>(_currentPlaceholder),
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    _placeholders[_currentPlaceholder],
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.6),
-                                      fontSize: 14,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
+                            : _buildRollingPlaceholder(),
                       ),
 
                       // Close button when searching
@@ -303,6 +269,64 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Rolling wheel-like animated placeholder when search is not focused
+  Widget _buildRollingPlaceholder() {
+    return ClipRect(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 700),
+        switchInCurve: Curves.easeInOutCubic,
+        switchOutCurve: Curves.easeInOutCubic,
+        layoutBuilder: (currentChild, previousChildren) {
+          return Stack(
+            alignment: Alignment.centerLeft,
+            children: <Widget>[
+              ...previousChildren,
+              if (currentChild != null) currentChild,
+            ],
+          );
+        },
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          final bool isIncoming = animation.status == AnimationStatus.forward;
+
+          final Animation<double> curved = CurvedAnimation(
+            parent: isIncoming ? animation : ReverseAnimation(animation),
+            curve: isIncoming ? Curves.easeOutCubic : Curves.easeInCubic,
+          );
+
+          final Animation<Offset> slide = isIncoming
+              // New text comes from bottom to center
+              ? Tween<Offset>(begin: const Offset(0, 1.2), end: Offset.zero)
+                  .animate(curved)
+              // Old text moves from center to top
+              : Tween<Offset>(begin: Offset.zero, end: const Offset(0, -1.2))
+                  .animate(curved);
+
+          final Animation<double> fade = isIncoming
+              ? Tween<double>(begin: 0.0, end: 1.0).animate(curved)
+              : Tween<double>(begin: 1.0, end: 0.0).animate(curved);
+
+          return FadeTransition(
+            opacity: fade,
+            child: SlideTransition(position: slide, child: child),
+          );
+        },
+        child: Container(
+          key: ValueKey<int>(_currentPlaceholder),
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _placeholders[_currentPlaceholder],
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 14,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ),
     );
   }
