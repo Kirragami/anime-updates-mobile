@@ -879,4 +879,127 @@ class ApiService {
       }
     }
   }
+
+  /// Fetch a paginated page of search results
+  Future<Map<String, dynamic>> searchAnimePage({
+    required String query,
+    required int page,
+    required int size,
+  }) async {
+    try {
+      final base = '${AppConstants.baseUrl}/api/anime/$query/get-releases';
+      final uri = Uri.parse(base).replace(
+        queryParameters: {
+          'page': page.toString(),
+          'size': size.toString(),
+        },
+      );
+
+      if (kDebugMode) {
+        print('Making paginated search API call to: $uri');
+      }
+
+      final response = await dioClient.get(
+        uri.toString(),
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'AnimeUpdates/1.0',
+          },
+        ),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}: ${response.statusMessage}');
+      }
+
+      final String responseBody = response.data.toString();
+      if (responseBody.isEmpty) {
+        return {
+          'items': <AnimeItem>[],
+          'last': true,
+        };
+      }
+
+      final decoded = response.data;
+      List<dynamic> jsonData;
+      bool last = false;
+
+      if (decoded is Map<String, dynamic>) {
+        if (decoded.containsKey('data')) {
+          final dynamic dataNode = decoded['data'];
+          if (dataNode is Map<String, dynamic>) {
+            if (dataNode.containsKey('content') && dataNode['content'] is List) {
+              jsonData = dataNode['content'] as List<dynamic>;
+            } else if (dataNode.containsKey('items') && dataNode['items'] is List) {
+              jsonData = dataNode['items'] as List<dynamic>;
+            } else {
+              jsonData = (dataNode.values).firstWhere(
+                (v) => v is List,
+                orElse: () => <dynamic>[],
+              ) as List<dynamic>;
+            }
+
+            if (dataNode.containsKey('last')) {
+              last = dataNode['last'] == true;
+            } else if (dataNode.containsKey('page') && dataNode['page'] is Map) {
+              final pageObj = dataNode['page'] as Map;
+              if (pageObj.containsKey('totalPages') && pageObj.containsKey('number')) {
+                final totalPages = int.tryParse(pageObj['totalPages'].toString()) ?? 1;
+                final current = int.tryParse(pageObj['number'].toString()) ?? (page - 1);
+                last = (current + 1) >= totalPages;
+              }
+            }
+          } else if (dataNode is List) {
+            jsonData = dataNode as List<dynamic>;
+          } else {
+            jsonData = <dynamic>[];
+          }
+        } else if (decoded.containsKey('content')) {
+          jsonData = decoded['content'] as List<dynamic>;
+        } else if (decoded.containsKey('items')) {
+          jsonData = decoded['items'] as List<dynamic>;
+        } else {
+          jsonData = (decoded as Map<String, dynamic>).values.firstWhere(
+            (v) => v is List,
+            orElse: () => <dynamic>[],
+          ) as List<dynamic>;
+        }
+
+        if (!last) {
+          if (decoded.containsKey('last')) {
+            last = decoded['last'] == true;
+          } else if (decoded.containsKey('page') && decoded['page'] is Map) {
+            final pageObj = decoded['page'] as Map;
+            if (pageObj.containsKey('totalPages') && pageObj.containsKey('number')) {
+              final totalPages = int.tryParse(pageObj['totalPages'].toString()) ?? 1;
+              final current = int.tryParse(pageObj['number'].toString()) ?? (page - 1);
+              last = (current + 1) >= totalPages;
+            }
+          }
+        }
+      } else if (decoded is List) {
+        jsonData = decoded as List<dynamic>;
+      } else {
+        jsonData = <dynamic>[];
+      }
+
+      final items = jsonData.map((e) => AnimeItem.fromJson(e)).toList();
+
+      if (!last) {
+        last = items.length < size;
+      }
+
+      return {
+        'items': items,
+        'last': last,
+      };
+    } catch (e) {
+      if (kDebugMode) {
+        print('Paginated search API call error: $e');
+      }
+      rethrow;
+    }
+  }
 } 

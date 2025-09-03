@@ -75,6 +75,8 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
       if (!_isSearchFocused) {
         _searchController.clear();
         FocusScope.of(context).unfocus();
+        // Clear search and return to normal browsing mode
+        ref.read(animeListNotifierProvider.notifier).clearSearch();
       } else {
         _searchFocusNode.requestFocus();
       }
@@ -88,7 +90,12 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
     // Very fast debounce for more responsive search
     _debounceTimer = Timer(const Duration(milliseconds: 100), () {
       if (query == _searchController.text) {
-        ref.read(animeListNotifierProvider.notifier).searchAnime(query);
+        if (query.isEmpty) {
+          // Clear search when query is empty
+          ref.read(animeListNotifierProvider.notifier).clearSearch();
+        } else {
+          ref.read(animeListNotifierProvider.notifier).searchAnime(query);
+        }
       }
     });
   }
