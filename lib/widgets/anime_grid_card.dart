@@ -104,6 +104,25 @@ class AnimeGridCard extends ConsumerWidget {
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 6),
+                              if (_isNewRelease())
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.successColor.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: AppTheme.successColor.withOpacity(0.5), width: 0.5),
+                                  ),
+                                  child: Text(
+                                    'NEW',
+                                    style: AppTheme.caption.copyWith(
+                                      color: AppTheme.successColor,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 9,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
                               const Spacer(),
                               // Tracking Heart Button
                               Consumer(
@@ -148,7 +167,7 @@ class AnimeGridCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           // Title
-                                                                                                           Text(
+                            Text(
                               anime.title,
                             style: AppTheme.body2.copyWith(
                               fontWeight: FontWeight.w600,
@@ -210,7 +229,7 @@ class AnimeGridCard extends ConsumerWidget {
           ],
         ),
       ),
-      child: Center(
+      child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -274,7 +293,7 @@ class AnimeGridCard extends ConsumerWidget {
           ],
         ),
       ),
-      child: Center(
+      child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -309,7 +328,7 @@ class AnimeGridCard extends ConsumerWidget {
           ],
         ),
       ),
-      child: Center(
+      child: const Center(
         child: CircularProgressIndicator(
           color: AppTheme.primaryColor,
           strokeWidth: 2,
@@ -331,6 +350,12 @@ class AnimeGridCard extends ConsumerWidget {
     } else {
       return '${difference.inDays ~/ 7}w ago';
     }
+  }
+
+  bool _isNewRelease() {
+    final now = DateTime.now();
+    final difference = now.difference(anime.releasedDate);
+    return difference.inDays < 2; // within last 48 hours
   }
 
   Widget _buildActionButtons(WidgetRef ref) {
