@@ -2,10 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import 'package:flutter/foundation.dart';
+import 'anime_providers.dart';
 
 // Authentication state notifier
 class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
-  AuthNotifier() : super(const AsyncValue.loading()) {
+  final Ref ref;
+  
+  AuthNotifier(this.ref) : super(const AsyncValue.loading()) {
     _initializeAuth();
   }
 
@@ -44,6 +47,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
 
       if (result['success']) {
         state = AsyncValue.data(AuthService.currentUser);
+        // Refresh tracked releases when user logs in
+        ref.invalidate(trackedReleasesNotifierProvider);
         return result;
       } else {
         state = const AsyncValue.data(null);
@@ -90,6 +95,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     try {
       final result = await AuthService.logout();
       state = const AsyncValue.data(null);
+      // Clear tracked releases when user logs out
+      ref.invalidate(trackedReleasesNotifierProvider);
       return result;
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
@@ -159,7 +166,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
 
 // Authentication provider
 final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>(
-  (ref) => AuthNotifier(),
+  (ref) => AuthNotifier(ref),
 );
 
 // Convenience providers

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/anime_item.dart';
 import '../services/tracking_service.dart';
+import 'anime_providers.dart';
 
 // Provider for the tracking service
 final trackingServiceProvider = Provider((ref) => TrackingService());
@@ -33,6 +34,9 @@ class AnimeTrackingNotifier extends StateNotifier<bool> {
         if (!result['success']) {
           // Rollback on failure
           state = previousState;
+        } else {
+          // Successfully untracked - immediately remove from tracked releases list
+          ref.read(trackedReleasesNotifierProvider.notifier).removeTrackedItem(animeShowId);
         }
       } else {
         // Was not tracked, now tracking
@@ -40,11 +44,19 @@ class AnimeTrackingNotifier extends StateNotifier<bool> {
         if (!result['success']) {
           // Rollback on failure
           state = previousState;
+        } else {
+          // Successfully tracked - refresh the tracked releases list to include new item
+          ref.invalidate(trackedReleasesNotifierProvider);
         }
       }
     } catch (e) {
       // Rollback on exception
       state = previousState;
     }
+  }
+
+  /// Update the tracking state (useful for syncing with server)
+  void updateTrackingState(bool isTracked) {
+    state = isTracked;
   }
 }

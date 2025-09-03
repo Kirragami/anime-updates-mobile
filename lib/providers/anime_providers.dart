@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'dart:async';
 import '../models/anime_item.dart';
 import '../services/services.dart';
+import 'tracking_provider.dart';
 
 
 part 'anime_providers.g.dart';
@@ -135,7 +136,13 @@ class TrackedReleasesNotifier extends _$TrackedReleasesNotifier {
     final result = await apiService.fetchTrackedReleasesPage(page: _currentPage, size: _pageSize);
     final List<AnimeItem> pageItems = (result['items'] as List<AnimeItem>);
     _hasMore = !(result['last'] as bool);
-    _items.addAll(pageItems);
+    
+    // Add items and remove duplicates based on animeShowId
+    _addItemsWithoutDuplicates(pageItems);
+    
+    // Sync tracking states with the fetched items
+    syncTrackingStates();
+    
     return List<AnimeItem>.from(_items);
   }
 
@@ -159,9 +166,13 @@ class TrackedReleasesNotifier extends _$TrackedReleasesNotifier {
       final List<AnimeItem> pageItems = (result['items'] as List<AnimeItem>);
       final bool last = result['last'] as bool;
 
-      _items.addAll(pageItems);
+      // Add items and remove duplicates based on animeShowId
+      _addItemsWithoutDuplicates(pageItems);
       _currentPage = nextPage;
       _hasMore = !last && pageItems.isNotEmpty;
+
+      // Sync tracking states with the new items
+      syncTrackingStates();
 
       // Publish new combined list
       state = AsyncData<List<AnimeItem>>(List<AnimeItem>.from(_items));
@@ -171,6 +182,40 @@ class TrackedReleasesNotifier extends _$TrackedReleasesNotifier {
     } finally {
       _isLoadingMore = false;
       ref.read(trackedListLoadingMoreProvider.notifier).setLoading(false);
+    }
+  }
+
+  /// Add items to the list without creating duplicates
+  void _addItemsWithoutDuplicates(List<AnimeItem> newItems) {
+    for (final item in newItems) {
+      // Check if item with same animeShowId already exists
+      final existingIndex = _items.indexWhere((existing) => existing.animeShowId == item.animeShowId);
+      if (existingIndex == -1) {
+        // Item doesn't exist, add it
+        _items.add(item);
+      } else {
+        // Item exists, update it with the latest data
+        _items[existingIndex] = item;
+      }
+    }
+  }
+
+  /// Remove an item from the tracked releases list
+  void removeTrackedItem(String animeShowId) {
+    _items.removeWhere((item) => item.animeShowId == animeShowId);
+    // Update the state to reflect the removal
+    if (state.hasValue) {
+      state = AsyncData<List<AnimeItem>>(List<AnimeItem>.from(_items));
+    }
+  }
+
+  /// Sync tracking states with the current items
+  void syncTrackingStates() {
+    if (state.hasValue) {
+      for (final item in _items) {
+        // Update the tracking state for each item
+        ref.read(animeTrackingProvider(item).notifier).updateTrackingState(item.tracked);
+      }
     }
   }
 }

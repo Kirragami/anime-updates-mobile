@@ -101,7 +101,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 20),
           // Title section
           Expanded(
             child: Column(
@@ -117,8 +117,8 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
                 ),
                 Text(
                   user != null 
-                      ? 'These are your favorite, ${user.username[0].toUpperCase()}${user.username.substring(1)}-sama'
-                      : 'These are your favorite,',
+                      ? 'These are your favorite: ${user.username[0].toUpperCase()}${user.username.substring(1)}-sama'
+                      : 'These are your favorite:',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 12,
@@ -310,7 +310,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
                 color: AppTheme.errorColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(50),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.error_outline_rounded,
                 size: 60,
                 color: AppTheme.errorColor,
