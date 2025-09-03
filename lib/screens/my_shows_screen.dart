@@ -10,6 +10,7 @@ import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
 import '../widgets/loading_widget.dart';
 import 'homepage_screen.dart';
+import 'profile_screen.dart';
 
 class MyShowsScreen extends ConsumerStatefulWidget {
   const MyShowsScreen({super.key});
@@ -82,59 +83,76 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
 
   Widget _buildAppBar(BuildContext context, WidgetRef ref, dynamic user) {
     return Container(
-      padding: const EdgeInsets.all(AppConstants.defaultPadding),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.arrow_back_rounded,
-                color: AppTheme.textPrimary,
-                size: 24,
+          // Back button without background - matching anime list style
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: const SizedBox(
+              width: 8,
+              height: 32,
+              child: Center(
+                child: Icon(
+                  Icons.arrow_back_ios_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 16),
+          // Title section
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'My Shows',
-                  style: AppTheme.heading2.copyWith(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text(
                   user != null 
                       ? 'These are your favorite, ${user.username[0].toUpperCase()}${user.username.substring(1)}-sama'
                       : 'These are your favorite,',
-                  style: AppTheme.body2.copyWith(
-                    color: AppTheme.textSecondary,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            onPressed: () => _showLogoutDialog(context, ref),
-            icon: Container(
-              padding: const EdgeInsets.all(8),
+          // Profile button instead of logout
+          GestureDetector(
+            onTap: () => _navigateToProfile(context),
+            child: Container(
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: AppTheme.errorColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
+                color: AppTheme.surfaceColor.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppTheme.primaryColor.withOpacity(0.3),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: const Icon(
-                Icons.logout_rounded,
-                color: AppTheme.errorColor,
-                size: 24,
+                Icons.person_rounded,
+                color: AppTheme.primaryColor,
+                size: 20,
               ),
             ),
           ),
@@ -320,52 +338,11 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
     );
   }
 
-  Future<void> _showLogoutDialog(BuildContext context, WidgetRef ref) async {
-    return showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppTheme.surfaceColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text(
-            'Logout',
-            style: AppTheme.heading3.copyWith(color: AppTheme.textPrimary),
-          ),
-          content: Text(
-            'Are you sure you want to logout?',
-            style: AppTheme.body1.copyWith(color: AppTheme.textSecondary),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(
-                'Cancel',
-                style: AppTheme.body1.copyWith(color: AppTheme.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-                await ref.read(authNotifierProvider).logout();
-                // Use the main context for navigation
-                if (context.mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const HomepageScreen()),
-                    (route) => false,
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.errorColor,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Logout'),
-            ),
-          ],
-        );
-      },
+  void _navigateToProfile(BuildContext context) {
+    Navigator.of(context).push(
+      CustomPageTransitions.slideFromRight(
+        const ProfileScreen(),
+      ),
     );
   }
 } 
