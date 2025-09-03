@@ -20,11 +20,13 @@ class AnimeListNotifier extends _$AnimeListNotifier {
   bool _isLoadingMore = false;
   final List<AnimeItem> _items = [];
   String _currentSearchQuery = '';
+  bool _isInSearchMode = false;
 
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
   int get pageSize => _pageSize;
   String get currentSearchQuery => _currentSearchQuery;
+  bool get isInSearchMode => _isInSearchMode;
 
   @override
   Future<List<AnimeItem>> build() async {
@@ -36,6 +38,7 @@ class AnimeListNotifier extends _$AnimeListNotifier {
     _hasMore = true;
     _isLoadingMore = false;
     _currentSearchQuery = '';
+    _isInSearchMode = false;
 
     // Fetch first page
     final result = await apiService.fetchAnimePage(page: _currentPage, size: _pageSize);
@@ -61,7 +64,19 @@ class AnimeListNotifier extends _$AnimeListNotifier {
     final nextPage = _currentPage + 1;
 
     try {
-      final result = await apiService.fetchAnimePage(page: nextPage, size: _pageSize);
+      Map<String, dynamic> result;
+      if (_isInSearchMode && _currentSearchQuery.isNotEmpty) {
+        // Load next page of search results
+        result = await apiService.searchAnimePage(
+          query: _currentSearchQuery,
+          page: nextPage,
+          size: _pageSize,
+        );
+      } else {
+        // Load next page of normal list
+        result = await apiService.fetchAnimePage(page: nextPage, size: _pageSize);
+      }
+
       final List<AnimeItem> pageItems = (result['items'] as List<AnimeItem>);
       final bool last = result['last'] as bool;
 
@@ -94,17 +109,35 @@ class AnimeListNotifier extends _$AnimeListNotifier {
     }
 
     _currentSearchQuery = query;
+    _isInSearchMode = true;
+    _hasMore = true; // We'll paginate via search endpoint
+    _currentPage = 0; // reset page so next loadMore fetches page 1
     
     try {
       final apiService = ref.read(apiServiceProvider);
-      final searchResults = await apiService.searchAnime(query);
-      
-      // Update state with search results
-      state = AsyncData<List<AnimeItem>>(searchResults);
+      // Fetch first page of search results
+      final result = await apiService.searchAnimePage(
+        query: query,
+        page: _currentPage,
+        size: _pageSize,
+      );
+      final List<AnimeItem> pageItems = (result['items'] as List<AnimeItem>);
+      _hasMore = !(result['last'] as bool);
+      _items
+        ..clear()
+        ..addAll(pageItems);
+      state = AsyncData<List<AnimeItem>>(List<AnimeItem>.from(_items));
     } catch (e, st) {
       // Surface error
       state = AsyncError<List<AnimeItem>>(e, st);
     }
+  }
+
+  /// Clear search and return to normal browsing mode
+  Future<void> clearSearch() async {
+    _currentSearchQuery = '';
+    _isInSearchMode = false;
+    refresh(); // This will reset to normal browsing mode
   }
 }
 
