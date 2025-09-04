@@ -149,11 +149,11 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: const SizedBox(
-              width: 8,
+              width: 14,
               height: 32,
               child: Center(
                 child: Icon(
-                  Icons.arrow_back_ios_rounded,
+                  Icons.arrow_back,
                   color: Colors.white,
                   size: 18,
                 ),

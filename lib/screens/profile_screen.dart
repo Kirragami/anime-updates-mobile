@@ -56,11 +56,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: const SizedBox(
-              width: 8,
+              width: 14,
               height: 32,
               child: Center(
                 child: Icon(
-                  Icons.arrow_back_ios_rounded,
+                  Icons.arrow_back,
                   color: Colors.white,
                   size: 18,
                 ),
@@ -354,14 +354,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               children: [
                 Icon(
                   Icons.logout_rounded,
-                  color: Colors.white,
+                  color: Color.fromARGB(255, 180, 9, 9),
                   size: 20,
                 ),
                 SizedBox(width: 8),
                 Text(
                   'Logout',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color.fromARGB(255, 180, 9, 9),
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
