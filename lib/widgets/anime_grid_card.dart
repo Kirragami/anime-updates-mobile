@@ -31,174 +31,176 @@ class AnimeGridCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return AnimationConfiguration.staggeredGrid(
-        position: index,
-        duration: AppConstants.mediumAnimation,
-        columnCount: 2,
-        child: SlideAnimation(
-          verticalOffset: 50.0,
-          child: FadeInAnimation(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 700),
-              child: Container(
-                margin: const EdgeInsets.all(AppConstants.smallPadding),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppTheme.cardColor,
-                      AppTheme.cardColor.withOpacity(0.8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
+      position: index,
+      duration: AppConstants.mediumAnimation,
+      columnCount: 2,
+      child: SlideAnimation(
+        verticalOffset: 50.0,
+        child: FadeInAnimation(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 700),
+            child: Container(
+              margin: const EdgeInsets.all(AppConstants.smallPadding),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppTheme.cardColor,
+                    AppTheme.cardColor.withOpacity(0.8),
                   ],
                 ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        CustomPageTransitions.slideFromRight(
-                          AnimeDetailScreen(anime: anime),
-                        ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppConstants.smallPadding),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                                                     // Anime Image
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              width: double.infinity,
-                              height: 200,
-                              child: _buildImageWidget(ref),
-                            ),
+                borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius:
+                          BorderRadius.circular(AppConstants.borderRadius),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          CustomPageTransitions.slideFromRight(
+                            AnimeDetailScreen(anime: anime),
                           ),
-                          const SizedBox(height: 10),
-                          // Episode Badge and Tracking Indicator Row
-                          Row(
-                            children: [
-                              // Episode Badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'EP ${anime.episode}',
-                                  style: AppTheme.caption.copyWith(
-                                    color: AppTheme.primaryColor,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 10,
-                                  ),
-                                ),
+                        );
+                      },
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.all(AppConstants.smallPadding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Anime Image
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: double.infinity,
+                                height: 200,
+                                child: _buildImageWidget(ref),
                               ),
-                              const SizedBox(width: 6),
-                              if (_isNewRelease())
+                            ),
+                            const SizedBox(height: 10),
+                            // Episode Badge and Tracking Indicator Row
+                            Row(
+                              children: [
+                                // Episode Badge
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.successColor.withOpacity(0.2),
+                                    color:
+                                        AppTheme.primaryColor.withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: AppTheme.successColor.withOpacity(0.5), width: 0.5),
                                   ),
                                   child: Text(
-                                    'NEW',
+                                    'EP ${anime.episode}',
                                     style: AppTheme.caption.copyWith(
-                                      color: AppTheme.successColor,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 9,
-                                      letterSpacing: 0.5,
+                                      color: AppTheme.primaryColor,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 10,
                                     ),
                                   ),
                                 ),
-                              const Spacer(),
-                              // Tracking Heart Button
-                              Consumer(
-                                builder: (context, ref, child) {
-                                  final isTracked = ref.watch(animeTrackingProvider(anime));
-                                  
-                                  // Only show heart button when tracked
-                                  if (!isTracked) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  
-                                  return Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: const LinearGradient(
-                                        colors: [Color(0xFFFF6B9A), Color(0xFFFF3366)],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFFFF3366).withOpacity(0.4),
-                                          blurRadius: 8,
-                                          spreadRadius: 1,
-                                          offset: const Offset(0, 2),
+                                const SizedBox(width: 6),
+                                const Spacer(),
+                                // Tracking Heart Button
+                                Consumer(
+                                  builder: (context, ref, child) {
+                                    final isTracked =
+                                        ref.watch(animeTrackingProvider(anime));
+
+                                    // Only show heart button when tracked
+                                    if (!isTracked) {
+                                      return const SizedBox.shrink();
+                                    }
+
+                                    return Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFFFF6B9A),
+                                            Color(0xFFFF3366)
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
                                         ),
-                                      ],
-                                    ),
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.favorite,
-                                        color: Colors.white,
-                                        size: 14,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFFFF3366)
+                                                .withOpacity(0.4),
+                                            blurRadius: 8,
+                                            spreadRadius: 1,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          // Title
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.favorite,
+                                          color: Colors.white,
+                                          size: 14,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            // Title
                             Text(
                               anime.title,
-                            style: AppTheme.body2.copyWith(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
+                              style: AppTheme.body2.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          // Spacer to push button to bottom
-                          const Spacer(),
-                          // Time Ago
-                          Text(
-                            _getTimeAgo(),
-                            style: AppTheme.caption.copyWith(
-                              color: AppTheme.textSecondary,
-                              fontSize: 10,
+                            // Spacer to push button to bottom
+                            const Spacer(),
+                            // Time Ago
+                            Text(
+                              _getTimeAgo(),
+                              style: AppTheme.caption.copyWith(
+                                color: AppTheme.textSecondary,
+                                fontSize: 10,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                                                     // Action Buttons
-                           _buildActionButtons(ref),
-                        ],
+                            const SizedBox(height: 6),
+                            // Action Buttons
+                            _buildActionButtons(ref),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                                     // NEW badge positioned to span the full card corner
+                   if (_isNewRelease())
+                     Positioned(
+                       top: -8,
+                       right: -25,
+                       child: _buildNewBadge(),
+                     ),
+                ],
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
   }
 
   Widget _buildImageWidget(WidgetRef ref) {
@@ -214,8 +216,6 @@ class AnimeGridCard extends ConsumerWidget {
       return _buildNoImagePlaceholder();
     }
   }
-
-
 
   Widget _buildErrorPlaceholder() {
     return Container(
@@ -238,7 +238,7 @@ class AnimeGridCard extends ConsumerWidget {
               color: AppTheme.primaryColor,
               size: 30,
             ),
-            const SizedBox(height: 4),
+             SizedBox(height: 4),
             Text(
               'Failed to load',
               style: TextStyle(
@@ -255,11 +255,11 @@ class AnimeGridCard extends ConsumerWidget {
   Widget _buildTrackingIndicator(WidgetRef ref) {
     // Watch the tracking state for this anime item
     final isTracked = ref.watch(animeTrackingProvider(anime));
-    
+
     if (!isTracked) {
       return const SizedBox.shrink();
     }
-    
+
     return Positioned(
       bottom: 24, // Position above the 24px tall action buttons
       right: 0,
@@ -302,7 +302,7 @@ class AnimeGridCard extends ConsumerWidget {
               color: AppTheme.primaryColor,
               size: 30,
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(
               'No image',
               style: TextStyle(
@@ -340,7 +340,7 @@ class AnimeGridCard extends ConsumerWidget {
   String _getTimeAgo() {
     final now = DateTime.now();
     final difference = now.difference(anime.releasedDate);
-    
+
     if (difference.inMinutes < 60) {
       return '${difference.inMinutes}m ago';
     } else if (difference.inHours < 24) {
@@ -355,7 +355,80 @@ class AnimeGridCard extends ConsumerWidget {
   bool _isNewRelease() {
     final now = DateTime.now();
     final difference = now.difference(anime.releasedDate);
-    return difference.inDays < 2; // within last 48 hours
+    return difference.inDays < 1; // within last 24 hours
+  }
+
+  Widget _buildNewBadge() {
+    return Transform.rotate(
+      angle: 0.785398, // 45 degrees in radians
+      child: Container(
+        height: 20, // Fixed height for consistent sizing
+        width: 100, // Increased width to reach the end of card corner
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF00C9FF), // Bright cyan
+              Color(0xFF92FE9D), // Light green
+              Color(0xFFFF6B6B), // Coral red
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(8), // Match card corner
+            bottomRight: Radius.circular(8), // Match card corner
+          ),
+          boxShadow: [
+            // Main 3D shadow - makes it appear above the card
+            BoxShadow(
+              color: Colors.black.withOpacity(0.6),
+              blurRadius: 10,
+              offset: const Offset(4, 4),
+            ),
+            // Highlight shadow for 3D effect
+            BoxShadow(
+              color: Colors.white.withOpacity(0.5),
+              blurRadius: 4,
+              offset: const Offset(-2, -2),
+            ),
+            // Glow effect
+            BoxShadow(
+              color: const Color(0xFF00C9FF).withOpacity(0.8),
+              blurRadius: 15,
+              spreadRadius: 2,
+              offset: const Offset(0, 0),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Padding(
+            padding: EdgeInsets.only(left: 30),
+            child: Text(
+              'NEW',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 9,
+                letterSpacing: 0.6,
+                height: 1.2, // Line height for better centering
+                shadows: [
+                  Shadow(
+                    color: Colors.black87,
+                    offset: Offset(1, 1),
+                    blurRadius: 2,
+                  ),
+                  Shadow(
+                    color: Colors.white30,
+                    offset: Offset(-1, -1),
+                    blurRadius: 1,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildActionButtons(WidgetRef ref) {
@@ -375,7 +448,7 @@ class AnimeGridCard extends ConsumerWidget {
         (state) => state[anime.id] ?? 0.0,
       ),
     );
-    
+
     if (isDownloading) {
       return Column(
         children: [
@@ -409,7 +482,10 @@ class AnimeGridCard extends ConsumerWidget {
               height: 24,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppTheme.primaryColor, AppTheme.primaryColor.withOpacity(0.8)],
+                  colors: [
+                    AppTheme.primaryColor,
+                    AppTheme.primaryColor.withOpacity(0.8)
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -437,7 +513,10 @@ class AnimeGridCard extends ConsumerWidget {
             width: 24,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppTheme.errorColor, AppTheme.errorColor.withOpacity(0.8)],
+                colors: [
+                  AppTheme.errorColor,
+                  AppTheme.errorColor.withOpacity(0.8)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -447,7 +526,7 @@ class AnimeGridCard extends ConsumerWidget {
               color: Colors.transparent,
               child: InkWell(
                 borderRadius: BorderRadius.circular(6),
-                                                                     onTap: onDelete,
+                onTap: onDelete,
                 child: Center(
                   child: Icon(
                     Icons.delete_rounded,
@@ -485,4 +564,4 @@ class AnimeGridCard extends ConsumerWidget {
       ),
     );
   }
-} 
+}
