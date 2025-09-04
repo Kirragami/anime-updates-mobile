@@ -59,20 +59,27 @@ class AnimeGridCard extends ConsumerWidget {
                   ),
                 ],
               ),
-              child: Stack(
-                children: [
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius:
-                          BorderRadius.circular(AppConstants.borderRadius),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          CustomPageTransitions.slideFromRight(
-                            AnimeDetailScreen(anime: anime),
-                          ),
-                        );
-                      },
+                             child: Stack(
+                 children: [
+                   Hero(
+                     tag: 'anime_${anime.id}',
+                     child: Material(
+                       color: Colors.transparent,
+                       child: InkWell(
+                         borderRadius:
+                             BorderRadius.circular(AppConstants.borderRadius),
+                         onTap: () {
+                           Navigator.of(context).push(
+                             PageRouteBuilder(
+                               pageBuilder: (context, animation, secondaryAnimation) =>
+                                   AnimeDetailScreen(anime: anime),
+                               transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                 return _buildDoorAnimation(animation, child);
+                               },
+                               transitionDuration: const Duration(milliseconds: 600),
+                             ),
+                           );
+                         },
                       child: Padding(
                         padding:
                             const EdgeInsets.all(AppConstants.smallPadding),
@@ -187,6 +194,7 @@ class AnimeGridCard extends ConsumerWidget {
                       ),
                     ),
                   ),
+                   ),
                                      // NEW badge positioned to span the full card corner
                    if (_isNewRelease())
                      Positioned(
@@ -496,7 +504,7 @@ class AnimeGridCard extends ConsumerWidget {
                 child: InkWell(
                   borderRadius: BorderRadius.circular(6),
                   onTap: onOpen,
-                  child: Center(
+                  child:const Center(
                     child: Icon(
                       Icons.play_arrow_rounded,
                       color: AppTheme.textPrimary,
@@ -527,7 +535,7 @@ class AnimeGridCard extends ConsumerWidget {
               child: InkWell(
                 borderRadius: BorderRadius.circular(6),
                 onTap: onDelete,
-                child: Center(
+                child: const Center(
                   child: Icon(
                     Icons.delete_rounded,
                     color: AppTheme.textPrimary,
@@ -562,6 +570,61 @@ class AnimeGridCard extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDoorAnimation(Animation<double> animation, Widget child) {
+    // Door opening effect with scale and rotation
+    final scaleAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack),
+    ));
+
+    final rotationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.0, 0.8, curve: Curves.easeOutCubic),
+    ));
+
+    final fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.2, 1.0, curve: Curves.easeIn),
+    ));
+
+    final slideAnimation = Tween<Offset>(
+      begin: const Offset(0.0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.0, 0.8, curve: Curves.easeOutCubic),
+    ));
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: scaleAnimation.value,
+          child: Transform.rotate(
+            angle: rotationAnimation.value,
+            child: FadeTransition(
+              opacity: fadeAnimation,
+              child: SlideTransition(
+                position: slideAnimation,
+                child: child!,
+              ),
+            ),
+          ),
+        );
+      },
+      child: child,
     );
   }
 }
