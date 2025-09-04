@@ -1,14 +1,22 @@
 package com.aura.anime_updates
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.frostwire.jlibtorrent.*
 import com.frostwire.jlibtorrent.alerts.*
 import com.frostwire.jlibtorrent.swig.torrent_flags_t
+import com.frostwire.jlibtorrent.swig.add_torrent_params
+import com.frostwire.jlibtorrent.ErrorCode
+import com.frostwire.jlibtorrent.swig.error_code
+import com.frostwire.jlibtorrent.Vectors
 import android.util.Log
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
+import io.flutter.plugin.common.EventChannel
+
 
 class TorrentManager (private val context: Context) {
 
@@ -18,8 +26,12 @@ class TorrentManager (private val context: Context) {
     private val managedTorrents = ConcurrentHashMap<String, ManagedTorrent>()
     private val sessionStateSaveFile = File(context.filesDir, "session.state")
     private val managedTorrentsSaveFile = File(context.filesDir, "managedTorrents.json")
+    private val completedTorrentsFile = File(context.filesDir, "completedTorrents.json")
     private val torrentFileLocation = File(context.getExternalFilesDir(null), "TorrentFileDownloads")
     private var isSessionStarted = false
+    private val newTorrents = mutableSetOf<String>()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    var torrentEventSink: EventChannel.EventSink? = null
 
     init {
         setupListener()
@@ -38,7 +50,10 @@ class TorrentManager (private val context: Context) {
             } else {
                 sessionManager?.start(SessionParams(loadSessionState()))
                 for (torrent in managedTorrents.values) {
-                    sessionManager?.download(TorrentInfo(loadResumeData(torrent.uniqueId)), torrentFileLocation)
+                    val ec = error_code()
+                    val vec = Vectors.bytes2byte_vector(loadResumeData(torrent.uniqueId))
+                    val params = add_torrent_params.read_resume_data(vec, ec)
+                    sessionManager?.swig()?.add_torrent(params, ec)
                 }
             }
             sessionManager?.resume()
@@ -53,10 +68,11 @@ class TorrentManager (private val context: Context) {
     /**
      * Add a torrent to the session with optional resume data
      */
-    fun addTorrent(uniqueId: String, magnetUrl: String, savePath: String, fileName: String) {
+    fun addTorrent(releaseId: String, magnetUrl: String, savePath: String, fileName: String) {
+        newTorrents.add(releaseId)
         sessionManager?.download(magnetUrl, File(savePath), torrent_flags_t())
-        val mt = ManagedTorrent(uniqueId, fileName, "", 0.0)
-        managedTorrents[uniqueId] = mt
+        val mt = ManagedTorrent(releaseId, fileName, "", 0.0)
+        managedTorrents[releaseId] = mt
         println("status in addTorrent method")
         println(managedTorrents)
     }
@@ -145,7 +161,14 @@ class TorrentManager (private val context: Context) {
                         val addAlert = alert as AddTorrentAlert
                         val handle = addAlert.handle()
                         handle.unsetFlags(TorrentFlags.AUTO_MANAGED)
-                        handle.resume()
+                        handle.pause()
+                        val releaseId = managedTorrents.values.find { it.fileName == handle.name() }?.uniqueId
+                        println("This is the releaseId we are checking > < ${releaseId}")
+                        println("THis is the list > < ${newTorrents}")
+                        if (newTorrents.contains(releaseId)) {
+                            handle.resume()
+                            newTorrents.remove(releaseId)
+                        }
                         managedTorrents.values.find { it.fileName == handle.name() }?.sha1 = handle.infoHash().toHex()
                         println("This is status in handle, kirra-sama > <")
                         println(managedTorrents)
@@ -155,13 +178,22 @@ class TorrentManager (private val context: Context) {
                         val blockAlert = alert as BlockFinishedAlert
                         val handle = blockAlert.handle()
                         // val uniqueId = findIdByHandle(handle)
-                        managedTorrents.values.find { it.fileName == handle.name() }?.progress = handle.status().progress() * 100.toDouble()
+                        val mt = managedTorrents.values.find { it.fileName == handle.name() }
+                        mt?.progress = handle.status().progress() * 100.toDouble()
                         // persistSessionState()
                         if (handle.needSaveResumeData()) {
                             println("Need save")
                             handle.saveResumeData()
                             persistSessionState()
                             saveManagedTorrents()
+                        }
+
+                        mt?.uniqueId?.let { id ->
+                            mainHandler.post {
+                                torrentEventSink?.success(
+                                    mapOf("releaseId" to id, "progress" to mt.progress, "status" to "downloading", "speed" to handle.status().downloadRate())
+                                )
+                            }
                         }
                         
                         // if (uniqueId != null) {
@@ -183,7 +215,16 @@ class TorrentManager (private val context: Context) {
                     AlertType.TORRENT_FINISHED -> {
                         val finishedAlert = alert as TorrentFinishedAlert
                         val handle = finishedAlert.handle()
-                        managedTorrents.values.find { it.fileName == handle.name() }?.progress = 100.0         
+                        val mt = managedTorrents.values.find { it.fileName == handle.name() }
+                        mt?.progress = 100.0
+                        sessionManager.remove(handle)
+                        mt?.uniqueId?.let { id ->
+                            torrentEventSink?.success(
+                                mapOf("releaseId" to id, "progress" to 100.0, "status" to "completed")
+                            )
+                        }
+
+                        saveCompletedTorrent(mt?.uniqueId, mt?.fileName)
                     }
 
                     AlertType.SAVE_RESUME_DATA -> {
@@ -256,6 +297,32 @@ class TorrentManager (private val context: Context) {
         println("loaded managed torrents")
         println(managedTorrents)
     }
+
+    fun getManagedTorrents(): Collection<ManagedTorrent> {
+        return managedTorrents.values
+    }
+
+    fun saveCompletedTorrent(releaseId: String?, fileName: String?) {
+        try {
+            
+            val currentList: MutableList<CompletedTorrent> = if (completedTorrentsFile.exists()) {
+                completedTorrentsFile.inputStream().use { Json.decodeFromStream(it) }
+            } else {
+                mutableListOf()
+            }
+            currentList.add(CompletedTorrent(releaseId, fileName))
+            completedTorrentsFile.writeText(Json.encodeToString(currentList))
+        } catch (e: Exception) {
+            println("Error saving completed torrent: $e")
+        }
+    }
+
+    fun loadCompleted(): List<CompletedTorrent> {
+        if (!completedTorrentsFile.exists()) return emptyList()
+        val json = completedTorrentsFile.readText()
+        return if (json.isEmpty()) emptyList() else Json.decodeFromString(json)
+    }
+
 }
 
 @Serializable
@@ -264,4 +331,10 @@ data class ManagedTorrent (
     val fileName: String,
     var sha1: String,
     var progress: Double
+)
+
+@Serializable
+data class CompletedTorrent (
+    val releaseId: String?,
+    val fileName: String?
 )

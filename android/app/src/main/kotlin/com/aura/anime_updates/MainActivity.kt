@@ -3,12 +3,15 @@ package com.aura.anime_updates
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.EventChannel
 import java.io.File
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.aura.anime_updates/torrent"
+    private val TORRENT_EVENT_CHANNEL = "com.aura.anime_updates/torrentEvents"
 
     private lateinit var torrentManager: TorrentManager
+    private var torrentEventSink: EventChannel.EventSink? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -58,16 +61,51 @@ class MainActivity : FlutterActivity() {
                     // ishowspeed
                     result.success(null)
                 }
-                "getStatus" -> {
-                    // Load conc hash map metadata from json to memory and return that | or nvm, this can only return strings
-                    // platform channels suck, man
-                    torrentManager.loadManagedTorrentsSaveFile()
-                    result.success("null")
+                "getCompletedTorrents" -> {
+                    try {
+                        val completed = torrentManager.loadCompleted()
+                        val completedList = completed.map { mapOf("releaseId" to it.releaseId, "fileName" to it.fileName) }
+                        result.success(completedList)
+                    } catch (e: Exception) {
+                        result.error("LOAD_ERROR", "Failed to load completed torrents", e.message)
+                    }
+                }
+
+                "getManagedTorrents" -> {
+                    try {
+                        val torrents = torrentManager.getManagedTorrents()
+                
+                        val torrentsList = torrents.map { torrent ->
+                            mapOf(
+                                "uniqueId" to torrent.uniqueId,
+                                "fileName" to torrent.fileName,
+                                "sha1" to torrent.sha1.toString(),
+                                "progress" to torrent.progress
+                            )
+                        }
+                        result.success(torrentsList)
+                    } catch (e: Exception) {
+                        result.error("GET_ERROR", "Failed to get managed torrents", e.message)
+                    }
                 }
 
                 else -> result.notImplemented()
             }
         }
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, TORRENT_EVENT_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    torrentEventSink = events
+                    torrentManager.torrentEventSink = torrentEventSink
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    torrentEventSink = null
+                    torrentManager.torrentEventSink = null
+                }
+            })
+
     }
 
     override fun onStop() {

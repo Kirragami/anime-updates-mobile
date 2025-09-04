@@ -12,6 +12,7 @@ plugins {
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
     id 'com.google.gms.google-services'
+    id "org.jetbrains.kotlin.plugin.serialization" version "1.9.22"
 }
 
 
@@ -61,6 +62,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'),
                     'proguard-rules.pro'
         }
+        debug {
+            minifyEnabled true
+            signingConfig = signingConfigs.debug
+            proguardFiles getDefaultProguardFile('proguard-android.txt'),
+                    'proguard-rules.pro'
+        }
     }
 
     sourceSets {
@@ -76,4 +83,5 @@ flutter {
 
 dependencies {
     implementation fileTree(dir: "libs", include: ["*.jar"])
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3"
 }
