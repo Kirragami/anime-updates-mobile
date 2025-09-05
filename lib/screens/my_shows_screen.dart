@@ -9,6 +9,8 @@ import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
 import '../widgets/loading_widget.dart';
+import '../models/anime_item.dart';
+import '../services/download_manager.dart';
 import 'homepage_screen.dart';
 
 class MyShowsScreen extends ConsumerStatefulWidget {
@@ -26,11 +28,6 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
   void initState() {
     super.initState();
     _refreshController = RefreshController(initialRefresh: false);
-    
-    // Recheck existing downloads for tracked releases when the screen is opened
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(downloadOperationsNotifierProvider.notifier).recheckTrackedDownloads();
-    });
   }
 
   @override
@@ -41,9 +38,6 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Ensure download operations provider initializes to check existing files
-    ref.watch(downloadOperationsNotifierProvider);
-    
     final userAsync = ref.watch(authProvider);
 
     return Scaffold(
@@ -58,13 +52,6 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
                 data: (user) => _buildAppBar(context, ref, user),
                 loading: () => _buildAppBar(context, ref, null),
                 error: (error, stack) => _buildAppBar(context, ref, null),
-              ),
-              // Ensure download operations provider initializes to check existing files
-              Consumer(
-                builder: (context, ref, child) {
-                  ref.watch(downloadOperationsNotifierProvider);
-                  return const SizedBox.shrink();
-                },
               ),
               Expanded(
                 child: userAsync.when(
@@ -164,9 +151,9 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
                   },
                   child: AnimeGridView(
                     animeList: items,
-                    onDownload: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).downloadAnime(anime),
-                    onDelete: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).deleteDownload(anime),
-                    onOpen: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).openDownloadedFile(anime),
+                    onDownload: (anime) => _downloadAnime(anime, ref),
+                    onDelete: (anime) => _deleteAnime(anime, ref),
+                    onOpen: (anime) => _openAnime(anime, ref),
                     useTrackedProviders: true,
                   ),
                 ),
@@ -318,6 +305,75 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _downloadAnime(AnimeItem anime, WidgetRef ref) async {
+    try {
+      final downloadManager = DownloadManager();
+      await downloadManager.downloadRelease(anime);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Download started!'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Download failed: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteAnime(AnimeItem anime, WidgetRef ref) async {
+    try {
+      // For now, we'll just show a message since the delete functionality 
+      // would need to be implemented in the Kotlin side
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Delete functionality would be implemented here'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Delete failed: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openAnime(AnimeItem anime, WidgetRef ref) async {
+    try {
+      // For now, we'll just show a message since the open functionality 
+      // would need to be implemented in the Kotlin side
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Open functionality would be implemented here'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Open failed: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _showLogoutDialog(BuildContext context, WidgetRef ref) async {

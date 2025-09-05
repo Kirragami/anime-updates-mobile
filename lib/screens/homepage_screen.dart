@@ -34,6 +34,8 @@ Widget build(BuildContext context, WidgetRef ref) {
                 children: [
                   _buildAnimatedGif(),
                   _buildNavigationButtons(context),
+                  const SizedBox(height: 20),
+                  _buildTorrentTestButton(context), // Added button for torrent test
                 ],
               ),
               const Spacer()
@@ -311,4 +313,60 @@ Widget build(BuildContext context, WidgetRef ref) {
       ],
     );
   }
-} 
+  
+  // Added button for torrent test
+  Widget _buildTorrentTestButton(BuildContext context) {
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.accentColor.withOpacity(0.1),
+            AppTheme.accentColor.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.accentColor,
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.accentColor.withOpacity(0.3),
+            blurRadius: 15,
+            spreadRadius: 0,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.of(context).pushNamed('/torrent-test');
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: Text(
+                'Torrent Test',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ).animate().fadeIn(
+      duration: AppConstants.shortAnimation,
+      delay: const Duration(milliseconds: 0),
+    ).slideY(begin: 0.1);
+  }
+}

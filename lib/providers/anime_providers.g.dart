@@ -6,59 +6,6 @@ part of 'anime_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$activeDownloadCountHash() =>
-    r'69cc3df0ea8a00efaeb358444de63acf2942c3de';
-
-/// Provides the number of active downloads
-///
-/// Copied from [activeDownloadCount].
-@ProviderFor(activeDownloadCount)
-final activeDownloadCountProvider = AutoDisposeProvider<int>.internal(
-  activeDownloadCount,
-  name: r'activeDownloadCountProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$activeDownloadCountHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef ActiveDownloadCountRef = AutoDisposeProviderRef<int>;
-String _$hasActiveDownloadsHash() =>
-    r'effd60adef1b86d096f121f5211147c1b6391e41';
-
-/// Provides whether there are any active downloads
-///
-/// Copied from [hasActiveDownloads].
-@ProviderFor(hasActiveDownloads)
-final hasActiveDownloadsProvider = AutoDisposeProvider<bool>.internal(
-  hasActiveDownloads,
-  name: r'hasActiveDownloadsProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$hasActiveDownloadsHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef HasActiveDownloadsRef = AutoDisposeProviderRef<bool>;
-String _$downloadedCountHash() => r'df8749c8df6639ad0f10c26e2ab9acdb9e848f23';
-
-/// Provides the number of downloaded items
-///
-/// Copied from [downloadedCount].
-@ProviderFor(downloadedCount)
-final downloadedCountProvider = AutoDisposeProvider<int>.internal(
-  downloadedCount,
-  name: r'downloadedCountProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$downloadedCountHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef DownloadedCountRef = AutoDisposeProviderRef<int>;
 String _$animeListNotifierHash() => r'045f2be4b73bdb13dbbebce45dcdd835e2ed05e3';
 
 /// Provides the list of anime items
@@ -171,24 +118,5 @@ final downloadStatesNotifierProvider = AutoDisposeNotifierProvider<
 );
 
 typedef _$DownloadStatesNotifier = AutoDisposeNotifier<Map<String, bool>>;
-String _$downloadOperationsNotifierHash() =>
-    r'1fb047f56bf0ad7e7b5be482067a7a226642edef';
-
-/// Provides download operations for anime items
-///
-/// Copied from [DownloadOperationsNotifier].
-@ProviderFor(DownloadOperationsNotifier)
-final downloadOperationsNotifierProvider =
-    AutoDisposeAsyncNotifierProvider<DownloadOperationsNotifier, void>.internal(
-  DownloadOperationsNotifier.new,
-  name: r'downloadOperationsNotifierProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$downloadOperationsNotifierHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$DownloadOperationsNotifier = AutoDisposeAsyncNotifier<void>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

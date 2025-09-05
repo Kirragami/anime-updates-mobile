@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../models/anime_item.dart';
+import '../models/download_state.dart';
 import '../providers/anime_providers.dart';
 import '../widgets/anime_grid_view.dart';
 import '../widgets/loading_widget.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
+import '../services/download_manager.dart';
 
 class AnimeListScreen extends ConsumerStatefulWidget {
   const AnimeListScreen({super.key});
@@ -74,9 +76,6 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Ensure download operations provider initializes to check existing files
-    ref.watch(downloadOperationsNotifierProvider);
-
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -218,6 +217,12 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
   }
 
   Widget _buildAnimeList(List<AnimeItem> animeList) {
+    // Initialize DownloadManager with the current anime list
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final downloadManager = DownloadManager();
+      downloadManager.initializeReleaseStates(animeList);
+    });
+    
     return SmartRefresher(
       key: _refreshKey, // Preserve state
       controller: _refreshController,
@@ -232,9 +237,79 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
       },
       child: AnimeGridView(
         animeList: animeList,
-        onDownload: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).downloadAnime(anime),
-        onDelete: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).deleteDownload(anime),
-        onOpen: (anime) => ref.read(downloadOperationsNotifierProvider.notifier).openDownloadedFile(anime),
+        onDownload: (anime) async {
+          final downloadManager = DownloadManager();
+          try {
+            await downloadManager.downloadRelease(anime);
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Download failed: ${e.toString()}'),
+                  backgroundColor: AppTheme.errorColor,
+                ),
+              );
+            }
+          }
+        },
+        onDelete: (anime) async {
+          try {
+            final downloadManager = DownloadManager();
+            // Pause the download if it's active
+            if (downloadManager.getDownloadState(anime.id) == DownloadState.downloading) {
+              await downloadManager.pauseRelease(anime.id);
+            }
+            // Delete the downloaded file
+            await downloadManager.deleteDownload(anime);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Download deleted'),
+                ),
+              );
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error deleting download: $e'),
+                  backgroundColor: AppTheme.errorColor,
+                ),
+              );
+            }
+          }
+        },
+        onOpen: (anime) async {
+          try {
+            final downloadManager = DownloadManager();
+            final success = await downloadManager.openDownloadedFile(anime);
+            if (context.mounted) {
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Opening downloaded file...'),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to open file'),
+                    backgroundColor: AppTheme.errorColor,
+                  ),
+                );
+              }
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error opening file: $e'),
+                  backgroundColor: AppTheme.errorColor,
+                ),
+              );
+            }
+          }
+        },
       ),
     );
   }

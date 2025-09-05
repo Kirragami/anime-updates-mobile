@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'download_state.dart';
 
 class AnimeItem {
   final String id;
@@ -11,6 +12,8 @@ class AnimeItem {
   final String fileName;
   final String imageUrl;
   final bool tracked;
+  final DownloadState downloadState;
+  final double progress;
 
   AnimeItem({
     required this.id,
@@ -22,6 +25,8 @@ class AnimeItem {
     required this.fileName,
     required this.imageUrl,
     required this.tracked,
+    this.downloadState = DownloadState.notDownloaded,
+    this.progress = 0.0,
   });
 
   factory AnimeItem.fromJson(Map<String, dynamic> json) {
@@ -58,7 +63,9 @@ class AnimeItem {
       releasedDate: parseReleasedDate(json['releasedDate']),
       fileName: json['fileName'] ?? '',
       imageUrl: json['imgUrl'] ?? '',
-      tracked: parseBool(json['tracked'])
+      tracked: parseBool(json['tracked']),
+      downloadState: DownloadState.notDownloaded,
+      progress: 0.0,
     );
   }
 
@@ -72,6 +79,8 @@ class AnimeItem {
       'releasedDate': releasedDate.toUtc().toIso8601String(),
       'imageUrl': imageUrl,
       'tracked': tracked,
+      'downloadState': downloadState.toString(),
+      'progress': progress,
     };
   }
 
@@ -85,6 +94,8 @@ class AnimeItem {
     String? fileName,
     String? imageUrl,
     bool? tracked,
+    DownloadState? downloadState,
+    double? progress,
   }) {
     return AnimeItem(
       id: id ?? this.id,
@@ -96,6 +107,8 @@ class AnimeItem {
       fileName: fileName ?? this.fileName,
       imageUrl: imageUrl ?? this.imageUrl,
       tracked: tracked ?? this.tracked,
+      downloadState: downloadState ?? this.downloadState,
+      progress: progress ?? this.progress,
     );
   }
 

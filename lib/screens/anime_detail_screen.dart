@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/anime_item.dart';
+import '../models/download_state.dart';
 import '../providers/auth_provider.dart';
 import '../providers/tracking_provider.dart';
 import '../providers/anime_providers.dart';
 import '../services/api_service.dart';
+import '../services/download_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_heart_button.dart';
 
@@ -368,7 +370,24 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                               color: Colors.transparent,
                                               child: InkWell(
                                                 borderRadius: BorderRadius.circular(16),
-                                                onTap: () => ref.read(downloadOperationsNotifierProvider.notifier).openDownloadedFile(widget.anime),
+                                                onTap: () async {
+                                                  final downloadManager = DownloadManager();
+                                                  final success = await downloadManager.openDownloadedFile(widget.anime);
+                                                  if (context.mounted) {
+                                                    if (success) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        const SnackBar(content: Text('Opening downloaded file...')),
+                                                      );
+                                                    } else {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text('Failed to open file'),
+                                                          backgroundColor: AppTheme.errorColor,
+                                                        ),
+                                                      );
+                                                    }
+                                                  }
+                                                },
                                                 child: Center(
                                                   child: Row(
                                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -417,7 +436,15 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                             color: Colors.transparent,
                                             child: InkWell(
                                               borderRadius: BorderRadius.circular(16),
-                                              onTap: () => ref.read(downloadOperationsNotifierProvider.notifier).deleteDownload(widget.anime),
+                                              onTap: () async {
+                                                final downloadManager = DownloadManager();
+                                                await downloadManager.deleteDownload(widget.anime);
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(content: Text('Download deleted')),
+                                                  );
+                                                }
+                                              },
                                               child: Center(
                                                 child: Icon(
                                                   Icons.delete_rounded,
@@ -448,7 +475,15 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                     child: Material(
                                       color: Colors.transparent,
                                       child: InkWell(
-                                        onTap: () => ref.read(downloadOperationsNotifierProvider.notifier).downloadAnime(widget.anime),
+                                        onTap: () async {
+                                          final downloadManager = DownloadManager();
+                                          await downloadManager.downloadRelease(widget.anime);
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Download started!')),
+                                            );
+                                          }
+                                        },
                                         borderRadius: BorderRadius.circular(16),
                                         child: Center(
                                           child: Row(
@@ -666,24 +701,17 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   }
 
   Widget _buildEpisodeItem(AnimeItem episode) {
-    return Consumer(
-      builder: (context, ref, child) {
-        // Watch download states for this specific episode
-        final isDownloading = ref.watch(
-          downloadStatesNotifierProvider.select(
-            (state) => state['downloading_${episode.id}'] ?? false,
-          ),
-        );
-        final isDownloaded = ref.watch(
-          downloadStatesNotifierProvider.select(
-            (state) => state['downloaded_${episode.id}'] ?? false,
-          ),
-        );
-        final downloadProgress = ref.watch(
-          downloadProgressNotifierProvider.select(
-            (state) => state[episode.id] ?? 0.0,
-          ),
-        );
+    return ValueListenableBuilder<Map<String, AnimeItem>>(
+      valueListenable: DownloadManager().stateNotifier,
+      builder: (context, releaseStates, child) {
+        // Get the current state of this anime item
+        final releaseState = releaseStates[episode.id];
+        final downloadState = releaseState?.downloadState ?? DownloadState.notDownloaded;
+        final progress = releaseState?.progress ?? 0.0;
+
+        final isDownloading = downloadState == DownloadState.downloading;
+        final isDownloaded = downloadState == DownloadState.downloaded;
+        final isPaused = downloadState == DownloadState.paused;
 
         return Container(
           decoration: BoxDecoration(
@@ -715,36 +743,140 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
               ),
             ),
             trailing: SizedBox(
-              width: 40,
+              width: 80,
               height: 40,
-              child: isDownloading
-                  ? Stack(
+              child: isDownloading || isPaused
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        // Progress background
-                        Container(
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceColor,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
                         // Progress indicator
-                        CircularProgressIndicator(
-                          value: downloadProgress,
-                          strokeWidth: 2,
-                          backgroundColor: AppTheme.surfaceColor,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppTheme.primaryColor,
+                        Stack(
+                          children: [
+                            // Progress background
+                            Container(
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceColor,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            // Progress indicator
+                            CircularProgressIndicator(
+                              value: progress / 100.0,
+                              strokeWidth: 2,
+                              backgroundColor: AppTheme.surfaceColor,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppTheme.primaryColor,
+                              ),
+                            ),
+                            // Percentage text
+                            Center(
+                              child: Text(
+                                '${(progress).toInt()}%',
+                                style: AppTheme.body2.copyWith(
+                                  color: AppTheme.primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 6,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 4),
+                        // Pause/Resume button
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.primaryGradient,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: IconButton(
+                            icon: isDownloading
+                                ? const Icon(
+                                    Icons.pause_rounded,
+                                    color: Colors.white,
+                                    size: 12,
+                                  )
+                                : const Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                            onPressed: () async {
+                              try {
+                                final downloadManager = DownloadManager();
+                                if (isDownloading) {
+                                  await downloadManager.pauseRelease(episode.id);
+                                } else if (isPaused) {
+                                  await downloadManager.resumeRelease(episode.id);
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          isDownloading
+                                              ? 'Error pausing download: $e'
+                                              : 'Error resuming download: $e'),
+                                      backgroundColor: AppTheme.errorColor,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            padding: EdgeInsets.zero,
                           ),
                         ),
-                        // Percentage text
-                        Center(
-                          child: Text(
-                            '${(downloadProgress * 100).toInt()}%',
-                            style: AppTheme.body2.copyWith(
-                              color: AppTheme.primaryColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 6,
+                        const SizedBox(width: 2),
+                        // Delete button
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.errorColor,
+                                AppTheme.errorColor.withOpacity(0.8)
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.delete_rounded,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                            onPressed: () async {
+                              try {
+                                final downloadManager = DownloadManager();
+                                // Pause the download if it's active
+                                if (isDownloading) {
+                                  await downloadManager.pauseRelease(episode.id);
+                                }
+                                // Delete the downloaded file
+                                await downloadManager.deleteDownload(episode);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Download deleted'),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error deleting download: $e'),
+                                      backgroundColor: AppTheme.errorColor,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            padding: EdgeInsets.zero,
                           ),
                         ),
                       ],
@@ -763,9 +895,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             ),
                             onPressed: () async {
                               try {
-                                final success = await ref
-                                    .read(downloadOperationsNotifierProvider.notifier)
-                                    .openDownloadedFile(episode);
+                                final downloadManager = DownloadManager();
+                                final success = await downloadManager.openDownloadedFile(episode);
                                 if (!success) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -805,9 +936,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             ),
                             onPressed: () async {
                               try {
-                                await ref
-                                    .read(downloadOperationsNotifierProvider.notifier)
-                                    .downloadAnime(episode);
+                                final downloadManager = DownloadManager();
+                                await downloadManager.downloadRelease(episode);
                               } catch (e) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(

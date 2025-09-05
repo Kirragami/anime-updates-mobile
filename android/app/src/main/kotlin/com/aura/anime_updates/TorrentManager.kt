@@ -223,7 +223,8 @@ class TorrentManager (private val context: Context) {
                                 mapOf("releaseId" to id, "progress" to 100.0, "status" to "completed")
                             )
                         }
-
+                        managedTorrents?.remove(mt?.uniqueId)
+                        saveManagedTorrents()
                         saveCompletedTorrent(mt?.uniqueId, mt?.fileName)
                     }
 
