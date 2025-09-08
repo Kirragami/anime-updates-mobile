@@ -66,7 +66,7 @@ Widget build(BuildContext context, WidgetRef ref) {
             ],
           ),
         ),
-        Text(
+       const Text(
           'UPDATES',
           style: TextStyle(
             fontSize: 32,
@@ -187,7 +187,7 @@ Widget build(BuildContext context, WidgetRef ref) {
                         ),
                       ),
                       const SizedBox(height: 1),
-                      Text(
+                     const Text(
                         'New Releases',
                         style: TextStyle(
                           fontSize: 10,

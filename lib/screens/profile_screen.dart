@@ -18,7 +18,20 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _notificationsEnabled = true;
   bool _pushNotificationsEnabled = true;
-  bool _emailNotificationsEnabled = false;
+  double _downloadSpeedLimit = 1000.0; // KB/s
+  final TextEditingController _speedController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _speedController.text = _downloadSpeedLimit.toString();
+  }
+
+  @override
+  void dispose() {
+    _speedController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,61 +96,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildProfileContent(dynamic user) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
           const SizedBox(height: 20),
-          _buildProfileCard(user),
-          const SizedBox(height: 32),
-          _buildSettingsSection(),
-          const SizedBox(height: 32),
-          _buildLogoutButton(),
+          _buildProfileHeader(user),
+          const SizedBox(height: 20),
+          _buildSettingsList(),
+          const SizedBox(height: 20),
+          _buildLogoutSection(),
           const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  Widget _buildProfileCard(dynamic user) {
+  Widget _buildProfileHeader(dynamic user) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Row(
         children: [
           // Profile Avatar
           Container(
-            width: 70,
-            height: 70,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               gradient: AppTheme.primaryGradient,
-              borderRadius: BorderRadius.circular(35),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primaryColor.withOpacity(0.3),
-                  blurRadius: 15,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(30),
             ),
             child: const Icon(
               Icons.person_rounded,
               color: Colors.white,
-              size: 35,
+              size: 30,
             ),
           ),
           const SizedBox(width: 16),
@@ -150,30 +139,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   user?.username ?? 'User',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 8),
-                // Member since badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: AppTheme.primaryColor.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: const Text(
-                    'Member since 2025',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
+                const SizedBox(height: 4),
+                Text(
+                  'Member since 2025',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],
@@ -181,101 +157,101 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.3);
-  }
-
-  Widget _buildSettingsSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildSettingsHeader(),
-          _buildNotificationToggle(
-            'Push Notifications',
-            'Receive notifications for new episodes',
-            _pushNotificationsEnabled,
-            (value) => setState(() => _pushNotificationsEnabled = value),
-          ),
-          _buildDivider(),
-          _buildNotificationToggle(
-            'Email Notifications',
-            'Get updates via email',
-            _emailNotificationsEnabled,
-            (value) => setState(() => _emailNotificationsEnabled = value),
-          ),
-          _buildDivider(),
-          _buildNotificationToggle(
-            'All Notifications',
-            'Enable or disable all notifications',
-            _notificationsEnabled,
-            (value) {
-              setState(() {
-                _notificationsEnabled = value;
-                _pushNotificationsEnabled = value;
-                _emailNotificationsEnabled = value;
-              });
-            },
-          ),
-        ],
-      ),
-    ).animate().fadeIn(duration: 600.ms, delay: 200.ms).slideY(begin: 0.3);
-  }
-
-  Widget _buildSettingsHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.notifications_rounded,
-              color: AppTheme.primaryColor,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Text(
-            'Notifications',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildNotificationToggle(
-    String title,
-    String subtitle,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
+  Widget _buildSettingsList() {
+    return Column(
+      children: [
+        _buildSettingsGroup(
+          'Notifications',
+          [
+            _buildSettingsItem(
+              icon: Icons.notifications_outlined,
+              title: 'Push Notifications',
+              subtitle: 'Receive notifications for new episodes',
+              trailing: Switch.adaptive(
+                value: _pushNotificationsEnabled,
+                onChanged: (value) => setState(() => _pushNotificationsEnabled = value),
+                activeColor: AppTheme.primaryColor,
+              ),
+            ),
+            _buildSettingsItem(
+              icon: Icons.notifications_active_outlined,
+              title: 'All Notifications',
+              subtitle: 'Enable or disable all notifications',
+              trailing: Switch.adaptive(
+                value: _notificationsEnabled,
+                onChanged: (value) {
+                  setState(() {
+                    _notificationsEnabled = value;
+                    _pushNotificationsEnabled = value;
+                  });
+                },
+                activeColor: AppTheme.primaryColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _buildSettingsGroup(
+          'Download Settings',
+          [
+            _buildDownloadSpeedItem(),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsGroup(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.1),
+              width: 1,
+            ),
+          ),
+          child: Column(children: children),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    Widget? trailing,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
+          Icon(
+            icon,
+            color: Colors.white.withOpacity(0.8),
+            size: 22,
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,7 +264,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: TextStyle(
@@ -300,78 +276,286 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ],
             ),
           ),
-          Switch.adaptive(
-            value: value,
-            onChanged: onChanged,
-            activeColor: AppTheme.primaryColor,
-            activeTrackColor: AppTheme.primaryColor.withOpacity(0.3),
-            inactiveThumbColor: Colors.white.withOpacity(0.8),
-            inactiveTrackColor: Colors.white.withOpacity(0.2),
-          ),
+          if (trailing != null) trailing,
         ],
       ),
     );
   }
 
-  Widget _buildDivider() {
+  Widget _buildDownloadSpeedItem() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      height: 1,
-      color: Colors.white.withOpacity(0.1),
-    );
-  }
-
-  Widget _buildLogoutButton() {
-    return Container(
-      width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.errorColor.withOpacity(0.8),
-            AppTheme.errorColor,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.errorColor.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Icon(
+            Icons.speed_outlined,
+            color: Colors.white.withOpacity(0.8),
+            size: 22,
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _showLogoutDialog(),
-          borderRadius: BorderRadius.circular(16),
-          child: const Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.logout_rounded,
-                  color: Color.fromARGB(255, 180, 9, 9),
-                  size: 20,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'Logout',
+                const Text(
+                  'Download Speed Limit',
                   style: TextStyle(
-                    color: Color.fromARGB(255, 180, 9, 9),
+                    color: Colors.white,
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Set maximum download speed in KB/s',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildCustomSlider(),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 80,
+                      child: TextField(
+                        controller: _speedController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'KB/s',
+                          hintStyle: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(
+                              color: Colors.white.withOpacity(0.3),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(
+                              color: Colors.white.withOpacity(0.3),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: const BorderSide(
+                              color: AppTheme.primaryColor,
+                              width: 1,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.1),
+                        ),
+                        onChanged: (value) {
+                          final newValue = double.tryParse(value);
+                          if (newValue != null && newValue >= 0 && newValue <= 10000) {
+                            setState(() {
+                              _downloadSpeedLimit = newValue;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogoutSection() {
+    return GestureDetector(
+      onTap: () => _showLogoutDialog(),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: _buildSettingsItem(
+          icon: Icons.logout_outlined,
+          title: 'Logout',
+          subtitle: 'Sign out of your account',
+          trailing: Icon(
+            Icons.arrow_forward_ios,
+            color: Colors.white.withOpacity(0.4),
+            size: 16,
+          ),
         ),
       ),
-    ).animate().fadeIn(duration: 600.ms, delay: 400.ms).slideY(begin: 0.3);
+    );
+  }
+
+  Widget _buildCustomSlider() {
+    return Row(
+      children: [
+        // Minus button
+        GestureDetector(
+          onTap: () {
+            if (_downloadSpeedLimit > 0) {
+              setState(() {
+                _downloadSpeedLimit = (_downloadSpeedLimit - 100).clamp(0, 10000);
+                _speedController.text = _downloadSpeedLimit.toString();
+              });
+            }
+          },
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.remove,
+              color: Colors.white,
+              size: 16,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Slider track
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final trackWidth = constraints.maxWidth;
+              final percentage = (_downloadSpeedLimit / 10000).clamp(0.0, 1.0);
+              final thumbPosition = percentage * trackWidth;
+              
+              return GestureDetector(
+                onTapDown: (details) {
+                  final localPosition = details.localPosition;
+                  final newPercentage = (localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                  setState(() {
+                    _downloadSpeedLimit = (newPercentage * 10000).clamp(0, 10000);
+                    _speedController.text = _downloadSpeedLimit.toString();
+                  });
+                },
+                onPanUpdate: (details) {
+                  final localPosition = details.localPosition;
+                  final newPercentage = (localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                  setState(() {
+                    _downloadSpeedLimit = (newPercentage * 10000).clamp(0, 10000);
+                    _speedController.text = _downloadSpeedLimit.toString();
+                  });
+                },
+                child: Container(
+                  height: 6,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(3),
+                    color: Colors.white.withOpacity(0.2),
+                  ),
+                  child: Stack(
+                    children: [
+                      // Filled portion
+                      Container(
+                        width: thumbPosition,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(3),
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                      // Thumb
+                      Positioned(
+                        left: thumbPosition - 20,
+                        top: -17,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              center: const Alignment(-0.3, -0.3),
+                              radius: 0.8,
+                              colors: [
+                                Colors.white,
+                                Colors.white.withOpacity(0.95),
+                                Colors.white.withOpacity(0.85),
+                              ],
+                              stops: const [0.0, 0.6, 1.0],
+                            ),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppTheme.primaryColor,
+                              width: 2.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primaryColor.withOpacity(0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.15),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Plus button
+        GestureDetector(
+          onTap: () {
+            if (_downloadSpeedLimit < 10000) {
+              setState(() {
+                _downloadSpeedLimit = (_downloadSpeedLimit + 100).clamp(0, 10000);
+                _speedController.text = _downloadSpeedLimit.toString();
+              });
+            }
+          },
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.add,
+              color: Colors.white,
+              size: 16,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return _buildLogoutSection();
   }
 
   Widget _buildLoadingContent() {
@@ -409,57 +593,111 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: AppTheme.surfaceColor,
+          backgroundColor: const Color(0xFFF5F5F5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(8),
           ),
-          title: const Text(
-            'Logout',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          content: const Text(
-            'Are you sure you want to logout?',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
+          contentPadding: const EdgeInsets.all(0),
+          content: Container(
+            width: 280,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Title
+                const Text(
+                  'Confirm Sign Out',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-                await ref.read(authNotifierProvider).logout();
-                if (context.mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    CustomPageTransitions.fadeWithScale(const HomepageScreen()),
-                    (route) => false,
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.errorColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 12),
+                // Message
+                const Text(
+                  'Are you sure you want to sign out of your account?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 16,
+                    height: 1.3,
+                  ),
                 ),
-              ),
-              child: const Text('Logout'),
+                const SizedBox(height: 20),
+                // Divider line
+                Container(
+                  height: 1,
+                  color: Colors.grey.withOpacity(0.3),
+                ),
+                const SizedBox(height: 0),
+                // Buttons row
+                Row(
+                  children: [
+                    // Cancel button
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.only(
+                              bottomLeft: Radius.circular(8),
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Vertical divider
+                    Container(
+                      width: 1,
+                      height: 50,
+                      color: Colors.grey.withOpacity(0.3),
+                    ),
+                    // Sign Out button
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () async {
+                          Navigator.of(dialogContext).pop();
+                          await ref.read(authNotifierProvider).logout();
+                          if (context.mounted) {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              CustomPageTransitions.fadeWithScale(const HomepageScreen()),
+                              (route) => false,
+                            );
+                          }
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.only(
+                              bottomRight: Radius.circular(8),
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          'Sign Out',
+                          style: TextStyle(
+                            color: AppTheme.primaryColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
