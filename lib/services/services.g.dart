@@ -55,5 +55,22 @@ final authServiceProvider = AutoDisposeProvider<AuthService>.internal(
 );
 
 typedef AuthServiceRef = AutoDisposeProviderRef<AuthService>;
+String _$speedLimitServiceHash() => r'8f4a2b1c9d3e5f6a7b8c9d0e1f2a3b4c5d6e7f8';
+
+/// Provides the speed limit service instance
+///
+/// Copied from [speedLimitService].
+@ProviderFor(speedLimitService)
+final speedLimitServiceProvider = AutoDisposeProvider<SpeedLimitService>.internal(
+  speedLimitService,
+  name: r'speedLimitServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$speedLimitServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef SpeedLimitServiceRef = AutoDisposeProviderRef<SpeedLimitService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

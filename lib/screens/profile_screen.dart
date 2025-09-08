@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
+import '../services/services.dart';
 import 'homepage_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -18,13 +19,46 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _notificationsEnabled = true;
   bool _pushNotificationsEnabled = true;
-  double _downloadSpeedLimit = 1000.0; // KB/s
+  double _downloadSpeedLimit = 0.0; // KB/s (0 = unlimited)
   final TextEditingController _speedController = TextEditingController();
+  bool _isLoadingSpeedLimit = true;
 
   @override
   void initState() {
     super.initState();
-    _speedController.text = _downloadSpeedLimit.toString();
+    _loadSpeedLimit();
+  }
+
+  Future<void> _loadSpeedLimit() async {
+    try {
+      final speedLimitService = ref.read(speedLimitServiceProvider);
+      await speedLimitService.initialize();
+      setState(() {
+        _downloadSpeedLimit = speedLimitService.speedLimit;
+        _speedController.text = _downloadSpeedLimit.toString();
+        _isLoadingSpeedLimit = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingSpeedLimit = false;
+      });
+    }
+  }
+
+  Future<void> _saveSpeedLimit() async {
+    try {
+      final speedLimitService = ref.read(speedLimitServiceProvider);
+      await speedLimitService.setSpeedLimit(_downloadSpeedLimit);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save speed limit: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -172,7 +206,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               subtitle: 'Receive notifications for new episodes',
               trailing: Switch.adaptive(
                 value: _pushNotificationsEnabled,
-                onChanged: (value) => setState(() => _pushNotificationsEnabled = value),
+                onChanged: (value) =>
+                    setState(() => _pushNotificationsEnabled = value),
                 activeColor: AppTheme.primaryColor,
               ),
             ),
@@ -307,7 +342,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Set maximum download speed in KB/s',
+                  _isLoadingSpeedLimit 
+                    ? 'Loading speed limit...'
+                    : 'Set maximum download speed in KB/s',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.6),
                     fontSize: 14,
@@ -365,10 +402,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                         onChanged: (value) {
                           final newValue = double.tryParse(value);
-                          if (newValue != null && newValue >= 0 && newValue <= 10000) {
+                          if (newValue != null &&
+                              newValue >= 0 &&
+                              newValue <= 10000) {
                             setState(() {
                               _downloadSpeedLimit = newValue;
                             });
+                            _saveSpeedLimit();
                           }
                         },
                       ),
@@ -411,148 +451,141 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildCustomSlider() {
-    return Row(
-      children: [
-        // Minus button
-        GestureDetector(
-          onTap: () {
-            if (_downloadSpeedLimit > 0) {
-              setState(() {
-                _downloadSpeedLimit = (_downloadSpeedLimit - 100).clamp(0, 10000);
-                _speedController.text = _downloadSpeedLimit.toString();
-              });
-            }
-          },
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.remove,
-              color: Colors.white,
-              size: 16,
-            ),
+  return Row(
+    children: [
+      // Minus button
+      GestureDetector(
+        onTap: () {
+          if (_downloadSpeedLimit > 0) {
+            setState(() {
+              _downloadSpeedLimit =
+                  (_downloadSpeedLimit - 100).clamp(0, 10000);
+              _speedController.text = _downloadSpeedLimit.toString();
+            });
+            _saveSpeedLimit();
+          }
+        },
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: const BoxDecoration(
+            color: AppTheme.primaryColor, // same as second image
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.remove,
+            color: Colors.white,
+            size: 16,
           ),
         ),
-        const SizedBox(width: 12),
-        // Slider track
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final trackWidth = constraints.maxWidth;
-              final percentage = (_downloadSpeedLimit / 10000).clamp(0.0, 1.0);
-              final thumbPosition = percentage * trackWidth;
-              
-              return GestureDetector(
-                onTapDown: (details) {
-                  final localPosition = details.localPosition;
-                  final newPercentage = (localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                  setState(() {
-                    _downloadSpeedLimit = (newPercentage * 10000).clamp(0, 10000);
-                    _speedController.text = _downloadSpeedLimit.toString();
-                  });
-                },
-                onPanUpdate: (details) {
-                  final localPosition = details.localPosition;
-                  final newPercentage = (localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                  setState(() {
-                    _downloadSpeedLimit = (newPercentage * 10000).clamp(0, 10000);
-                    _speedController.text = _downloadSpeedLimit.toString();
-                  });
-                },
-                child: Container(
-                  height: 6,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(3),
-                    color: Colors.white.withOpacity(0.2),
-                  ),
-                  child: Stack(
-                    children: [
-                      // Filled portion
-                      Container(
-                        width: thumbPosition,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(3),
+      ),
+      const SizedBox(width: 12),
+
+      // Slider track
+      Expanded(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final trackWidth = constraints.maxWidth;
+            final percentage = (_downloadSpeedLimit / 10000).clamp(0.0, 1.0);
+            final thumbPosition = percentage * trackWidth;
+
+            return GestureDetector(
+              onTapDown: (details) {
+                final localPosition = details.localPosition;
+                final newPercentage =
+                    (localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                setState(() {
+                  _downloadSpeedLimit =
+                      (newPercentage * 10000).clamp(0, 10000);
+                  _speedController.text = _downloadSpeedLimit.toString();
+                });
+                _saveSpeedLimit();
+              },
+              onPanUpdate: (details) {
+                final localPosition = details.localPosition;
+                final newPercentage =
+                    (localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                setState(() {
+                  _downloadSpeedLimit =
+                      (newPercentage * 10000).clamp(0, 10000);
+                  _speedController.text = _downloadSpeedLimit.toString();
+                });
+                _saveSpeedLimit();
+              },
+              child: SizedBox(
+                height: 40,
+                child: Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    // Track background
+                    Container(
+                      height: 6,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(3),
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                    // Filled portion
+                    Container(
+                      width: thumbPosition,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(3),
+                        color: AppTheme.primaryColor, // same style as 2nd image
+                      ),
+                    ),
+                    // Thumb (circle above the track)
+                    Positioned(
+                      left: thumbPosition - 12, // center thumb horizontally
+                      top: 8,                 // move it above the line
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: const BoxDecoration(
                           color: AppTheme.primaryColor,
+                          shape: BoxShape.circle,
                         ),
                       ),
-                      // Thumb
-                      Positioned(
-                        left: thumbPosition - 20,
-                        top: -17,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            gradient: RadialGradient(
-                              center: const Alignment(-0.3, -0.3),
-                              radius: 0.8,
-                              colors: [
-                                Colors.white,
-                                Colors.white.withOpacity(0.95),
-                                Colors.white.withOpacity(0.85),
-                              ],
-                              stops: const [0.0, 0.6, 1.0],
-                            ),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppTheme.primaryColor,
-                              width: 2.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primaryColor.withOpacity(0.3),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(width: 12),
-        // Plus button
-        GestureDetector(
-          onTap: () {
-            if (_downloadSpeedLimit < 10000) {
-              setState(() {
-                _downloadSpeedLimit = (_downloadSpeedLimit + 100).clamp(0, 10000);
-                _speedController.text = _downloadSpeedLimit.toString();
-              });
-            }
+              ),
+            );
           },
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.add,
-              color: Colors.white,
-              size: 16,
-            ),
+        ),
+      ),
+      const SizedBox(width: 12),
+
+      // Plus button
+      GestureDetector(
+        onTap: () {
+          if (_downloadSpeedLimit < 10000) {
+            setState(() {
+              _downloadSpeedLimit =
+                  (_downloadSpeedLimit + 100).clamp(0, 10000);
+              _speedController.text = _downloadSpeedLimit.toString();
+            });
+            _saveSpeedLimit();
+          }
+        },
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: const BoxDecoration(
+            color: AppTheme.primaryColor, // same as second image
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.add,
+            color: Colors.white,
+            size: 16,
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
+
 
   Widget _buildLogoutButton() {
     return _buildLogoutSection();
@@ -593,14 +626,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFFF5F5F5),
+          backgroundColor: AppTheme.surfaceColor,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(16),
           ),
           contentPadding: const EdgeInsets.all(0),
           content: Container(
             width: 280,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(0, 20, 0, 0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -608,27 +641,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const Text(
                   'Confirm Sign Out',
                   style: TextStyle(
-                    color: Colors.black,
+                    color: AppTheme.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 12),
                 // Message
-                const Text(
-                  'Are you sure you want to sign out of your account?',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    height: 1.3,
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
+                  child: Text(
+                    'Are you sure you want to sign out of your account?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 16,
+                      height: 1.3,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
                 // Divider line
                 Container(
                   height: 1,
-                  color: Colors.grey.withOpacity(0.3),
+                  color: AppTheme.textSecondary.withOpacity(0.2),
                 ),
                 const SizedBox(height: 0),
                 // Buttons row
@@ -642,14 +678,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: const RoundedRectangleBorder(
                             borderRadius: BorderRadius.only(
-                              bottomLeft: Radius.circular(8),
+                              bottomLeft: Radius.circular(16),
                             ),
                           ),
                         ),
-                        child: Text(
+                        child: const Text(
                           'Cancel',
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: AppTheme.textSecondary,
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                           ),
@@ -660,7 +696,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     Container(
                       width: 1,
                       height: 50,
-                      color: Colors.grey.withOpacity(0.3),
+                      color: AppTheme.textSecondary.withOpacity(0.2),
                     ),
                     // Sign Out button
                     Expanded(
@@ -670,7 +706,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           await ref.read(authNotifierProvider).logout();
                           if (context.mounted) {
                             Navigator.of(context).pushAndRemoveUntil(
-                              CustomPageTransitions.fadeWithScale(const HomepageScreen()),
+                              CustomPageTransitions.fadeWithScale(
+                                  const HomepageScreen()),
                               (route) => false,
                             );
                           }
@@ -679,11 +716,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: const RoundedRectangleBorder(
                             borderRadius: BorderRadius.only(
-                              bottomRight: Radius.circular(8),
+                              bottomRight: Radius.circular(16),
                             ),
                           ),
                         ),
-                        child: Text(
+                        child: const Text(
                           'Sign Out',
                           style: TextStyle(
                             color: AppTheme.primaryColor,

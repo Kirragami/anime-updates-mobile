@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file/open_file.dart';
 import '../constants/app_constants.dart';
 import 'package:flutter/foundation.dart';
+import 'speed_limit_service.dart';
 
 class DownloadService {
   static final DownloadService _instance = DownloadService._internal();
@@ -12,6 +14,42 @@ class DownloadService {
   DownloadService._internal();
 
   final Dio _dio = Dio();
+  final SpeedLimitService _speedLimitService = SpeedLimitService();
+  int _bytesReceivedInCurrentSecond = 0;
+  DateTime _lastSecondStart = DateTime.now();
+  bool _isDownloading = false;
+
+  /// Initialize the speed limit service
+  Future<void> initialize() async {
+    await _speedLimitService.initialize();
+  }
+
+  /// Throttle download based on speed limit
+  Future<void> _throttleDownload() async {
+    if (!_speedLimitService.isSpeedLimited || !_isDownloading) return;
+
+    final now = DateTime.now();
+    final timeSinceLastSecond = now.difference(_lastSecondStart).inMilliseconds;
+
+    // Reset counter every second
+    if (timeSinceLastSecond >= 1000) {
+      _bytesReceivedInCurrentSecond = 0;
+      _lastSecondStart = now;
+      return;
+    }
+
+    // Check if we've exceeded the speed limit for this second
+    final maxBytesPerSecond = _speedLimitService.speedLimitBytesPerSecond;
+    if (_bytesReceivedInCurrentSecond >= maxBytesPerSecond) {
+      // Calculate how long to wait until the next second
+      final waitTime = 1000 - timeSinceLastSecond;
+      if (waitTime > 0) {
+        await Future.delayed(Duration(milliseconds: waitTime));
+        _bytesReceivedInCurrentSecond = 0;
+        _lastSecondStart = DateTime.now();
+      }
+    }
+  }
 
   Future<bool> requestPermissions() async {
     if (Platform.isAndroid) {
@@ -119,6 +157,9 @@ class DownloadService {
         print('Starting download: $url to $filename');
       }
 
+      // Initialize speed limit service
+      await _speedLimitService.initialize();
+
       // Request permissions
       final hasPermission = await requestPermissions();
       if (!hasPermission) {
@@ -137,13 +178,31 @@ class DownloadService {
       
       if (kDebugMode) {
         print('Full file path: $filePath');
+        print('Speed limit: ${_speedLimitService.formattedSpeedLimit}');
       }
 
-      // Download file
+      // Reset speed limiting counters
+      _bytesReceivedInCurrentSecond = 0;
+      _lastSecondStart = DateTime.now();
+      _isDownloading = true;
+
+      // Download file with speed limiting
       await _dio.download(
         url,
         filePath,
-        onReceiveProgress: onProgress,
+        onReceiveProgress: (received, total) async {
+          // Update speed limiting counter
+          final newBytes = received - _bytesReceivedInCurrentSecond;
+          if (newBytes > 0) {
+            _bytesReceivedInCurrentSecond = received;
+            
+            // Apply throttling if needed
+            await _throttleDownload();
+          }
+          
+          // Call the original progress callback
+          onProgress?.call(received, total);
+        },
         options: Options(
           responseType: ResponseType.bytes,
           followRedirects: true,
@@ -152,6 +211,8 @@ class DownloadService {
           },
         ),
       );
+
+      _isDownloading = false;
 
       if (kDebugMode) {
         print('Download completed: $filePath');
@@ -162,6 +223,7 @@ class DownloadService {
 
       return filePath;
     } catch (e) {
+      _isDownloading = false;
       if (kDebugMode) {
         print('Download error: $e');
       }

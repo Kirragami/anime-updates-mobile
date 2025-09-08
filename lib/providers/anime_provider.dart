@@ -134,6 +134,9 @@ class AnimeProvider extends ChangeNotifier {
     try {
       final filename = '${anime.title.replaceAll(" ", "_")}.torrent';
       
+      // Initialize download service with speed limiting
+      await _downloadService.initialize();
+      
       await _downloadService.downloadFile(
         url: anime.downloadUrl,
         filename: filename,
