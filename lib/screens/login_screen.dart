@@ -206,6 +206,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           child: TextFormField(
             controller: _usernameController,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.username],
             keyboardType: TextInputType.text,
             style: AppTheme.body1,
             decoration: InputDecoration(
@@ -248,6 +250,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: TextFormField(
             controller: _passwordController,
             obscureText: !_isPasswordVisible,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _isLoading ? null : _login(),
+            autofillHints: const [AutofillHints.password],
             style: AppTheme.body1,
             decoration: InputDecoration(
               hintText: 'Password',

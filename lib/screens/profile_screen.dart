@@ -536,7 +536,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                     // Thumb (circle above the track)
                     Positioned(
-                      left: thumbPosition - 12, // center thumb horizontally
+                      left: thumbPosition - 10, // center thumb horizontally
                       top: 8,                 // move it above the line
                       child: Container(
                         width: 24,
