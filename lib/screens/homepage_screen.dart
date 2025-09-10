@@ -13,38 +13,37 @@ import 'login_screen.dart';
 class HomepageScreen extends ConsumerWidget {
   final String? fcmToken;
   const HomepageScreen({super.key, this.fcmToken});
-  
+
   @override
-Widget build(BuildContext context, WidgetRef ref) {
-  return Scaffold(
-    body: Container(
-      decoration: const BoxDecoration(
-        gradient: AppTheme.backgroundGradient,
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppConstants.largePadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Spacer(),
-              _buildAppTitle(),
-              const Spacer(),
-              Column(
-                children: [
-                  _buildAnimatedGif(),
-                  _buildNavigationButtons(context),
-                ],
-              ),
-              const Spacer()
-            ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: AppTheme.backgroundGradient,
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppConstants.largePadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Spacer(),
+                _buildAppTitle(),
+                const Spacer(),
+                Column(
+                  children: [
+                    _buildAnimatedGif(),
+                    _buildNavigationButtons(context),
+                  ],
+                ),
+                const Spacer()
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   Widget _buildAppTitle() {
     return Column(
@@ -66,25 +65,22 @@ Widget build(BuildContext context, WidgetRef ref) {
               ),
             ],
           ),
-        )
-            .animate(onPlay: (c) => c.repeat())
-            .shimmer(
-              duration: AppConstants.longAnimation,
-              colors: const [
-                AppTheme.primaryColor,
-                AppTheme.secondaryColor,
-                AppTheme.accentColor,
-              ],
-            )
-            .scale(
-              begin: const Offset(0.98, 0.98),
-              end: const Offset(1.0, 1.0),
-              duration: AppConstants.longAnimation,
-              curve: Curves.easeOut,
-            ),
+        ).animate(onPlay: (c) => c.repeat()).shimmer(
+          duration: AppConstants.longAnimation,
+          colors: const [
+            AppTheme.primaryColor,
+            AppTheme.secondaryColor,
+            AppTheme.accentColor,
+          ],
+        ).scale(
+          begin: const Offset(0.98, 0.98),
+          end: const Offset(1.0, 1.0),
+          duration: AppConstants.longAnimation,
+          curve: Curves.easeOut,
+        ),
         const SizedBox(height: 8),
         // Animated subtitle (once)
-       const Text(
+        const Text(
           'Track it. Watch it. Love it.',
           style: TextStyle(
             fontSize: 16,
@@ -99,9 +95,12 @@ Widget build(BuildContext context, WidgetRef ref) {
             .then()
             .shimmer(duration: const Duration(milliseconds: 800)),
       ],
-    ).animate().fadeIn(
-      duration: AppConstants.mediumAnimation,
-    ).slideY(begin: -0.5);
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.mediumAnimation,
+        )
+        .slideY(begin: -0.5);
   }
 
   Widget _buildAnimatedGif() {
@@ -181,7 +180,10 @@ Widget build(BuildContext context, WidgetRef ref) {
                 borderRadius: BorderRadius.circular(20),
                 onTap: () {
                   Navigator.of(context).push(
-                    CustomPageTransitions.slideFromLeft(const AnimeListScreen()),
+                    CustomPageTransitions.simpleSlide(
+                      const AnimeListScreen(),
+                      fromRight: false,
+                    ),
                   );
                 },
                 child: Container(
@@ -210,7 +212,7 @@ Widget build(BuildContext context, WidgetRef ref) {
                         ),
                       ),
                       const SizedBox(height: 1),
-                     const Text(
+                      const Text(
                         'New Releases',
                         style: TextStyle(
                           fontSize: 10,
@@ -226,13 +228,16 @@ Widget build(BuildContext context, WidgetRef ref) {
               ),
             ),
           ),
-        ).animate().fadeIn(
-          duration: AppConstants.shortAnimation,
-          delay: const Duration(milliseconds: 0),
-        ).slideX(begin: -0.1),
-        
+        )
+            .animate()
+            .fadeIn(
+              duration: AppConstants.shortAnimation,
+              delay: const Duration(milliseconds: 0),
+            )
+            .slideX(begin: -0.1),
+
         const SizedBox(width: 2),
-        
+
         // My Shows Button
         Expanded(
           child: Container(
@@ -270,11 +275,14 @@ Widget build(BuildContext context, WidgetRef ref) {
                   final isLoggedIn = AuthService.isLoggedIn;
                   if (isLoggedIn) {
                     Navigator.of(context).push(
-                      CustomPageTransitions.slideFromRight(const MyShowsScreen()),
+                      CustomPageTransitions.simpleSlide(
+                        const MyShowsScreen(),
+                        fromRight: true,
+                      ),
                     );
                   } else {
                     Navigator.of(context).push(
-                      CustomPageTransitions.slideFromBottom(
+                      CustomPageTransitions.simpleFade(
                         LoginScreen(destination: const MyShowsScreen()),
                       ),
                     );
@@ -288,7 +296,7 @@ Widget build(BuildContext context, WidgetRef ref) {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
+                          gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
@@ -313,7 +321,7 @@ Widget build(BuildContext context, WidgetRef ref) {
                         ),
                       ),
                       const SizedBox(height: 1),
-                      Text(
+                      const Text(
                         'My Shows',
                         style: TextStyle(
                           fontSize: 10,
@@ -329,11 +337,14 @@ Widget build(BuildContext context, WidgetRef ref) {
               ),
             ),
           ),
-        ).animate().fadeIn(
-          duration: AppConstants.shortAnimation,
-          delay: const Duration(milliseconds: 0),
-        ).slideX(begin: 0.1),
+        )
+            .animate()
+            .fadeIn(
+              duration: AppConstants.shortAnimation,
+              delay: const Duration(milliseconds: 0),
+            )
+            .slideX(begin: 0.1),
       ],
     );
   }
-} 
+}
