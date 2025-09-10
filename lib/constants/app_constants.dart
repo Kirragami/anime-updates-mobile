@@ -26,7 +26,7 @@ class AppConstants {
   static const Duration longAnimation = Duration(milliseconds: 600);
   
   // App Configuration
-  static const String appName = 'Anime Updates';
+  static const String appName = 'Anivio';
   static const String appVersion = '1.0.0';
   
   // Storage Keys

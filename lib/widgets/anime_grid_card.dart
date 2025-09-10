@@ -62,7 +62,7 @@ class AnimeGridCard extends ConsumerWidget {
                              child: Stack(
                  children: [
                    Hero(
-                     tag: 'anime_${anime.id}',
+                     tag: 'anime_image_${anime.id}',
                      child: Material(
                        color: Colors.transparent,
                        child: InkWell(
@@ -70,13 +70,8 @@ class AnimeGridCard extends ConsumerWidget {
                              BorderRadius.circular(AppConstants.borderRadius),
                          onTap: () {
                            Navigator.of(context).push(
-                             PageRouteBuilder(
-                               pageBuilder: (context, animation, secondaryAnimation) =>
-                                   AnimeDetailScreen(anime: anime),
-                               transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                 return _buildDoorAnimation(animation, child);
-                               },
-                               transitionDuration: const Duration(milliseconds: 600),
+                             CustomPageTransitions.heroSlide(
+                               AnimeDetailScreen(anime: anime),
                              ),
                            );
                          },

@@ -49,14 +49,15 @@ Widget build(BuildContext context, WidgetRef ref) {
   Widget _buildAppTitle() {
     return Column(
       children: [
+        // Animated title
         Text(
-          'ANIME',
+          'Anivio',
           style: TextStyle(
-            height: 0.5,
+            height: 0.9,
             fontSize: 48,
             fontWeight: FontWeight.w900,
             color: AppTheme.primaryColor,
-            letterSpacing: 8,
+            letterSpacing: 2,
             shadows: [
               Shadow(
                 color: AppTheme.primaryColor.withOpacity(0.3),
@@ -65,16 +66,38 @@ Widget build(BuildContext context, WidgetRef ref) {
               ),
             ],
           ),
-        ),
+        )
+            .animate(onPlay: (c) => c.repeat())
+            .shimmer(
+              duration: AppConstants.longAnimation,
+              colors: const [
+                AppTheme.primaryColor,
+                AppTheme.secondaryColor,
+                AppTheme.accentColor,
+              ],
+            )
+            .scale(
+              begin: const Offset(0.98, 0.98),
+              end: const Offset(1.0, 1.0),
+              duration: AppConstants.longAnimation,
+              curve: Curves.easeOut,
+            ),
+        const SizedBox(height: 8),
+        // Animated subtitle (once)
        const Text(
-          'UPDATES',
+          'Track it. Watch it. Love it.',
           style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
             color: AppTheme.textSecondary,
-            letterSpacing: 4,
+            letterSpacing: 1.2,
           ),
-        ),
+        )
+            .animate()
+            .fadeIn(duration: AppConstants.mediumAnimation)
+            .slideY(begin: 0.2, curve: Curves.easeOut)
+            .then()
+            .shimmer(duration: const Duration(milliseconds: 800)),
       ],
     ).animate().fadeIn(
       duration: AppConstants.mediumAnimation,

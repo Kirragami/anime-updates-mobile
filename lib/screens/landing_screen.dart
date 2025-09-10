@@ -21,6 +21,7 @@ class _LandingScreenState extends State<LandingScreen>
   late AnimationController _slideController;
   late AnimationController _particleController;
   late AnimationController _gradientController;
+  late AnimationController _progressController;
 
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -58,6 +59,10 @@ class _LandingScreenState extends State<LandingScreen>
       duration: const Duration(seconds: 4),
       vsync: this,
     );
+    _progressController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
@@ -68,7 +73,8 @@ class _LandingScreenState extends State<LandingScreen>
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+    ).animate(
+        CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
     _gradientAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _gradientController, curve: Curves.easeInOut),
     );
@@ -93,6 +99,7 @@ class _LandingScreenState extends State<LandingScreen>
     _slideController.forward();
     _particleController.repeat();
     _gradientController.repeat(reverse: true);
+    _progressController.forward();
 
     // Navigate to homepage after 3 seconds (reduced for better UX)
     Future.delayed(const Duration(seconds: 3), () {
@@ -111,6 +118,7 @@ class _LandingScreenState extends State<LandingScreen>
     _slideController.dispose();
     _particleController.dispose();
     _gradientController.dispose();
+    _progressController.dispose();
     super.dispose();
   }
 
@@ -142,9 +150,12 @@ class _LandingScreenState extends State<LandingScreen>
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        AppTheme.primaryColor.withOpacity(_gradientAnimation.value * 0.1),
-                        AppTheme.secondaryColor.withOpacity(_gradientAnimation.value * 0.05),
-                        AppTheme.accentColor.withOpacity(_gradientAnimation.value * 0.08),
+                        AppTheme.primaryColor
+                            .withOpacity(_gradientAnimation.value * 0.1),
+                        AppTheme.secondaryColor
+                            .withOpacity(_gradientAnimation.value * 0.05),
+                        AppTheme.accentColor
+                            .withOpacity(_gradientAnimation.value * 0.08),
                       ],
                     ),
                   ),
@@ -157,7 +168,8 @@ class _LandingScreenState extends State<LandingScreen>
               animation: _particleController,
               builder: (context, child) {
                 return CustomPaint(
-                  painter: ParticlePainter(_particles, _particleController.value),
+                  painter:
+                      ParticlePainter(_particles, _particleController.value),
                   size: Size.infinite,
                 );
               },
@@ -170,7 +182,7 @@ class _LandingScreenState extends State<LandingScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Spacer(flex: 2),
-                    
+
                     // App logo/icon with animation
                     AnimatedBuilder(
                       animation: _scaleAnimation,
@@ -190,7 +202,8 @@ class _LandingScreenState extends State<LandingScreen>
                                   spreadRadius: 5,
                                 ),
                                 BoxShadow(
-                                  color: AppTheme.secondaryColor.withOpacity(0.3),
+                                  color:
+                                      AppTheme.secondaryColor.withOpacity(0.3),
                                   blurRadius: 50,
                                   spreadRadius: 10,
                                 ),
@@ -212,69 +225,138 @@ class _LandingScreenState extends State<LandingScreen>
                     AnimatedBuilder(
                       animation: _slideAnimation,
                       builder: (context, child) {
-                        return SlideTransition(
-                          position: _slideAnimation,
-                          child: FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: Column(
-                              children: [
-                                Text(
-                                  'ANIME',
-                                  style: TextStyle(
-                                    fontSize: 48,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppTheme.primaryColor,
-                                    letterSpacing: 8,
-                                    shadows: [
-                                      Shadow(
-                                        color: AppTheme.primaryColor.withOpacity(0.5),
-                                        offset: const Offset(0, 4),
-                                        blurRadius: 12,
-                                      ),
-                                    ],
+                        return Column(
+                          children: [
+                            // Animated title
+                            Text(
+                              'Anivio',
+                              style: TextStyle(
+                                height: 0.9,
+                                fontSize: 48,
+                                fontWeight: FontWeight.w900,
+                                color: AppTheme.primaryColor,
+                                letterSpacing: 2,
+                                shadows: [
+                                  Shadow(
+                                    color:
+                                        AppTheme.primaryColor.withOpacity(0.3),
+                                    offset: const Offset(0, 4),
+                                    blurRadius: 8,
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                               const Text(
-                                  'UPDATES',
-                                  style: TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.textSecondary,
-                                    letterSpacing: 4,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Discover • Download • Enjoy',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppTheme.textSecondary.withOpacity(0.8),
-                                    letterSpacing: 2,
-                                  ),
-                                ),
+                                ],
+                              ),
+                            ).animate(onPlay: (c) => c.repeat()).shimmer(
+                              duration: AppConstants.longAnimation,
+                              colors: const [
+                                AppTheme.primaryColor,
+                                AppTheme.secondaryColor,
+                                AppTheme.accentColor,
                               ],
+                            ).scale(
+                              begin: const Offset(0.98, 0.98),
+                              end: const Offset(1.0, 1.0),
+                              duration: AppConstants.longAnimation,
+                              curve: Curves.easeOut,
                             ),
-                          ),
-                        );
+                            const SizedBox(height: 8),
+                            // Animated subtitle (once)
+                            const Text(
+                              'Track it. Watch it. Love it.',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondary,
+                                letterSpacing: 1.2,
+                              ),
+                            )
+                                .animate()
+                                .fadeIn(duration: AppConstants.mediumAnimation)
+                                .slideY(begin: 0.2, curve: Curves.easeOut)
+                                .then()
+                                .shimmer(
+                                    duration:
+                                        const Duration(milliseconds: 800)),
+                          ],
+                        )
+                            .animate()
+                            .fadeIn(
+                              duration: AppConstants.mediumAnimation,
+                            )
+                            .slideY(begin: -0.5);
                       },
                     ),
 
                     const Spacer(flex: 2),
 
-                    // Loading indicator
+                    // Loading indicator - gradient animated progress bar
                     FadeTransition(
                       opacity: _fadeAnimation,
                       child: Column(
                         children: [
                           SizedBox(
-                            width: 40,
-                            height: 40,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 3,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppTheme.primaryColor.withOpacity(0.8),
+                            width: 220,
+                            height: 8,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: AnimatedBuilder(
+                                animation: _progressController,
+                                builder: (context, _) {
+                                  return LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final totalWidth = constraints.maxWidth;
+                                      final fillWidth = totalWidth *
+                                          _progressController.value;
+                                      final shimmerWidth = 70.0;
+                                      final dx = (fillWidth + shimmerWidth) *
+                                              _progressController.value -
+                                          shimmerWidth;
+                                      return Stack(
+                                        children: [
+                                          // Track
+                                          Container(
+                                              color: AppTheme.surfaceColor
+                                                  .withOpacity(0.6)),
+                                          // Filled gradient
+                                          Container(
+                                            width: fillWidth.clamp(
+                                                0.0, totalWidth),
+                                            decoration: const BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.centerLeft,
+                                                end: Alignment.centerRight,
+                                                colors: [
+                                                  AppTheme.primaryColor,
+                                                  AppTheme.secondaryColor,
+                                                  AppTheme.accentColor,
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          // Moving shimmer highlight
+                                          Transform.translate(
+                                            offset: Offset(
+                                                dx.clamp(0.0, totalWidth), 0),
+                                            child: Container(
+                                              width: shimmerWidth,
+                                              decoration: const BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.centerLeft,
+                                                  end: Alignment.centerRight,
+                                                  colors: [
+                                                    Colors.transparent,
+                                                    Colors.white70,
+                                                    Colors.transparent,
+                                                  ],
+                                                  stops: [0.0, 0.5, 1.0],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
                               ),
                             ),
                           ),
@@ -328,16 +410,20 @@ class ParticlePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.fill;
+    final paint = Paint()..style = PaintingStyle.fill;
 
     for (final particle in particles) {
       // Calculate new position based on animation
-      final newX = (particle.x + math.cos(particle.angle) * particle.speed * animationValue) % 1.0;
-      final newY = (particle.y + math.sin(particle.angle) * particle.speed * animationValue) % 1.0;
+      final newX = (particle.x +
+              math.cos(particle.angle) * particle.speed * animationValue) %
+          1.0;
+      final newY = (particle.y +
+              math.sin(particle.angle) * particle.speed * animationValue) %
+          1.0;
 
       // Create pulsing effect
-      final pulse = (math.sin(animationValue * 2 * math.pi + particle.angle) + 1) / 2;
+      final pulse =
+          (math.sin(animationValue * 2 * math.pi + particle.angle) + 1) / 2;
       final currentOpacity = particle.opacity * (0.5 + pulse * 0.5);
 
       paint.color = AppTheme.primaryColor.withOpacity(currentOpacity);
