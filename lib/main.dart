@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'screens/landing_screen.dart';
 import 'screens/homepage_screen.dart';
 import 'theme/app_theme.dart';
 import 'constants/app_constants.dart';
@@ -145,9 +146,7 @@ class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: HomepageScreen(
-        fcmToken: _firebaseToken, // pass token if you want to show/debug it
-      ),
+      home: LandingScreen(),
     );
   }
 }

@@ -145,7 +145,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildProfileHeader(dynamic user) {
-    return Container(
+    return  Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Row(
         children: [
@@ -404,7 +404,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           final newValue = double.tryParse(value);
                           if (newValue != null &&
                               newValue >= 0 &&
-                              newValue <= 10000) {
+                              newValue <= 50000) {
                             setState(() {
                               _downloadSpeedLimit = newValue;
                             });
@@ -459,7 +459,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           if (_downloadSpeedLimit > 0) {
             setState(() {
               _downloadSpeedLimit =
-                  (_downloadSpeedLimit - 100).clamp(0, 10000);
+                  (_downloadSpeedLimit - 100).clamp(0, 50000);
               _speedController.text = _downloadSpeedLimit.toString();
             });
             _saveSpeedLimit();
@@ -486,7 +486,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final trackWidth = constraints.maxWidth;
-            final percentage = (_downloadSpeedLimit / 10000).clamp(0.0, 1.0);
+            final percentage = (_downloadSpeedLimit / 50000).clamp(0.0, 1.0);
             final thumbPosition = percentage * trackWidth;
 
             return GestureDetector(
@@ -496,7 +496,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     (localPosition.dx / trackWidth).clamp(0.0, 1.0);
                 setState(() {
                   _downloadSpeedLimit =
-                      (newPercentage * 10000).clamp(0, 10000);
+                      (newPercentage * 50000).clamp(0, 50000);
                   _speedController.text = _downloadSpeedLimit.toString();
                 });
                 _saveSpeedLimit();
@@ -507,7 +507,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     (localPosition.dx / trackWidth).clamp(0.0, 1.0);
                 setState(() {
                   _downloadSpeedLimit =
-                      (newPercentage * 10000).clamp(0, 10000);
+                      (newPercentage * 50000).clamp(0, 50000);
                   _speedController.text = _downloadSpeedLimit.toString();
                 });
                 _saveSpeedLimit();
@@ -536,7 +536,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                     // Thumb (circle above the track)
                     Positioned(
-                      left: thumbPosition - 10, // center thumb horizontally
+                      left: (thumbPosition - 12).clamp(0.0, trackWidth - 24), // center thumb horizontally, clamp to prevent clipping
                       top: 8,                 // move it above the line
                       child: Container(
                         width: 24,
@@ -559,10 +559,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       // Plus button
       GestureDetector(
         onTap: () {
-          if (_downloadSpeedLimit < 10000) {
+          if (_downloadSpeedLimit < 50000) {
             setState(() {
               _downloadSpeedLimit =
-                  (_downloadSpeedLimit + 100).clamp(0, 10000);
+                  (_downloadSpeedLimit + 100).clamp(0, 50000);
               _speedController.text = _downloadSpeedLimit.toString();
             });
             _saveSpeedLimit();

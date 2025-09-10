@@ -37,9 +37,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       final result = await ref.read(authNotifierProvider).login(
-        username: _usernameController.text.trim(),
-        password: _passwordController.text,
-      );
+            username: _usernameController.text.trim(),
+            password: _passwordController.text,
+          );
 
       if (result['success']) {
         if (mounted) {
@@ -85,10 +85,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             padding: const EdgeInsets.all(AppConstants.largePadding),
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height - 
-                           MediaQuery.of(context).padding.top - 
-                           MediaQuery.of(context).padding.bottom - 
-                           (AppConstants.largePadding * 2),
+                minHeight: MediaQuery.of(context).size.height -
+                    MediaQuery.of(context).padding.top -
+                    MediaQuery.of(context).padding.bottom -
+                    (AppConstants.largePadding * 2),
               ),
               child: IntrinsicHeight(
                 child: Form(
@@ -97,30 +97,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const SizedBox(height: 60),
-                      
+
                       // App Logo/Title
                       _buildAppHeader(),
-                      
+
                       const SizedBox(height: AppConstants.largePadding),
-                      
+
                       // Welcome Text
                       _buildWelcomeText(),
-                      
+
                       const SizedBox(height: AppConstants.largePadding),
-                      
+
                       // Login Form
                       _buildLoginForm(),
-                      
+
                       const SizedBox(height: AppConstants.largePadding),
-                      
+
                       // Login Button
                       _buildLoginButton(),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Register Link
                       _buildRegisterLink(),
-                      
+
                       const SizedBox(height: 32),
                     ],
                   ),
@@ -160,7 +160,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         //   ),
         // ),
       ],
-    ).animate().fadeIn(duration: AppConstants.mediumAnimation).slideY(begin: -0.3);
+    )
+        .animate()
+        .fadeIn(duration: AppConstants.mediumAnimation)
+        .slideY(begin: -0.3);
   }
 
   Widget _buildWelcomeText() {
@@ -169,24 +172,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         Text(
           'Okaerinasai!',
           style: AppTheme.heading1.copyWith(
-            fontSize: 32,
+            fontSize: 30,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'How long are you going to just stand there? Sign in',
+          'Stay updated with your favorite anime in one place',
           style: AppTheme.body2.copyWith(
-            fontSize: 13,
+            fontSize: 14,
             color: AppTheme.textSecondary,
           ),
           textAlign: TextAlign.center,
         ),
       ],
-    ).animate().fadeIn(
-      duration: AppConstants.mediumAnimation,
-      delay: const Duration(milliseconds: 200),
-    ).slideY(begin: 0.3);
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.mediumAnimation,
+          delay: const Duration(milliseconds: 200),
+        )
+        .slideY(begin: 0.3);
   }
 
   Widget _buildLoginForm() {
@@ -212,7 +218,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             style: AppTheme.body1,
             decoration: InputDecoration(
               hintText: 'Username',
-              prefixIcon: const Icon(Icons.person_outline, color: AppTheme.primaryColor),
+              prefixIcon: const Icon(Icons.person_outline,
+                  color: AppTheme.primaryColor),
               filled: true,
               fillColor: AppTheme.surfaceColor,
               border: OutlineInputBorder(
@@ -221,7 +228,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                borderSide:
+                    const BorderSide(color: AppTheme.primaryColor, width: 2),
               ),
             ),
             validator: (value) {
@@ -232,9 +240,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             },
           ),
         ),
-        
+
         const SizedBox(height: 20),
-        
+
         // Password Field
         Container(
           decoration: BoxDecoration(
@@ -256,11 +264,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             style: AppTheme.body1,
             decoration: InputDecoration(
               hintText: 'Password',
-              prefixIcon: const Icon(Icons.lock_rounded, color: AppTheme.primaryColor),
+              prefixIcon:
+                  const Icon(Icons.lock_outlined, color: AppTheme.primaryColor),
               suffixIcon: IconButton(
                 icon: Image.asset(
-                  _isPasswordVisible 
-                      ? 'assets/images/gojo-eye-open.png' 
+                  _isPasswordVisible
+                      ? 'assets/images/gojo-eye-open.png'
                       : 'assets/images/gojo-eye-closed.png',
                   width: 34,
                   height: 34,
@@ -280,7 +289,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                borderSide:
+                    const BorderSide(color: AppTheme.primaryColor, width: 2),
               ),
             ),
             validator: (value) {
@@ -295,10 +305,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ],
-    ).animate().fadeIn(
-      duration: AppConstants.mediumAnimation,
-      delay: const Duration(milliseconds: 400),
-    ).slideY(begin: 0.3);
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.mediumAnimation,
+          delay: const Duration(milliseconds: 400),
+        )
+        .slideY(begin: 0.3);
   }
 
   Widget _buildLoginButton() {
@@ -333,10 +346,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
       ),
-    ).animate().fadeIn(
-      duration: AppConstants.mediumAnimation,
-      delay: const Duration(milliseconds: 600),
-    ).slideY(begin: 0.3);
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.mediumAnimation,
+          delay: const Duration(milliseconds: 600),
+        )
+        .slideY(begin: 0.3);
   }
 
   Widget _buildRegisterLink() {
@@ -364,9 +380,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ],
-    ).animate().fadeIn(
-      duration: AppConstants.mediumAnimation,
-      delay: const Duration(milliseconds: 800),
-    ).slideY(begin: 0.3);
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.mediumAnimation,
+          delay: const Duration(milliseconds: 800),
+        )
+        .slideY(begin: 0.3);
   }
-} 
+}

@@ -37,9 +37,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     try {
       final result = await ref.read(authNotifierProvider).register(
-        username: _usernameController.text.trim(),
-        password: _passwordController.text,
-      );
+            username: _usernameController.text.trim(),
+            password: _passwordController.text,
+          );
 
       if (result['success']) {
         if (mounted) {
@@ -77,10 +77,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             padding: const EdgeInsets.all(AppConstants.largePadding),
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height - 
-                           MediaQuery.of(context).padding.top - 
-                           MediaQuery.of(context).padding.bottom - 
-                           (AppConstants.largePadding * 2),
+                minHeight: MediaQuery.of(context).size.height -
+                    MediaQuery.of(context).padding.top -
+                    MediaQuery.of(context).padding.bottom -
+                    (AppConstants.largePadding * 2),
               ),
               child: IntrinsicHeight(
                 child: Form(
@@ -89,30 +89,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const SizedBox(height: 40),
-                      
+
                       // App Logo/Title
                       _buildAppHeader(),
-                      
+
                       const SizedBox(height: AppConstants.largePadding),
-                      
+
                       // Welcome Text
                       _buildWelcomeText(),
-                      
+
                       const SizedBox(height: AppConstants.largePadding),
-                      
+
                       // Registration Form
                       _buildRegistrationForm(),
-                      
+
                       const SizedBox(height: AppConstants.largePadding),
-                      
+
                       // Register Button
                       _buildRegisterButton(),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Login Link
                       _buildLoginLink(),
-                      
+
                       const SizedBox(height: 32),
                     ],
                   ),
@@ -152,7 +152,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         //   ),
         // ),
       ],
-    ).animate().fadeIn(duration: AppConstants.mediumAnimation).slideY(begin: -0.3);
+    )
+        .animate()
+        .fadeIn(duration: AppConstants.mediumAnimation)
+        .slideY(begin: -0.3);
   }
 
   // Widget _buildAppHeader() {
@@ -195,26 +198,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return Column(
       children: [
         Text(
-          'Join us',
+          'Join us!',
           style: AppTheme.heading1.copyWith(
-            fontSize: 32,
+            fontSize: 30,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Its not like we want you to make an account, Baka~',
+          'Be the first to know when new episodes drop',
           style: AppTheme.body2.copyWith(
-            fontSize: 13,
+            fontSize: 14,
             color: AppTheme.textSecondary,
           ),
           textAlign: TextAlign.center,
         ),
       ],
-    ).animate().fadeIn(
-      duration: AppConstants.mediumAnimation,
-      delay: const Duration(milliseconds: 200),
-    ).slideY(begin: 0.3);
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.mediumAnimation,
+          delay: const Duration(milliseconds: 200),
+        )
+        .slideY(begin: 0.3);
   }
 
   Widget _buildRegistrationForm() {
@@ -237,7 +243,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             style: AppTheme.body1,
             decoration: InputDecoration(
               hintText: 'Username',
-              prefixIcon: const Icon(Icons.person_rounded, color: AppTheme.secondaryColor),
+              prefixIcon: const Icon(Icons.person_rounded,
+                  color: AppTheme.secondaryColor),
               filled: true,
               fillColor: AppTheme.surfaceColor,
               border: OutlineInputBorder(
@@ -246,7 +253,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppTheme.secondaryColor, width: 2),
+                borderSide:
+                    const BorderSide(color: AppTheme.secondaryColor, width: 2),
               ),
             ),
             validator: (value) {
@@ -260,9 +268,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             },
           ),
         ),
-        
+
         const SizedBox(height: 20),
-        
+
         // Password Field
         Container(
           decoration: BoxDecoration(
@@ -281,11 +289,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             style: AppTheme.body1,
             decoration: InputDecoration(
               hintText: 'Password',
-              prefixIcon: const Icon(Icons.lock_rounded, color: AppTheme.secondaryColor),
+              prefixIcon: const Icon(Icons.lock_outlined,
+                  color: AppTheme.secondaryColor),
               suffixIcon: IconButton(
                 icon: Image.asset(
-                  _isPasswordVisible 
-                      ? 'assets/images/gojo-eye-open.png' 
+                  _isPasswordVisible
+                      ? 'assets/images/gojo-eye-open.png'
                       : 'assets/images/gojo-eye-closed.png',
                   width: 34,
                   height: 34,
@@ -305,7 +314,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppTheme.secondaryColor, width: 2),
+                borderSide:
+                    const BorderSide(color: AppTheme.secondaryColor, width: 2),
               ),
             ),
             validator: (value) {
@@ -319,13 +329,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             },
           ),
         ),
-        
+
         // No confirm password in simplified flow
       ],
-    ).animate().fadeIn(
-      duration: AppConstants.mediumAnimation,
-      delay: const Duration(milliseconds: 400),
-    ).slideY(begin: 0.3);
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.mediumAnimation,
+          delay: const Duration(milliseconds: 400),
+        )
+        .slideY(begin: 0.3);
   }
 
   Widget _buildRegisterButton() {
@@ -360,10 +373,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
               ),
       ),
-    ).animate().fadeIn(
-      duration: AppConstants.mediumAnimation,
-      delay: const Duration(milliseconds: 600),
-    ).slideY(begin: 0.3);
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.mediumAnimation,
+          delay: const Duration(milliseconds: 600),
+        )
+        .slideY(begin: 0.3);
   }
 
   Widget _buildLoginLink() {
@@ -391,9 +407,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ),
       ],
-    ).animate().fadeIn(
-      duration: AppConstants.mediumAnimation,
-      delay: const Duration(milliseconds: 800),
-    ).slideY(begin: 0.3);
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.mediumAnimation,
+          delay: const Duration(milliseconds: 800),
+        )
+        .slideY(begin: 0.3);
   }
-} 
+}

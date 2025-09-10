@@ -42,8 +42,8 @@ class SpeedLimitService {
       await initialize();
     }
 
-    // Clamp the value between 0 and 10000 KB/s
-    _currentSpeedLimit = speedLimitKBps.clamp(0.0, 10000.0);
+    // Clamp the value between 0 and 50000 KB/s
+    _currentSpeedLimit = speedLimitKBps.clamp(0.0, 50000.0);
 
     try {
       final prefs = await SharedPreferences.getInstance();

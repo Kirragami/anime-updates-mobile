@@ -115,7 +115,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
-                    Icons.arrow_back_ios,
+                    Icons.arrow_back,
                     color: Colors.white,
                     size: 20,
                   ),
@@ -554,7 +554,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                         shape: BoxShape.circle,
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.2),
+                                            color:
+                                                Colors.black.withOpacity(0.2),
                                             blurRadius: 8,
                                             offset: const Offset(0, 4),
                                           ),
@@ -839,7 +840,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                           value: downloadProgress,
                           strokeWidth: 2,
                           backgroundColor: AppTheme.surfaceColor,
-                          valueColor:const AlwaysStoppedAnimation<Color>(
+                          valueColor: const AlwaysStoppedAnimation<Color>(
                             AppTheme.primaryColor,
                           ),
                         ),
