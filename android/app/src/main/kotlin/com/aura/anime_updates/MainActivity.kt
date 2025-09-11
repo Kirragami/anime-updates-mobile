@@ -16,7 +16,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        torrentManager = TorrentManager(this)
+        torrentManager = TorrentManager.getInstance(this)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -43,22 +43,17 @@ class MainActivity : FlutterActivity() {
                     torrentManager.resumeTorrent(releaseId)
                     result.success(null)
                 }
+                "deleteTorrentFile" -> {
+                    val releaseId = call.argument<String>("releaseId")!!
+                    torrentManager.deleteTorrent(releaseId)
+                    result.success(null)
+                }
                 "pauseAllTorrents" -> {
                     torrentManager.pauseAll()
                     result.success(null)
                 }
                 "resumeAllTorrents" -> {
                     torrentManager.resumeAll()
-                    result.success(null)
-                }
-                "getProgress" -> {
-                    val releaseId = call.argument<String>("releaseId")!!
-                    val progress = torrentManager.getProgress(releaseId)
-                    result.success(progress)
-                }
-                "getDownloadSpeed" -> {
-                    val releaseId = call.argument<String>("releaseId")!!
-                    // ishowspeed
                     result.success(null)
                 }
                 "getCompletedTorrents" -> {
@@ -77,7 +72,7 @@ class MainActivity : FlutterActivity() {
                 
                         val torrentsList = torrents.map { torrent ->
                             mapOf(
-                                "uniqueId" to torrent.uniqueId,
+                                "releaseId" to torrent.uniqueId,
                                 "fileName" to torrent.fileName,
                                 "sha1" to torrent.sha1.toString(),
                                 "progress" to torrent.progress
@@ -96,12 +91,12 @@ class MainActivity : FlutterActivity() {
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, TORRENT_EVENT_CHANNEL)
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                    torrentEventSink = events
-                    torrentManager.torrentEventSink = torrentEventSink
+                    TorrentEventSinkManager.instance.setEventSink(events)
+                    torrentManager.torrentEventSink = events
                 }
 
                 override fun onCancel(arguments: Any?) {
-                    torrentEventSink = null
+                    TorrentEventSinkManager.instance.clearEventSink()
                     torrentManager.torrentEventSink = null
                 }
             })

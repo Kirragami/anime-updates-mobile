@@ -42,7 +42,7 @@ class TorrentPlatform {
       final List<dynamic> result = await _channel.invokeMethod("getManagedTorrents");
       return result.cast<Map<dynamic, dynamic>>().map((e) {
         return {
-          "uniqueId": e["uniqueId"] as String,
+          "uniqueId": e["releaseId"] as String,
           "fileName": e["fileName"] as String,
           "sha1": e["sha1"] as String,
           "progress": (e["progress"] as num).toDouble(),

@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/widgets.dart';
 import '../models/anime_item.dart';
 import '../models/download_state.dart';
+import 'package:open_file/open_file.dart';
 
 class DownloadManager {
   static const _channel = MethodChannel("com.aura.anime_updates/torrent");
@@ -55,7 +56,7 @@ class DownloadManager {
       
       final Map<String, Map<dynamic, dynamic>> managedMap = {
         for (var torrent in managedTorrents)
-          if (torrent['uniqueId'] != null) torrent['uniqueId'].toString(): torrent
+          if (torrent['releaseId'] != null) torrent['releaseId'].toString(): torrent
       };
       
       if (kDebugMode) {
@@ -85,7 +86,7 @@ class DownloadManager {
             print("  -> Release ${release.id} is MANAGED with progress: ${(torrent['progress'] as num).toDouble()}");
           }
           _releaseStates[release.id] = release.copyWith(
-            downloadState: DownloadState.downloading, // Default to downloading, will be updated by events
+            downloadState: DownloadState.paused,
             progress: (torrent['progress'] as num).toDouble()
           );
         } else {
@@ -141,6 +142,7 @@ class DownloadManager {
           }
           
           if (releaseId != null && progress != null) {
+            // Default to downloading for progress events, unless explicitly paused or completed
             DownloadState state = DownloadState.downloading;
             if (status == "completed") {
               state = DownloadState.downloaded;
@@ -157,9 +159,16 @@ class DownloadManager {
               if (kDebugMode) {
                 print(">>> DOWNLOADING EVENT DETECTED for release: $releaseId <<<");
               }
-            } else {
+            } else if (status == "notDownloaded") {
+              state = DownloadState.notDownloaded;
               if (kDebugMode) {
-                print(">>> UNKNOWN STATUS '$status' for release: $releaseId <<<");
+                print(">>> DELETION EVENT DETECTED for release: $releaseId <<<");
+              }
+            } else {
+              // For progress events without explicit status, treat as downloading
+              state = DownloadState.downloading;
+              if (kDebugMode) {
+                print(">>> PROGRESS EVENT TREATED AS DOWNLOADING for release: $releaseId <<<");
               }
             }
             
@@ -326,7 +335,7 @@ class DownloadManager {
   // Delete a downloaded release
   Future<void> deleteDownload(AnimeItem release) async {
     try {
-      await _channel.invokeMethod("deleteTorrent", {
+      await _channel.invokeMethod("deleteTorrentFile", {
         "releaseId": release.id
       });
       
@@ -353,19 +362,12 @@ class DownloadManager {
   // Open a downloaded release
   Future<bool> openDownloadedFile(AnimeItem release) async {
     try {
-      final result = await _channel.invokeMethod("openTorrent", {
-        "releaseId": release.id
-      });
-      
-      if (kDebugMode) {
-        print("Opened download for release: ${release.id}");
-      }
-      
-      return result as bool? ?? false;
+      Directory? directory;
+      directory = await getExternalStorageDirectory();
+      final filePath = '${directory?.path}/TorrentFileDownloads/' + release.fileName;
+      final result = await OpenFile.open(filePath);
+      return result.type == ResultType.done;
     } catch (e) {
-      if (kDebugMode) {
-        print("Error opening download for release ${release.id}: $e");
-      }
       return false;
     }
   }

@@ -283,22 +283,6 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen>
           try {
             final downloadManager = DownloadManager();
             final success = await downloadManager.openDownloadedFile(anime);
-            if (context.mounted) {
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Opening downloaded file...'),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to open file'),
-                    backgroundColor: AppTheme.errorColor,
-                  ),
-                );
-              }
-            }
           } catch (e) {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
