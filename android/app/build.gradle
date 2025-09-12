@@ -75,6 +75,16 @@ android {
             jniLibs.srcDirs = ['libs']
         }
     }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            def appName = "anime-updates"
+            def buildType = variant.buildType.name
+            def versionName = variant.versionName
+            outputFileName = "${appName}-v${versionName}.apk"
+        }
+    }
+
 }
 
 flutter {
