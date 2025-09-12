@@ -56,6 +56,11 @@ class MainActivity : FlutterActivity() {
                     torrentManager.resumeAll()
                     result.success(null)
                 }
+                "setDownloadSpeedLimit" -> {
+                    val limit = call.argument<Int>("speedLimit")!!
+                    torrentManager.setDownloadSpeedLimit(limit)
+                    result.success(null)
+                }
                 "getCompletedTorrents" -> {
                     try {
                         val completed = torrentManager.loadCompleted()

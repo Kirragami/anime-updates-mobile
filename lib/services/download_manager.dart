@@ -376,4 +376,15 @@ class DownloadManager {
   DownloadState getDownloadState(String releaseId) {
     return _releaseStates[releaseId]?.downloadState ?? DownloadState.notDownloaded;
   }
+
+
+  Future<void> setDownloadSpeedLimit(int limit) async {
+    try {
+      await _channel.invokeMethod("setDownloadSpeedLimit", {
+        "speedLimit": limit
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

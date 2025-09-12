@@ -171,6 +171,10 @@ class TorrentManager private constructor(private val context: Context) {
         }
     }
 
+    fun setDownloadSpeedLimit(limit: Int) {
+        sessionManager?.downloadRateLimit(limit)
+    }
+
     /**
      * Stop the session entirely (pauses all and stops alerts)
      */
