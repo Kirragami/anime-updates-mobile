@@ -1,0 +1,58 @@
+name: APK Deployment
+
+on:
+  push:
+    branches:
+      - apk-deployment
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.22.2
+
+      # 3. Cache Flutter & Gradle dependencies for speed
+      - name: Cache Flutter and Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache
+            $HOME/flutter/bin/cache
+            ~/.gradle
+          key: ${{ runner.os }}-flutter-3.22.2-${{ hashFiles('**/pubspec.yaml') }}
+
+      # 4. Install Android SDK components (if needed)
+      - name: Install Android SDK components
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip curl
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;34.0.0"
+
+      # 5. Get Flutter dependencies
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      # 6. Build APK
+      - name: Build APK
+        run: flutter build apk --release
+
+      # 7. Upload APK to your VPS
+      - name: Upload APK to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_KEY }}
+          source: build/app/outputs/flutter-apk/app-release.apk
+          target: ${{ secrets.SERVER_APK_PATH }}
