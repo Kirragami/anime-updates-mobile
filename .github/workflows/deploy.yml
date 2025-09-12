@@ -60,13 +60,18 @@ jobs:
       - name: Move APK to workspace root
         run: cp build/app/outputs/apk/release/anime-updates*.apk ./
 
-      # 8. Upload APK to VPS
-      - name: Upload APK to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          port: ${{ secrets.SERVER_PORT }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_KEY }}
-          source: ./anime-updates*.apk
-          target: ${{ secrets.SERVER_APK_PATH }}
+      - name: Install rsync
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Upload APK via rsync
+        run: |
+          rsync -avz --progress --partial \
+            -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -p ${{ secrets.SERVER_PORT }}" \
+            build/app/outputs/apk/release/anime-updates*.apk \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{secrets.SERVER_APK_PATH}}
