@@ -63,9 +63,6 @@ jobs:
       - name: Build APK
         run: flutter build apk --release -v
 
-      - name: Move APK to workspace root
-        run: cp build/app/outputs/apk/release/anime-updates*.apk ./
-
       - name: Install rsync
         run: sudo apt-get update && sudo apt-get install -y rsync
 
