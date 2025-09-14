@@ -10,24 +10,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Restore secret files
       - name: Restore Firebase config files
         run: |
           mkdir -p lib/config
           echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > android/app/google-services.json
           echo "${{ secrets.FIREBASE_CONFIG_DART }}" | base64 --decode > lib/config/firebase_config.dart
 
-      # 3. Setup Flutter pinned version
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.22.2
 
-      # 4. Cache Flutter SDK, Pub & Gradle for faster builds
       - name: Cache Flutter & Gradle
         uses: actions/cache@v3
         with:
@@ -37,7 +33,6 @@ jobs:
             ~/.gradle
           key: ${{ runner.os }}-flutter-3.22.2-${{ hashFiles('**/pubspec.yaml') }}
 
-      # 5. Install minimal Android SDK
       - name: Install Android SDK
         run: |
           mkdir -p $HOME/android-sdk/cmdline-tools
@@ -49,17 +44,15 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;34.0.0"
 
-      # 6. Get Flutter dependencies
       - name: Get Flutter dependencies
         run: flutter pub get
 
       - name: Get app version
         id: version
         run: |
-          APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
 
-      # 7. Build APK
       - name: Build APK
         run: flutter build apk --release -v
 
