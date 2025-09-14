@@ -53,6 +53,16 @@ jobs:
           APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
 
+      - name: Setup release keystore and env vars
+        run: |
+          # Decode keystore from GitHub Secret into a temporary file
+          echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 --decode > /tmp/key.jks
+
+          echo "KEYSTORE_PATH=/tmp/key.jks" >> $GITHUB_ENV
+          echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+
       - name: Build APK
         run: flutter build apk --release -v
 
