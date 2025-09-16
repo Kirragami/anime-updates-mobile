@@ -548,7 +548,7 @@ class AnimeGridCard extends ConsumerWidget {
                       onPressed: () async {
                         try {
                           final downloadManager = DownloadManager();
-                          await downloadManager.deleteDownload(anime);
+                          await downloadManager.deleteDownload(anime.id);
                         } catch (e) {
                           // Handle error silently or show a snack bar
                         }

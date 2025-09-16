@@ -381,7 +381,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
               await downloadManager.pauseRelease(anime.id);
             }
             // Delete the downloaded file
-            await downloadManager.deleteDownload(anime);
+            await downloadManager.deleteDownload(anime.id);
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(

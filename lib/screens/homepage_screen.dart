@@ -3,12 +3,15 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
-import '../providers/auth_provider.dart';
 import '../services/auth_service.dart';
+import '../services/download_manager.dart';
+import '../models/anime_item.dart';
+import '../models/download_state.dart';
 import '../utils/page_transitions.dart';
 import 'anime_list_screen.dart';
 import 'my_shows_screen.dart';
 import 'login_screen.dart';
+import 'download_manager_screen.dart';
 
 class HomepageScreen extends ConsumerWidget {
   final String? fcmToken;
@@ -22,23 +25,87 @@ class HomepageScreen extends ConsumerWidget {
           gradient: AppTheme.backgroundGradient,
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(AppConstants.largePadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Spacer(),
-                _buildAppTitle(),
-                const Spacer(),
-                Column(
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(AppConstants.largePadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    _buildAnimatedGif(),
-                    _buildNavigationButtons(context),
+                    const Spacer(),
+                    _buildAppTitle(),
+                    const Spacer(),
+                    Column(
+                      children: [
+                        _buildAnimatedGif(),
+                        _buildNavigationButtons(context),
+                      ],
+                    ),
+                    const Spacer()
                   ],
                 ),
-                const Spacer()
-              ],
-            ),
+              ),
+              // Download button with badge
+              Positioned(
+                top: 16,
+                right: 16,
+                child: ValueListenableBuilder<Map<String, AnimeItem>>(
+                  valueListenable: DownloadManager().stateNotifier,
+                  builder: (context, releaseStates, child) {
+                    // Count active downloads (downloading or paused)
+                    final activeDownloads = releaseStates.entries.where((entry) {
+                      final state = entry.value.downloadState;
+                      return state == DownloadState.downloading || state == DownloadState.paused;
+                    }).length;
+                    
+                    return Stack(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.download_rounded,
+                            size: 32,
+                            color: AppTheme.textPrimary,
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              CustomPageTransitions.simpleSlide(
+                                const DownloadManagerScreen(),
+                                fromRight: true,
+                              ),
+                            );
+                          },
+                        ),
+                        if (activeDownloads > 0)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.errorColor,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              child: Text(
+                                '$activeDownloads',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
