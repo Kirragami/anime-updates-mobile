@@ -12,6 +12,7 @@ import 'anime_list_screen.dart';
 import 'my_shows_screen.dart';
 import 'login_screen.dart';
 import 'download_manager_screen.dart';
+import 'profile_screen.dart';
 
 class HomepageScreen extends ConsumerWidget {
   final String? fcmToken;
@@ -45,64 +46,87 @@ class HomepageScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              // Download button with badge
+              // Top right buttons (Settings and Download)
               Positioned(
                 top: 16,
                 right: 16,
-                child: ValueListenableBuilder<Map<String, AnimeItem>>(
-                  valueListenable: DownloadManager().stateNotifier,
-                  builder: (context, releaseStates, child) {
-                    // Count active downloads (downloading or paused)
-                    final activeDownloads = releaseStates.entries.where((entry) {
-                      final state = entry.value.downloadState;
-                      return state == DownloadState.downloading || state == DownloadState.paused;
-                    }).length;
-                    
-                    return Stack(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.download_rounded,
-                            size: 32,
-                            color: AppTheme.textPrimary,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Settings button
+                    IconButton(
+                      icon: const Icon(
+                        Icons.settings_rounded,
+                        size: 32,
+                        color: AppTheme.textPrimary,
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          CustomPageTransitions.simpleSlide(
+                            const ProfileScreen(),
+                            fromRight: true,
                           ),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              CustomPageTransitions.simpleSlide(
-                                const DownloadManagerScreen(),
-                                fromRight: true,
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    // Download button with badge
+                    ValueListenableBuilder<Map<String, AnimeItem>>(
+                      valueListenable: DownloadManager().stateNotifier,
+                      builder: (context, releaseStates, child) {
+                        // Count active downloads (downloading or paused)
+                        final activeDownloads = releaseStates.entries.where((entry) {
+                          final state = entry.value.downloadState;
+                          return state == DownloadState.downloading || state == DownloadState.paused;
+                        }).length;
+                        
+                        return Stack(
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.download_rounded,
+                                size: 32,
+                                color: AppTheme.textPrimary,
                               ),
-                            );
-                          },
-                        ),
-                        if (activeDownloads > 0)
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: AppTheme.errorColor,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 20,
-                                minHeight: 20,
-                              ),
-                              child: Text(
-                                '$activeDownloads',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  CustomPageTransitions.simpleSlide(
+                                    const DownloadManagerScreen(),
+                                    fromRight: true,
+                                  ),
+                                );
+                              },
                             ),
-                          ),
-                      ],
-                    );
-                  },
+                            if (activeDownloads > 0)
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.errorColor,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 20,
+                                    minHeight: 20,
+                                  ),
+                                  child: Text(
+                                    '$activeDownloads',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],

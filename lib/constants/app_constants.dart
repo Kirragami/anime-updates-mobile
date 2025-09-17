@@ -11,7 +11,7 @@ class AppConstants {
   static const String refreshEndpoint = '/api/auth/refresh';
   static const String profileEndpoint = '/api/auth/profile';
 
-  //Tracking Endpoints
+  // Tracking Endpoints
   static const String trackedReleasesEndpoint = '/api/tracking/get-releases';
   static const String trackedShowsEndpoint = '/api/tracking/shows';
   static const String trackShowEndpoint = '/api/tracking/track';
@@ -19,6 +19,10 @@ class AppConstants {
   
   // Anime Show Endpoints
   static const String animeShowEpisodesEndpoint = '/api/anime-show';
+  
+  // Update Checking Endpoints
+  static const String checkUpdateEndpoint = '/api/android/app-version/check';
+  static const String updateDownloadUrl = 'https://anime-updates.kirragami.com/download';
   
   // Animation Durations
   static const Duration shortAnimation = Duration(milliseconds: 200);

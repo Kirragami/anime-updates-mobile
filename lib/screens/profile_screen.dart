@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
@@ -22,6 +23,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   double _downloadSpeedLimit = 0.0; // KB/s (0 = unlimited)
   final TextEditingController _speedController = TextEditingController();
   bool _isLoadingSpeedLimit = true;
+  
+  // Update checking state
+  bool _isCheckingUpdate = false;
+  bool _updateAvailable = false;
+  String _updateStatus = '';
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
 
   @override
   void initState() {
@@ -133,11 +141,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Column(
         children: [
           const SizedBox(height: 20),
-          _buildProfileHeader(user),
-          const SizedBox(height: 20),
+          // Show profile header only if user is logged in
+          if (user != null) _buildProfileHeader(user),
+          if (user != null) const SizedBox(height: 20),
           _buildSettingsList(),
           const SizedBox(height: 20),
-          _buildLogoutSection(),
+          // Show logout section only if user is logged in
+          if (user != null) _buildLogoutSection(),
           const SizedBox(height: 40),
         ],
       ),
@@ -233,6 +243,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           'Download Settings',
           [
             _buildDownloadSpeedItem(),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _buildSettingsGroup(
+          'App Updates',
+          [
+            _buildCheckUpdateItem(),
           ],
         ),
       ],
@@ -619,6 +636,251 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildCheckUpdateItem() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.system_update_outlined,
+                color: Colors.white.withOpacity(0.8),
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Check for Updates',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _isCheckingUpdate 
+                        ? 'Checking for updates...' 
+                        : _updateStatus.isEmpty 
+                          ? 'Check for the latest version' 
+                          : _updateStatus,
+                      style: TextStyle(
+                        color: _updateAvailable 
+                          ? AppTheme.primaryColor // Use exciting color for new version available
+                          : Colors.white.withOpacity(0.6),
+                        fontSize: 14,
+                        fontWeight: _updateAvailable 
+                          ? FontWeight.bold // Make it bold for emphasis
+                          : FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_isCheckingUpdate)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppTheme.primaryColor,
+                  ),
+                )
+              else if (_updateAvailable && !_isDownloading)
+                TextButton(
+                  onPressed: _downloadUpdate,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    minimumSize: const Size(0, 0),
+                  ),
+                  child: const Text(
+                    'Download',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
+              else if (!_isDownloading)
+                IconButton(
+                  icon: const Icon(
+                    Icons.refresh,
+                    color: AppTheme.primaryColor,
+                    size: 20,
+                  ),
+                  onPressed: _checkForUpdate,
+                ),
+            ],
+          ),
+          if (_isDownloading)
+            Column(
+              children: [
+                const SizedBox(height: 12),
+                LinearProgressIndicator(
+                  value: _downloadProgress,
+                  backgroundColor: AppTheme.surfaceColor,
+                  valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Downloading update... ${(_downloadProgress * 100).toInt()}%',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _checkForUpdate() async {
+    setState(() {
+      _isCheckingUpdate = true;
+      _updateStatus = '';
+    });
+
+    try {
+      final updateService = ref.read(updateServiceProvider);
+      final result = await updateService.checkForUpdate();
+
+      if (result['success']) {
+        if (result['needUpdate']) {
+          setState(() {
+            _updateAvailable = true;
+            _updateStatus = 'New version available!';
+          });
+        } else {
+          setState(() {
+            _updateAvailable = false;
+            _updateStatus = 'Your version is up to date';
+          });
+        }
+      } else {
+        setState(() {
+          _updateStatus = result['message'] ?? 'Failed to check for updates';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _updateStatus = 'Error: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isCheckingUpdate = false;
+      });
+    }
+  }
+
+  Future<void> _downloadUpdate() async {
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+    });
+
+    try {
+      final updateService = ref.read(updateServiceProvider);
+      
+      // First check for updates to get the download URL
+      final checkResult = await updateService.checkForUpdate();
+      
+      if (!checkResult['success'] || !checkResult['needUpdate']) {
+        setState(() {
+          _isDownloading = false;
+          _updateStatus = 'No update available';
+        });
+        return;
+      }
+      
+      final downloadUrl = checkResult['downloadUrl'];
+      
+      final downloadResult = await updateService.downloadUpdate(
+        downloadUrl: downloadUrl,
+        onProgress: (received, total) {
+          if (total != -1) {
+            setState(() {
+              _downloadProgress = received / total;
+            });
+          }
+        },
+      );
+
+      if (downloadResult['success']) {
+        final filePath = downloadResult['filePath'];
+        // Install the update
+        final installResult = await updateService.installUpdate(filePath);
+        
+        if (installResult['success']) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('APK opened for installation. Please check your notifications if you don\'t see the installer.'),
+                backgroundColor: AppTheme.successColor,
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            // Check if it's a permission issue
+            final message = installResult['message'] as String? ?? 'Unknown error';
+            if (message.contains('Permission to install packages is required')) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('$message Please go to Settings > Apps > Anime Updates > Permissions and enable "Install unknown apps"'),
+                  backgroundColor: AppTheme.errorColor,
+                  action: SnackBarAction(
+                    label: 'Settings',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      openAppSettings();
+                    },
+                  ),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to open APK: $message'),
+                  backgroundColor: AppTheme.errorColor,
+                ),
+              );
+            }
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(downloadResult['message'] ?? 'Download failed'),
+              backgroundColor: AppTheme.errorColor,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isDownloading = false;
+      });
+    }
   }
 
   Future<void> _showLogoutDialog() async {

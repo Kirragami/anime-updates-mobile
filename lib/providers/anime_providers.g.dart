@@ -6,7 +6,7 @@ part of 'anime_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$animeListNotifierHash() => r'045f2be4b73bdb13dbbebce45dcdd835e2ed05e3';
+String _$animeListNotifierHash() => r'b4a0090e2c4daf9086933e857b234964dbeadb92';
 
 /// Provides the list of anime items
 ///
@@ -25,7 +25,7 @@ final animeListNotifierProvider = AutoDisposeAsyncNotifierProvider<
 
 typedef _$AnimeListNotifier = AutoDisposeAsyncNotifier<List<AnimeItem>>;
 String _$trackedReleasesNotifierHash() =>
-    r'fe55207a4d3d937a472bab5e480eabec3ee0d4a1';
+    r'd49aca223680cf556fadef5080e623f3e8af5b2f';
 
 /// Provides the list of tracked releases (authenticated)
 ///

@@ -3,6 +3,7 @@ import 'api_service.dart';
 import 'auth_service.dart';
 import 'download_service.dart';
 import 'speed_limit_service.dart';
+import 'update_service.dart';
 
 part 'services.g.dart';
 
@@ -20,4 +21,8 @@ AuthService authService(AuthServiceRef ref) => AuthService();
 
 /// Provides the speed limit service instance
 @riverpod
-SpeedLimitService speedLimitService(SpeedLimitServiceRef ref) => SpeedLimitService(); 
+SpeedLimitService speedLimitService(SpeedLimitServiceRef ref) => SpeedLimitService();
+
+/// Provides the update service instance
+@riverpod
+UpdateService updateService(UpdateServiceRef ref) => UpdateService(); 

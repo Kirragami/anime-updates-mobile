@@ -93,7 +93,7 @@ class TorrentManager private constructor(private val context: Context) {
         mt?.uniqueId?.let { id ->
             mainHandler.post {
                 TorrentEventSinkManager.instance.sendEvent(
-                    mapOf("releaseId" to id, "progress" to mt.progress, "status" to "downloading", "speed" to handle.status().downloadRate())
+                    mapOf("releaseId" to id, "progress" to mt.progress, "status" to "downloading")
                 )
             }
         }
