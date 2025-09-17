@@ -186,22 +186,6 @@ class HomepageScreen extends ConsumerWidget {
           duration: AppConstants.longAnimation,
           curve: Curves.easeOut,
         ),
-        const SizedBox(height: 8),
-        // Animated subtitle (once)
-        const Text(
-          'Track it. Watch it. Love it.',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textSecondary,
-            letterSpacing: 1.2,
-          ),
-        )
-            .animate()
-            .fadeIn(duration: AppConstants.mediumAnimation)
-            .slideY(begin: 0.2, curve: Curves.easeOut)
-            .then()
-            .shimmer(duration: const Duration(milliseconds: 800)),
       ],
     )
         .animate()
