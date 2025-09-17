@@ -55,13 +55,14 @@ final authServiceProvider = AutoDisposeProvider<AuthService>.internal(
 );
 
 typedef AuthServiceRef = AutoDisposeProviderRef<AuthService>;
-String _$speedLimitServiceHash() => r'8f4a2b1c9d3e5f6a7b8c9d0e1f2a3b4c5d6e7f8';
+String _$speedLimitServiceHash() => r'6b20140a7f83cae6295a5f61ab6a03a9ae090e06';
 
 /// Provides the speed limit service instance
 ///
 /// Copied from [speedLimitService].
 @ProviderFor(speedLimitService)
-final speedLimitServiceProvider = AutoDisposeProvider<SpeedLimitService>.internal(
+final speedLimitServiceProvider =
+    AutoDisposeProvider<SpeedLimitService>.internal(
   speedLimitService,
   name: r'speedLimitServiceProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -72,5 +73,22 @@ final speedLimitServiceProvider = AutoDisposeProvider<SpeedLimitService>.interna
 );
 
 typedef SpeedLimitServiceRef = AutoDisposeProviderRef<SpeedLimitService>;
+String _$updateServiceHash() => r'98bc6e5a0be9c6523c6d443f192c54c6d8ac64e9';
+
+/// Provides the update service instance
+///
+/// Copied from [updateService].
+@ProviderFor(updateService)
+final updateServiceProvider = AutoDisposeProvider<UpdateService>.internal(
+  updateService,
+  name: r'updateServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$updateServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef UpdateServiceRef = AutoDisposeProviderRef<UpdateService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

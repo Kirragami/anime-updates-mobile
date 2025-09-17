@@ -466,7 +466,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                               borderRadius: BorderRadius.circular(16),
                                               onTap: () async {
                                                 final downloadManager = DownloadManager();
-                                                await downloadManager.deleteDownload(widget.anime);
+                                                await downloadManager.deleteDownload(widget.anime.id);
                                                 if (context.mounted) {
                                                   ScaffoldMessenger.of(context).showSnackBar(
                                                     const SnackBar(content: Text('Download deleted')),
@@ -950,7 +950,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                   await downloadManager.pauseRelease(episode.id);
                                 }
                                 // Delete the downloaded file
-                                await downloadManager.deleteDownload(episode);
+                                await downloadManager.deleteDownload(episode.id);
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(

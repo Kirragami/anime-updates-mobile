@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/landing_screen.dart';
 import 'screens/homepage_screen.dart';
 import 'screens/torrent_test_screen.dart'; // Added import for torrent test screen
+import 'screens/download_manager_screen.dart'; // Import for download manager screen
 import 'theme/app_theme.dart';
 import 'constants/app_constants.dart';
 import 'services/auth_service.dart';

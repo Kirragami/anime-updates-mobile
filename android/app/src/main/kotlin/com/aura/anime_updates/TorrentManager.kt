@@ -90,6 +90,13 @@ class TorrentManager private constructor(private val context: Context) {
         sessionManager?.download(magnetUrl, File(savePath), torrent_flags_t())
         val mt = ManagedTorrent(releaseId, fileName, "", 0.0)
         managedTorrents[releaseId] = mt
+        mt?.uniqueId?.let { id ->
+            mainHandler.post {
+                TorrentEventSinkManager.instance.sendEvent(
+                    mapOf("releaseId" to id, "progress" to mt.progress, "status" to "downloading")
+                )
+            }
+        }
         println("status in addTorrent method")
         println(managedTorrents)
     }
@@ -206,7 +213,7 @@ class TorrentManager private constructor(private val context: Context) {
                         handle.pause()
                         val mt = managedTorrents.values.find { it.fileName == handle.name() }
                         println("This is the releaseId we are checking > < ${mt?.uniqueId}")
-                        println("THis is the list > < ${newTorrents}")
+                        println("This is the list > < ${newTorrents}")
                         if (newTorrents.contains(mt?.uniqueId)) {
                             handle.resume()
                             newTorrents.remove(mt?.uniqueId)
@@ -215,7 +222,7 @@ class TorrentManager private constructor(private val context: Context) {
                         mt?.uniqueId?.let { id ->
                             mainHandler.post {
                                 TorrentEventSinkManager.instance.sendEvent(
-                                    mapOf("releaseId" to id, "progress" to mt.progress, "status" to "downloading", "speed" to handle.status().downloadRate())
+                                    mapOf("event" to "added", "releaseId" to id, "progress" to mt.progress, "status" to "downloading", "speed" to handle.status().downloadRate())
                                 )
                             }
                         }
@@ -238,7 +245,7 @@ class TorrentManager private constructor(private val context: Context) {
                         mt?.uniqueId?.let { id ->
                             mainHandler.post {
                                 TorrentEventSinkManager.instance.sendEvent(
-                                    mapOf("releaseId" to id, "progress" to mt.progress, "status" to "downloading", "speed" to handle.status().downloadRate())
+                                    mapOf("event" to "updated", "releaseId" to id, "progress" to mt.progress, "status" to "downloading", "speed" to handle.status().downloadRate())
                                 )
                             }
                         }
@@ -252,7 +259,7 @@ class TorrentManager private constructor(private val context: Context) {
                         mt?.uniqueId?.let { id ->
                             mainHandler.post {
                                 TorrentEventSinkManager.instance.sendEvent(
-                                    mapOf("releaseId" to id, "progress" to mt.progress, "status" to "paused", "speed" to handle.status().downloadRate())
+                                    mapOf("event" to "paused", "releaseId" to id, "progress" to mt.progress, "status" to "paused", "speed" to handle.status().downloadRate())
                                 )
                             }
                         }
@@ -267,7 +274,7 @@ class TorrentManager private constructor(private val context: Context) {
                         mt?.uniqueId?.let { id ->
                             mainHandler.post {
                                 TorrentEventSinkManager.instance.sendEvent(
-                                    mapOf("releaseId" to id, "progress" to 100.0, "status" to "completed")
+                                    mapOf("event" to "completed", "releaseId" to id, "progress" to 100.0, "status" to "completed")
                                 )
                             }
                         }
@@ -285,7 +292,7 @@ class TorrentManager private constructor(private val context: Context) {
                         mt?.uniqueId?.let { id ->
                             mainHandler.post {
                                 TorrentEventSinkManager.instance.sendEvent(
-                                    mapOf("releaseId" to id, "status" to "notDownloaded")
+                                    mapOf("event" to "deleted", "releaseId" to id, "status" to "notDownloaded")
                                 )
                             }
                         }

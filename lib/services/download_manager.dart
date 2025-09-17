@@ -333,14 +333,14 @@ class DownloadManager {
   }
   
   // Delete a downloaded release
-  Future<void> deleteDownload(AnimeItem release) async {
+  Future<void> deleteDownload(String releaseId) async {
     try {
       await _channel.invokeMethod("deleteTorrentFile", {
-        "releaseId": release.id
+        "releaseId": releaseId
       });
       
       // Update state
-      _releaseStates[release.id] = release.copyWith(
+      _releaseStates[releaseId] = _releaseStates[releaseId]!.copyWith(
         downloadState: DownloadState.notDownloaded,
         progress: 0.0
       );
@@ -349,11 +349,11 @@ class DownloadManager {
       _stateNotifier.value = Map<String, AnimeItem>.from(_releaseStates);
       
       if (kDebugMode) {
-        print("Deleted download for release: ${release.id}");
+        print("Deleted download for release: ${releaseId}");
       }
     } catch (e) {
       if (kDebugMode) {
-        print("Error deleting download for release ${release.id}: $e");
+        print("Error deleting download for release ${releaseId}: $e");
       }
       rethrow;
     }
