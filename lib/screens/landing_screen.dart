@@ -227,23 +227,39 @@ class _LandingScreenState extends State<LandingScreen>
                       builder: (context, child) {
                         return Column(
                           children: [
-                            // Animated title
-                            Text(
-                              'Anivio',
+                            // Animated title - "Anime" on first line
+                            const Text(
+                              'Anime',
                               style: TextStyle(
                                 height: 0.9,
-                                fontSize: 48,
+                                fontSize: 42,
                                 fontWeight: FontWeight.w900,
                                 color: AppTheme.primaryColor,
                                 letterSpacing: 2,
-                                shadows: [
-                                  Shadow(
-                                    color:
-                                        AppTheme.primaryColor.withOpacity(0.3),
-                                    offset: const Offset(0, 4),
-                                    blurRadius: 8,
-                                  ),
-                                ],
+                              ),
+                            ).animate(onPlay: (c) => c.repeat()).shimmer(
+                              duration: AppConstants.longAnimation,
+                              colors: const [
+                                AppTheme.primaryColor,
+                                AppTheme.secondaryColor,
+                                AppTheme.accentColor,
+                              ],
+                            ).scale(
+                              begin: const Offset(0.98, 0.98),
+                              end: const Offset(1.0, 1.0),
+                              duration: AppConstants.longAnimation,
+                              curve: Curves.easeOut,
+                            ),
+                            const SizedBox(height: 8),
+                            // "Updates" on second line
+                            const Text(
+                              'Updates',
+                              style: TextStyle(
+                                height: 0.9,
+                                fontSize: 42,
+                                fontWeight: FontWeight.w900,
+                                color: AppTheme.primaryColor,
+                                letterSpacing: 2,
                               ),
                             ).animate(onPlay: (c) => c.repeat()).shimmer(
                               duration: AppConstants.longAnimation,
