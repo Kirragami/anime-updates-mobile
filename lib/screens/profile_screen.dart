@@ -58,14 +58,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final speedLimitService = ref.read(speedLimitServiceProvider);
       await speedLimitService.setSpeedLimit(_downloadSpeedLimit);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save speed limit: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
+      // Failed to save speed limit - error handling can be added here if needed
     }
   }
 
@@ -821,61 +814,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         final installResult = await updateService.installUpdate(filePath);
         
         if (installResult['success']) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('APK opened for installation. Please check your notifications if you don\'t see the installer.'),
-                backgroundColor: AppTheme.successColor,
-              ),
-            );
-          }
+          // APK opened for installation
         } else {
           if (mounted) {
             // Check if it's a permission issue
             final message = installResult['message'] as String? ?? 'Unknown error';
             if (message.contains('Permission to install packages is required')) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$message Please go to Settings > Apps > Anime Updates > Permissions and enable "Install unknown apps"'),
-                  backgroundColor: AppTheme.errorColor,
-                  action: SnackBarAction(
-                    label: 'Settings',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      openAppSettings();
-                    },
-                  ),
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Failed to open APK: $message'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
+              // Permission issue - can open settings if needed
+              openAppSettings();
             }
+            // Installation failed
           }
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(downloadResult['message'] ?? 'Download failed'),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
-        }
+        // Download failed
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
+      // Update error - error handling can be added here if needed
     } finally {
       setState(() {
         _isDownloading = false;

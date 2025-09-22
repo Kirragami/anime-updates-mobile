@@ -11,7 +11,7 @@ import '../widgets/loading_widget.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
-import '../services/download_manager.dart';
+import '../providers/download_providers.dart';
 
 class AnimeListScreen extends ConsumerStatefulWidget {
   const AnimeListScreen({super.key});
@@ -338,12 +338,6 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
   }
 
   Widget _buildAnimeList(List<AnimeItem> animeList) {
-    // Initialize DownloadManager with the current anime list
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final downloadManager = DownloadManager();
-      downloadManager.initializeReleaseStates(animeList);
-    });
-    
     return SmartRefresher(
       key: _refreshKey, // Preserve state
       controller: _refreshController,
@@ -359,60 +353,43 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
       child: AnimeGridView(
         animeList: animeList,
         onDownload: (anime) async {
-          final downloadManager = DownloadManager();
           try {
-            await downloadManager.downloadRelease(anime);
+            await ref.read(activeDownloadsProvider.notifier).startDownload(
+              releaseId: anime.id,
+              magnetUrl: anime.downloadUrl,
+              fileName: anime.fileName,
+              showName: anime.title,
+              episode: anime.episode,
+            );
           } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Download failed: ${e.toString()}'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
-            }
+            // Download failed - error handling can be added here if needed
           }
         },
         onDelete: (anime) async {
           try {
-            final downloadManager = DownloadManager();
-            // Pause the download if it's active
-            if (downloadManager.getDownloadState(anime.id) == DownloadState.downloading) {
-              await downloadManager.pauseRelease(anime.id);
+            final downloadStatus = ref.read(downloadStatusProvider(anime.id));
+            
+            // Check if it's an active download
+            if (downloadStatus.isActive) {
+              await ref.read(activeDownloadsProvider.notifier).cancelDownload(anime.id);
+              // Download cancelled
             }
-            // Delete the downloaded file
-            await downloadManager.deleteDownload(anime.id);
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Download deleted'),
-                ),
-              );
+            // Check if it's a completed download
+            else if (downloadStatus.isCompleted) {
+              await ref.read(completedDownloadsProvider.notifier).deleteDownload(anime.id);
+              // Download deleted
             }
           } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Error deleting download: $e'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
-            }
+            // Error deleting download - error handling can be added here if needed
           }
         },
         onOpen: (anime) async {
           try {
-            final downloadManager = DownloadManager();
-            final success = await downloadManager.openDownloadedFile(anime);
+            final success = await ref.read(completedDownloadsProvider.notifier).openFile(anime.id);
+            
+            // File open result - can add handling here if needed
           } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Error opening file: $e'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
-            }
+            // Error opening file - error handling can be added here if needed
           }
         },
       ),

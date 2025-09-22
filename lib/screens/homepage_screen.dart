@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/download_providers.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../services/auth_service.dart';
-import '../services/download_manager.dart';
-import '../models/anime_item.dart';
 import '../models/download_state.dart';
 import '../utils/page_transitions.dart';
 import 'anime_list_screen.dart';
 import 'my_shows_screen.dart';
 import 'login_screen.dart';
 import 'download_manager_screen.dart';
+import 'downloaded_episodes_screen.dart';
 import 'profile_screen.dart';
 
 class HomepageScreen extends ConsumerWidget {
@@ -71,14 +71,10 @@ class HomepageScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 8),
                     // Download button with badge
-                    ValueListenableBuilder<Map<String, AnimeItem>>(
-                      valueListenable: DownloadManager().stateNotifier,
-                      builder: (context, releaseStates, child) {
-                        // Count active downloads (downloading or paused)
-                        final activeDownloads = releaseStates.entries.where((entry) {
-                          final state = entry.value.downloadState;
-                          return state == DownloadState.downloading || state == DownloadState.paused;
-                        }).length;
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final activeDownloads = ref.watch(activeDownloadsProvider);
+                        final activeCount = activeDownloads.length;
                         
                         return Stack(
                           children: [
@@ -97,7 +93,7 @@ class HomepageScreen extends ConsumerWidget {
                                 );
                               },
                             ),
-                            if (activeDownloads > 0)
+                            if (activeCount > 0)
                               Positioned(
                                 right: 0,
                                 top: 0,
@@ -112,7 +108,7 @@ class HomepageScreen extends ConsumerWidget {
                                     minHeight: 20,
                                   ),
                                   child: Text(
-                                    '$activeDownloads',
+                                    '$activeCount',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,
@@ -236,207 +232,323 @@ class HomepageScreen extends ConsumerWidget {
   }
 
   Widget _buildNavigationButtons(BuildContext context) {
-    return Row(
-      children: [
-        // New Releases Button
-        Expanded(
-          child: Container(
-            height: 80,
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppTheme.primaryColor.withOpacity(0.1),
-                  AppTheme.primaryColor.withOpacity(0.05),
+    return Consumer(
+      builder: (context, ref, child) {
+        final completedDownloads = ref.watch(completedDownloadsProvider);
+        final hasCompletedDownloads = completedDownloads.length > 1;
+        
+        if (hasCompletedDownloads) {
+          // Show 3 buttons when there are completed downloads
+          return Column(
+            children: [
+              // First row: New Releases and My Shows
+              Row(
+                children: [
+                  _buildNewReleasesButton(context),
+                  const SizedBox(width: 2),
+                  _buildMyShowsButton(context),
                 ],
               ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppTheme.primaryColor,
-                width: 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primaryColor.withOpacity(0.3),
-                  blurRadius: 15,
-                  spreadRadius: 0,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () {
-                  Navigator.of(context).push(
-                    CustomPageTransitions.simpleSlide(
-                      const AnimeListScreen(),
-                      fromRight: false,
-                    ),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.primaryGradient,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryColor.withOpacity(0.4),
-                              blurRadius: 8,
-                              spreadRadius: 0,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.new_releases_rounded,
-                          size: 10,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      const Text(
-                        'New Releases',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                          letterSpacing: 0.5,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        )
-            .animate()
-            .fadeIn(
-              duration: AppConstants.shortAnimation,
-              delay: const Duration(milliseconds: 0),
-            )
-            .slideX(begin: -0.1),
-
-        const SizedBox(width: 2),
-
-        // My Shows Button
-        Expanded(
-          child: Container(
-            height: 80,
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppTheme.secondaryColor.withOpacity(0.1),
-                  AppTheme.secondaryColor.withOpacity(0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppTheme.secondaryColor,
-                width: 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.secondaryColor.withOpacity(0.3),
-                  blurRadius: 15,
-                  spreadRadius: 0,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () {
-                  // Check if user is logged in
-                  final isLoggedIn = AuthService.isLoggedIn;
-                  if (isLoggedIn) {
-                    Navigator.of(context).push(
-                      CustomPageTransitions.simpleSlide(
-                        const MyShowsScreen(),
-                        fromRight: true,
-                      ),
-                    );
-                  } else {
-                    Navigator.of(context).push(
-                      CustomPageTransitions.simpleFade(
-                        LoginScreen(destination: const MyShowsScreen()),
-                      ),
-                    );
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppTheme.secondaryColor,
-                              AppTheme.accentColor,
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.secondaryColor.withOpacity(0.4),
-                              blurRadius: 8,
-                              spreadRadius: 0,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.favorite_rounded,
-                          size: 10,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      const Text(
-                        'My Shows',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                          letterSpacing: 0.5,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        )
-            .animate()
-            .fadeIn(
-              duration: AppConstants.shortAnimation,
-              delay: const Duration(milliseconds: 0),
-            )
-            .slideX(begin: 0.1),
-      ],
+              const SizedBox(height: 8),
+              // Second row: Downloaded Episodes (full width)
+              _buildDownloadedEpisodesButton(context, completedDownloads.length),
+            ],
+          );
+        } else {
+          // Show only 2 buttons when no completed downloads
+          return Row(
+            children: [
+              _buildNewReleasesButton(context),
+              const SizedBox(width: 2),
+              _buildMyShowsButton(context),
+            ],
+          );
+        }
+      },
     );
+  }
+
+  Widget _buildNewReleasesButton(BuildContext context) {
+    return Expanded(
+      child: Container(
+        height: 80,
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.primaryColor.withOpacity(0.1),
+              AppTheme.primaryColor.withOpacity(0.05),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppTheme.primaryColor,
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryColor.withOpacity(0.3),
+              blurRadius: 15,
+              spreadRadius: 0,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () {
+              Navigator.of(context).push(
+                CustomPageTransitions.simpleSlide(
+                  const AnimeListScreen(),
+                  fromRight: false,
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.primaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryColor.withOpacity(0.4),
+                          blurRadius: 8,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.new_releases_rounded,
+                      size: 10,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  const Text(
+                    'New Releases',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                      letterSpacing: 0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.shortAnimation,
+          delay: const Duration(milliseconds: 0),
+        )
+        .slideX(begin: -0.1);
+  }
+
+  Widget _buildMyShowsButton(BuildContext context) {
+    return Expanded(
+      child: Container(
+        height: 80,
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.secondaryColor.withOpacity(0.1),
+              AppTheme.secondaryColor.withOpacity(0.05),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppTheme.secondaryColor,
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.secondaryColor.withOpacity(0.3),
+              blurRadius: 15,
+              spreadRadius: 0,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () {
+              // Check if user is logged in
+              final isLoggedIn = AuthService.isLoggedIn;
+              if (isLoggedIn) {
+                Navigator.of(context).push(
+                  CustomPageTransitions.simpleSlide(
+                    const MyShowsScreen(),
+                    fromRight: true,
+                  ),
+                );
+              } else {
+                Navigator.of(context).push(
+                  CustomPageTransitions.simpleFade(
+                    LoginScreen(destination: const MyShowsScreen()),
+                  ),
+                );
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.secondaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.secondaryColor.withOpacity(0.4),
+                          blurRadius: 8,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.favorite_rounded,
+                      size: 10,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  const Text(
+                    'My Shows',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                      letterSpacing: 0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.shortAnimation,
+          delay: const Duration(milliseconds: 100),
+        )
+        .slideX(begin: 0.1);
+  }
+
+  Widget _buildDownloadedEpisodesButton(BuildContext context, int count) {
+    return Container(
+      height: 60,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.successColor.withOpacity(0.1),
+            AppTheme.successColor.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.successColor,
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.successColor.withOpacity(0.3),
+            blurRadius: 15,
+            spreadRadius: 0,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.of(context).push(
+              CustomPageTransitions.simpleSlide(
+                const DownloadedEpisodesScreen(),
+                fromRight: true,
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppTheme.successColor, AppTheme.successColor.withOpacity(0.8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.successColor.withOpacity(0.4),
+                        blurRadius: 8,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.download_done_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Downloaded Episodes ($count)',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(
+          duration: AppConstants.shortAnimation,
+          delay: const Duration(milliseconds: 200),
+        )
+        .slideY(begin: 0.2);
   }
 }

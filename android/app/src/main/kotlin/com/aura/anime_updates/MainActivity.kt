@@ -21,7 +21,6 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "startSession" -> {
-                    // val savedSessionState = torrentManager.loadSessionState() // <-- load from disk
                     torrentManager.startSession()
                     result.success(null)
                 }
@@ -30,7 +29,9 @@ class MainActivity : FlutterActivity() {
                     val magnetUrl = call.argument<String>("magnetUrl")!!
                     val savePath = call.argument<String>("savePath")!!
                     val fileName = call.argument<String>("fileName")!!
-                    torrentManager.addTorrent(releaseId, magnetUrl, savePath, fileName)
+                    val showName = call.argument<String>("showName")!!
+                    val episode = call.argument<String>("episode")!!
+                    torrentManager.addTorrent(releaseId, magnetUrl, savePath, fileName, showName, episode)
                     result.success(null)
                 }
                 "pauseTorrent" -> {
@@ -64,7 +65,7 @@ class MainActivity : FlutterActivity() {
                 "getCompletedTorrents" -> {
                     try {
                         val completed = torrentManager.loadCompleted()
-                        val completedList = completed.map { mapOf("releaseId" to it.releaseId, "fileName" to it.fileName) }
+                        val completedList = completed.map { it.toMap() }
                         result.success(completedList)
                     } catch (e: Exception) {
                         result.error("LOAD_ERROR", "Failed to load completed torrents", e.message)
@@ -76,12 +77,7 @@ class MainActivity : FlutterActivity() {
                         val torrents = torrentManager.getManagedTorrents()
                 
                         val torrentsList = torrents.map { torrent ->
-                            mapOf(
-                                "releaseId" to torrent.uniqueId,
-                                "fileName" to torrent.fileName,
-                                "sha1" to torrent.sha1.toString(),
-                                "progress" to torrent.progress
-                            )
+                            torrent.toMap()
                         }
                         result.success(torrentsList)
                     } catch (e: Exception) {

@@ -10,7 +10,7 @@ import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
 import '../widgets/loading_widget.dart';
 import '../models/anime_item.dart';
-import '../services/download_manager.dart';
+import '../providers/download_providers.dart';
 import 'homepage_screen.dart';
 import 'profile_screen.dart';
 
@@ -327,70 +327,38 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
 
   Future<void> _downloadAnime(AnimeItem anime, WidgetRef ref) async {
     try {
-      final downloadManager = DownloadManager();
-      await downloadManager.downloadRelease(anime);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Download started!'),
-          ),
-        );
-      }
+      await ref.read(activeDownloadsProvider.notifier).startDownload(
+        releaseId: anime.id,
+        magnetUrl: anime.downloadUrl,
+        fileName: anime.fileName,
+        showName: anime.title,
+        episode: anime.episode,
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Download failed: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
+      // Download failed - error handling can be added here if needed
     }
   }
 
   Future<void> _deleteAnime(AnimeItem anime, WidgetRef ref) async {
     try {
-      // For now, we'll just show a message since the delete functionality 
-      // would need to be implemented in the Kotlin side
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Delete functionality would be implemented here'),
-          ),
-        );
+      final downloadStatus = ref.read(downloadStatusProvider(anime.id));
+      
+      if (downloadStatus.isActive) {
+        await ref.read(activeDownloadsProvider.notifier).cancelDownload(anime.id);
+      } else if (downloadStatus.isCompleted) {
+        await ref.read(completedDownloadsProvider.notifier).deleteDownload(anime.id);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Delete failed: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
+      // Delete failed - error handling can be added here if needed
     }
   }
 
   Future<void> _openAnime(AnimeItem anime, WidgetRef ref) async {
     try {
-      // For now, we'll just show a message since the open functionality 
-      // would need to be implemented in the Kotlin side
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Open functionality would be implemented here'),
-          ),
-        );
-      }
+      final success = await ref.read(completedDownloadsProvider.notifier).openFile(anime.id);
+      // File open result - can add handling here if needed
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Open failed: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
+      // Open failed - error handling can be added here if needed
     }
   }
 

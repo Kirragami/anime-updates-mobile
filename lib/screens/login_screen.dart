@@ -57,14 +57,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           }
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message']),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
-        }
+        // Login failed - error handling can be added here if needed
       }
     } finally {
       if (mounted) {

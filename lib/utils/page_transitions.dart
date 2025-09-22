@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+// Helper function for easy usage
+PageRouteBuilder createSlideRoute(Widget page) {
+  return CustomPageTransitions.slideFromRight(page);
+}
+
 class CustomPageTransitions {
   // Slide from right with fade - OPTIMIZED
   static PageRouteBuilder slideFromRight(Widget page) {
