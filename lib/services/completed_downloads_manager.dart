@@ -101,7 +101,11 @@ class CompletedDownloadsManager {
         return false;
       }
       
-      final result = await OpenFile.open(filePath);
+      final _OpenTypeHint typeHint = _inferOpenTypeFromPath(filePath);
+      final result = await OpenFile.open(
+        filePath,
+        type: typeHint.mimeType,
+      );
       final success = result.type == ResultType.done;
       
       if (kDebugMode) {
@@ -268,4 +272,46 @@ class CompletedDownloadsManager {
   void dispose() {
     stateNotifier.dispose();
   }
+}
+
+// Helper: Determine appropriate MIME type (Android) from a file path
+_OpenTypeHint _inferOpenTypeFromPath(String filePath) {
+  final String lower = filePath.toLowerCase();
+
+  // Common video extensions
+  const List<String> videoExts = [
+    '.mp4', '.mkv', '.webm', '.avi', '.m4v', '.3gp', '.mov', '.flv', '.ts', '.mpeg', '.mpg'
+  ];
+
+  for (final ext in videoExts) {
+    if (lower.endsWith(ext)) {
+      return const _OpenTypeHint(mimeType: 'video/*');
+    }
+  }
+
+  // Audio extensions (in case some downloads are audio-only)
+  const List<String> audioExts = [
+    '.mp3', '.aac', '.m4a', '.flac', '.wav', '.ogg', '.opus'
+  ];
+  for (final ext in audioExts) {
+    if (lower.endsWith(ext)) {
+      return const _OpenTypeHint(mimeType: 'audio/*');
+    }
+  }
+
+  // Subtitles and text
+  const List<String> subtitleExts = ['.srt', '.ass', '.vtt'];
+  for (final ext in subtitleExts) {
+    if (lower.endsWith(ext)) {
+      return const _OpenTypeHint(mimeType: 'text/plain');
+    }
+  }
+
+  // Default: let the platform resolve
+  return const _OpenTypeHint();
+}
+
+class _OpenTypeHint {
+  final String? mimeType; // Android/Linux/Windows
+  const _OpenTypeHint({this.mimeType});
 }

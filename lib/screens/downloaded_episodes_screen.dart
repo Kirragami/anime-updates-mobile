@@ -68,21 +68,6 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                Consumer(
-                  builder: (context, ref, child) {
-                    final completedDownloads = ref.watch(completedDownloadsProvider);
-                    final count = completedDownloads.length;
-                    return Text(
-                      count == 0 ? 'No downloaded episodes' : 
-                      count == 1 ? '1 downloaded episode' : '$count downloaded episodes',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    );
-                  },
-                ),
               ],
             ),
           ),
@@ -164,52 +149,9 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                     ],
                   ),
                 ),
-                // Completed Icon
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.successColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.check_circle_rounded,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: 16),
-            
-            // File Info
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.insert_drive_file_rounded,
-                    color: Colors.white.withOpacity(0.7),
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      download.fileName,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 12,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+
             const SizedBox(height: 16),
             
             // Action Buttons

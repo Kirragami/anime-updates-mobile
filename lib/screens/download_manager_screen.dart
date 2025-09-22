@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../providers/download_providers.dart';
 import '../models/active_download.dart';
+import '../utils/page_transitions.dart';
+import 'downloaded_episodes_screen.dart';
 
 class DownloadManagerScreen extends ConsumerStatefulWidget {
   const DownloadManagerScreen({super.key});
@@ -15,7 +17,15 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
+          Navigator.of(context).push(
+            CustomPageTransitions.slideFromRight(const DownloadedEpisodesScreen()),
+          );
+        }
+      },
+      child: Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: AppTheme.backgroundGradient,
@@ -31,6 +41,7 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -169,101 +180,86 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title and Episode
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            // Left: Texts and progress
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Text(
+                    download.showName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // Episode
+                  Text(
+                    "Episode " + download.episode,
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Progress info
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        download.showName,
+                        '${download.progress.toStringAsFixed(1)}%',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Episode " + download.episode,
-                        style: TextStyle(
-                          color: AppTheme.primaryColor,
                           fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
+                      if (download.speed > 0)
+                        Text(
+                          _formatSpeed(download.speed),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 12,
+                          ),
+                        ),
                     ],
                   ),
-                ),
-                // Status Icon
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: download.status.isActive ? AppTheme.primaryColor : AppTheme.warningColor,
-                    borderRadius: BorderRadius.circular(20),
+                  const SizedBox(height: 8),
+                  // Progress bar
+                  LinearProgressIndicator(
+                    value: download.progress / 100,
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                   ),
-                  child: Icon(
-                    download.status.isActive ? Icons.download_rounded : Icons.pause_rounded,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            
-            // Progress Bar
+            const SizedBox(width: 12),
+            // Right: Small icon buttons (pause/resume and delete)
             Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${download.progress.toStringAsFixed(1)}%',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    iconSize: 22,
+                    splashRadius: 20,
+                    icon: Icon(
+                      download.status.isActive ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      color: Colors.white,
                     ),
-                    if (download.status.isActive && download.speed > 0)
-                      Text(
-                        _formatSpeed(download.speed),
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 12,
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: download.progress / 100,
-                  backgroundColor: Colors.white.withOpacity(0.2),
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    download.status.isActive ? AppTheme.primaryColor : AppTheme.warningColor,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            // Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: _buildActionButton(
-                    icon: download.status.isActive ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    label: download.status.isActive ? 'Pause' : 'Resume',
-                    color: download.status.isActive ? AppTheme.warningColor : AppTheme.primaryColor,
-                    onTap: () async {
+                    onPressed: () async {
                       if (download.status.isActive) {
                         await ref.read(activeDownloadsProvider.notifier).pauseDownload(download.releaseId);
                       } else {
@@ -272,17 +268,25 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
                     },
                   ),
                 ),
-                const SizedBox(width: 12),
-                _buildActionButton(
-                  icon: Icons.close_rounded,
-                  label: 'Cancel',
-                  color: AppTheme.errorColor,
-                  onTap: () async {
-                    final confirmed = await _showCancelConfirmation(download.showName);
-                    if (confirmed && context.mounted) {
-                      await ref.read(activeDownloadsProvider.notifier).cancelDownload(download.releaseId);
-                    }
-                  },
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    iconSize: 22,
+                    splashRadius: 20,
+                    icon: const Icon(
+                      Icons.delete_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final confirmed = await _showCancelConfirmation(download.showName);
+                      if (confirmed && context.mounted) {
+                        await ref.read(activeDownloadsProvider.notifier).cancelDownload(download.releaseId);
+                      }
+                    },
+                  ),
                 ),
               ],
             ),
