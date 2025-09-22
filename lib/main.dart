@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Added import for MethodChannel
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/landing_screen.dart';
-import 'screens/homepage_screen.dart';
-import 'screens/torrent_test_screen.dart'; // Added import for torrent test screen
-import 'screens/download_manager_screen.dart'; // Import for download manager screen
 import 'theme/app_theme.dart';
 import 'constants/app_constants.dart';
 import 'services/auth_service.dart';
@@ -12,11 +8,12 @@ import 'services/device_id_service.dart';
 import 'services/fcm_registration_service.dart';
 import 'services/auth_storage.dart';
 import 'services/notification_service.dart';
-import 'services/download_manager.dart';
+import 'services/active_downloads_manager.dart';
+import 'services/completed_downloads_manager.dart';
+import 'services/download_event_dispatcher.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'config/firebase_config.dart';
-import 'package:flutter/services.dart';
 
 /// Background handler for push notifications
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -25,41 +22,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print(message.data);
 }
 
-// Moved TorrentPlatform outside of the app state class
-class TorrentPlatform {
-  static const _channel = MethodChannel("com.aura.anime_updates/torrent");
-
-  static Future<void> startSession() async {
-    try {
-      // Removed undefined savedState 
-      print("Trying to start session from flutter");
-      await _channel.invokeMethod("startSession");
-    } catch (e) {
-      debugPrint("Failed to start session: $e");
-    }
-  }
-
-  static Future<List<Map<String, dynamic>>> getManagedTorrents() async {
-    try {
-      final List<dynamic> result = await _channel.invokeMethod("getManagedTorrents");
-      return result.cast<Map<dynamic, dynamic>>().map((e) {
-        return {
-          "uniqueId": e["releaseId"] as String,
-          "fileName": e["fileName"] as String,
-          "sha1": e["sha1"] as String,
-          "progress": (e["progress"] as num).toDouble(),
-        };
-      }).toList();
-    } on PlatformException catch (e) {
-      print("Error loading managed torrents: $e");
-      return [];
-    }
-  }
-}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await TorrentPlatform.startSession();
+  
   // Initialize Firebase
   await Firebase.initializeApp(
     options: FirebaseConfig.firebaseOptions,
@@ -69,14 +35,24 @@ Future<void> main() async {
   // Restore user session
   await AuthService.restoreSession();
   print("session restore done");
-  
-  print("Managed Torrents on flutter side");
-  print(await TorrentPlatform.getManagedTorrents());
 
-  // Initialize DownloadManager
-  final downloadManager = DownloadManager();
-  downloadManager.startProgressListener();
-  print("DownloadManager initialized and progress listener started");
+  // Initialize new download management system
+  final downloadEventDispatcher = DownloadEventDispatcher();
+  downloadEventDispatcher.initialize();
+  
+  final activeDownloadsManager = ActiveDownloadsManager();
+  final completedDownloadsManager = CompletedDownloadsManager();
+  
+  // Initialize managers with native data
+  await activeDownloadsManager.initialize();
+  await completedDownloadsManager.initialize();
+  
+  // Start listening to events
+  downloadEventDispatcher.startListening();
+  
+  print("Download management system initialized successfully");
+  print("Active downloads: ${activeDownloadsManager.activeCount}");
+  print("Completed downloads: ${completedDownloadsManager.completedCount}");
 
   // Setup background FCM handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);

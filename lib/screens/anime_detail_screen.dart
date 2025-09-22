@@ -4,14 +4,14 @@ import 'package:intl/intl.dart';
 import 'package:like_button/like_button.dart';
 import '../models/anime_item.dart';
 import '../models/download_state.dart';
+import '../models/active_download.dart';
 import '../providers/auth_provider.dart';
 import '../providers/tracking_provider.dart';
 import '../providers/anime_providers.dart';
 import '../services/api_service.dart';
-import '../services/download_manager.dart';
+import '../providers/download_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_heart_button.dart';
-import '../widgets/top_toast.dart';
 
 class AnimeDetailScreen extends ConsumerStatefulWidget {
   final AnimeItem anime;
@@ -389,22 +389,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                               child: InkWell(
                                                 borderRadius: BorderRadius.circular(16),
                                                 onTap: () async {
-                                                  final downloadManager = DownloadManager();
-                                                  final success = await downloadManager.openDownloadedFile(widget.anime);
-                                                  if (context.mounted) {
-                                                    if (success) {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        const SnackBar(content: Text('Opening downloaded file...')),
-                                                      );
-                                                    } else {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        const SnackBar(
-                                                          content: Text('Failed to open file'),
-                                                          backgroundColor: AppTheme.errorColor,
-                                                        ),
-                                                      );
-                                                    }
-                                                  }
+                                                  final success = await ref.read(completedDownloadsProvider.notifier).openFile(widget.anime.id);
+                                                  // File open result - can add handling here if needed
                                                 },
                                                 child: Center(
                                                   child: Row(
@@ -465,13 +451,15 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                             child: InkWell(
                                               borderRadius: BorderRadius.circular(16),
                                               onTap: () async {
-                                                final downloadManager = DownloadManager();
-                                                await downloadManager.deleteDownload(widget.anime.id);
-                                                if (context.mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(content: Text('Download deleted')),
-                                                  );
+                                                final downloadStatus = ref.read(downloadStatusProvider(widget.anime.id));
+                                                
+                                                if (downloadStatus.isActive) {
+                                                  await ref.read(activeDownloadsProvider.notifier).cancelDownload(widget.anime.id);
+                                                } else if (downloadStatus.isCompleted) {
+                                                  await ref.read(completedDownloadsProvider.notifier).deleteDownload(widget.anime.id);
                                                 }
+                                                
+                                                // Download deleted
                                               },
                                               child: Center(
                                                 child: Icon(
@@ -505,13 +493,14 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                       color: Colors.transparent,
                                       child: InkWell(
                                         onTap: () async {
-                                          final downloadManager = DownloadManager();
-                                          await downloadManager.downloadRelease(widget.anime);
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Download started!')),
-                                            );
-                                          }
+                                          await ref.read(activeDownloadsProvider.notifier).startDownload(
+                                            releaseId: widget.anime.id,
+                                            magnetUrl: widget.anime.downloadUrl,
+                                            fileName: widget.anime.fileName,
+                                            showName: widget.anime.title,
+                                            episode: widget.anime.episode,
+                                          );
+                                          // Download started
                                         },
                                         borderRadius: BorderRadius.circular(16),
                                         child: const Center(
@@ -598,20 +587,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                     final willBeTracked = !liked;
                                     await trackingNotifier.toggleTracking();
                                     if (!mounted) return liked;
-                                    await showTopToast(
-                                      context,
-                                      willBeTracked
-                                          ? 'You have tracked this show!'
-                                          : 'Removed from tracking.',
-                                      icon: willBeTracked
-                                          ? Icons.check_circle_rounded
-                                          : Icons.favorite_border_rounded,
-                                      background: willBeTracked
-                                          ? AppTheme.successColor
-                                          : AppTheme.surfaceColor,
-                                      foreground: Colors.white,
-                                      duration: const Duration(seconds: 2),
-                                    );
                                     return willBeTracked;
                                   },
                                 );
@@ -791,17 +766,14 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   }
 
   Widget _buildEpisodeItem(AnimeItem episode) {
-    return ValueListenableBuilder<Map<String, AnimeItem>>(
-      valueListenable: DownloadManager().stateNotifier,
-      builder: (context, releaseStates, child) {
-        // Get the current state of this anime item
-        final releaseState = releaseStates[episode.id];
-        final downloadState = releaseState?.downloadState ?? DownloadState.notDownloaded;
-        final progress = releaseState?.progress ?? 0.0;
-
-        final isDownloading = downloadState == DownloadState.downloading;
-        final isDownloaded = downloadState == DownloadState.downloaded;
-        final isPaused = downloadState == DownloadState.paused;
+    return Consumer(
+      builder: (context, ref, child) {
+        final downloadStatus = ref.watch(downloadStatusProvider(episode.id));
+        
+        final isDownloading = downloadStatus.isDownloading;
+        final isPaused = downloadStatus.isPaused;
+        final isDownloaded = downloadStatus.isCompleted;
+        final progress = downloadStatus.progress;
 
         return Container(
           decoration: BoxDecoration(
@@ -897,24 +869,13 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                   ),
                             onPressed: () async {
                               try {
-                                final downloadManager = DownloadManager();
                                 if (isDownloading) {
-                                  await downloadManager.pauseRelease(episode.id);
+                                  await ref.read(activeDownloadsProvider.notifier).pauseDownload(episode.id);
                                 } else if (isPaused) {
-                                  await downloadManager.resumeRelease(episode.id);
+                                  await ref.read(activeDownloadsProvider.notifier).resumeDownload(episode.id);
                                 }
                               } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          isDownloading
-                                              ? 'Error pausing download: $e'
-                                              : 'Error resuming download: $e'),
-                                      backgroundColor: AppTheme.errorColor,
-                                    ),
-                                  );
-                                }
+                                // Error handling download pause/resume
                               }
                             },
                             padding: EdgeInsets.zero,
@@ -944,29 +905,14 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             ),
                             onPressed: () async {
                               try {
-                                final downloadManager = DownloadManager();
-                                // Pause the download if it's active
-                                if (isDownloading) {
-                                  await downloadManager.pauseRelease(episode.id);
+                                if (downloadStatus.isActive) {
+                                  await ref.read(activeDownloadsProvider.notifier).cancelDownload(episode.id);
+                                } else if (downloadStatus.isCompleted) {
+                                  await ref.read(completedDownloadsProvider.notifier).deleteDownload(episode.id);
                                 }
-                                // Delete the downloaded file
-                                await downloadManager.deleteDownload(episode.id);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Download deleted'),
-                                    ),
-                                  );
-                                }
+                                // Download deleted
                               } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Error deleting download: $e'),
-                                      backgroundColor: AppTheme.errorColor,
-                                    ),
-                                  );
-                                }
+                                // Error deleting download
                               }
                             },
                             padding: EdgeInsets.zero,
@@ -988,29 +934,12 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             ),
                             onPressed: () async {
                               try {
-                                final downloadManager = DownloadManager();
-                                final success = await downloadManager.openDownloadedFile(episode);
+                                final success = await ref.read(completedDownloadsProvider.notifier).openFile(episode.id);
                                 if (!success) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                            'Failed to open the downloaded file'),
-                                        backgroundColor: AppTheme.errorColor,
-                                      ),
-                                    );
-                                  }
+                                  // Failed to open file
                                 }
                               } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          'Error opening file: ${e.toString()}'),
-                                      backgroundColor: AppTheme.errorColor,
-                                    ),
-                                  );
-                                }
+                                // Error opening file
                               }
                             },
                             padding: EdgeInsets.zero,
@@ -1029,18 +958,15 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             ),
                             onPressed: () async {
                               try {
-                                final downloadManager = DownloadManager();
-                                await downloadManager.downloadRelease(episode);
+                                await ref.read(activeDownloadsProvider.notifier).startDownload(
+                                  releaseId: episode.id,
+                                  magnetUrl: episode.downloadUrl,
+                                  fileName: episode.fileName,
+                                  showName: episode.title,
+                                  episode: episode.episode,
+                                );
                               } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          'Download failed: ${e.toString()}'),
-                                      backgroundColor: AppTheme.errorColor,
-                                    ),
-                                  );
-                                }
+                                // Download failed
                               }
                             },
                             padding: EdgeInsets.zero,
