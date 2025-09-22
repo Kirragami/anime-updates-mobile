@@ -62,17 +62,23 @@ class AnimeGridCard extends ConsumerWidget {
               ),
                              child: Stack(
                  children: [
-                   Hero(
-                     tag: 'anime_image_${anime.id}',
-                     child: Material(
+                   Material(
                        color: Colors.transparent,
                        child: InkWell(
                          borderRadius:
                              BorderRadius.circular(AppConstants.borderRadius),
-                         onTap: () {
+                         onTap: () async {
+                           // Start precaching in background; don't block navigation
+                           if (anime.imageUrl.isNotEmpty && context.mounted) {
+                             final image = Image.network(anime.imageUrl);
+                             // Fire-and-forget
+                             // ignore: unawaited_futures
+                             precacheImage(image.image, context);
+                           }
                            Navigator.of(context).push(
-                             CustomPageTransitions.heroSlide(
+                             CustomPageTransitions.simpleSlide(
                                AnimeDetailScreen(anime: anime),
+                               fromRight: true,
                              ),
                            );
                          },
@@ -82,7 +88,7 @@ class AnimeGridCard extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Anime Image
+                            // Anime Image (no Hero)
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
@@ -190,7 +196,6 @@ class AnimeGridCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                   ),
                                      // NEW badge positioned to span the full card corner
                    if (_isNewRelease())
                      Positioned(
@@ -445,106 +450,91 @@ class AnimeGridCard extends ConsumerWidget {
     final progress = downloadStatus.progress;
     
     if (isDownloading || isPaused) {
-      return Column(
+      return Row(
         children: [
-          SizedBox(
-            width: double.infinity,
-            height: 20,
-            child: LinearProgressIndicator(
-              value: progress / 100.0,
-              backgroundColor: AppTheme.surfaceColor,
-              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-              borderRadius: BorderRadius.circular(4),
+          Expanded(
+            child: SizedBox(
+              height: 24,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    LinearProgressIndicator(
+                      value: (progress / 100.0).clamp(0.0, 1.0),
+                      backgroundColor: AppTheme.surfaceColor,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                    ),
+                    Center(
+                      child: Text(
+                        '${progress.toInt()}%',
+                        style: AppTheme.caption.copyWith(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              Text(
-                '${(progress).toInt()}%',
-                style: AppTheme.caption.copyWith(
-                  color: AppTheme.primaryColor,
-                  fontSize: 8,
-                ),
+          const SizedBox(width: 4),
+          Container(
+            height: 24,
+            width: 24,
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: IconButton(
+              icon: Icon(
+                isDownloading ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 14,
               ),
-              const Spacer(),
-              if (isDownloading)
-                Container(
-                  height: 20,
-                  width: 20,
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.pause_rounded,
-                      color: Colors.white,
-                      size: 12,
-                    ),
-                    onPressed: () async {
-                      try {
-                        await ref.read(activeDownloadsProvider.notifier).pauseDownload(anime.id);
-                      } catch (e) {
-                        // Handle error silently or show a snack bar
-                      }
-                    },
-                    padding: EdgeInsets.zero,
-                  ),
-                )
-              else if (isPaused)
-                Container(
-                  height: 20,
-                  width: 20,
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 12,
-                    ),
-                    onPressed: () async {
-                      try {
-                        await ref.read(activeDownloadsProvider.notifier).resumeDownload(anime.id);
-                      } catch (e) {
-                        // Handle error silently or show a snack bar
-                      }
-                    },
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
-              const SizedBox(width: 4),
-              Container(
-                height: 20,
-                width: 20,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppTheme.errorColor, AppTheme.errorColor.withOpacity(0.8)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.delete_rounded,
-                    color: Colors.white,
-                    size: 12,
-                  ),
-                  onPressed: () async {
-                    try {
-                      await ref.read(activeDownloadsProvider.notifier).cancelDownload(anime.id);
-                    } catch (e) {
-                      // Handle error silently or show a snack bar
-                    }
-                  },
-                  padding: EdgeInsets.zero,
-                ),
+              onPressed: () async {
+                try {
+                  if (isDownloading) {
+                    await ref.read(activeDownloadsProvider.notifier).pauseDownload(anime.id);
+                  } else {
+                    await ref.read(activeDownloadsProvider.notifier).resumeDownload(anime.id);
+                  }
+                } catch (e) {
+                  // Handle error silently or show a snack bar
+                }
+              },
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Container(
+            height: 24,
+            width: 24,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppTheme.errorColor, AppTheme.errorColor.withOpacity(0.8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-            ],
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: IconButton(
+              icon: const Icon(
+                Icons.delete_rounded,
+                color: Colors.white,
+                size: 14,
+              ),
+              onPressed: () async {
+                try {
+                  await ref.read(activeDownloadsProvider.notifier).cancelDownload(anime.id);
+                } catch (e) {
+                  // Handle error silently or show a snack bar
+                }
+              },
+              padding: EdgeInsets.zero,
+            ),
           ),
         ],
       );

@@ -8,6 +8,7 @@ import '../widgets/anime_grid_view.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
+import 'download_manager_screen.dart';
 import '../widgets/loading_widget.dart';
 import '../models/anime_item.dart';
 import '../providers/download_providers.dart';
@@ -41,7 +42,15 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
   Widget build(BuildContext context) {
     final userAsync = ref.watch(authProvider);
 
-    return Scaffold(
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
+          Navigator.of(context).push(
+            CustomPageTransitions.slideFromRight(const DownloadManagerScreen()),
+          );
+        }
+      },
+      child: Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: AppTheme.backgroundGradient,
@@ -65,6 +74,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
           ),
         ),
       ),
+    ),
     );
   }
 

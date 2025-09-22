@@ -53,19 +53,27 @@ class HomepageScreen extends ConsumerWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Settings button
-                    IconButton(
-                      icon: const Icon(
-                        Icons.settings_rounded,
-                        size: 32,
-                        color: AppTheme.textPrimary,
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          CustomPageTransitions.simpleSlide(
-                            const ProfileScreen(),
-                            fromRight: true,
+                    // Downloaded episodes shortcut (small icon) - visible when there is at least one completed download
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final completedDownloads = ref.watch(completedDownloadsProvider);
+                        final hasCompleted = completedDownloads.isNotEmpty;
+                        if (!hasCompleted) return const SizedBox.shrink();
+                        return IconButton(
+                          tooltip: 'Downloaded Episodes',
+                          icon: const Icon(
+                            Icons.movie_creation_rounded,
+                            size: 28,
+                            color: AppTheme.textPrimary,
                           ),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              CustomPageTransitions.simpleSlide(
+                                const DownloadedEpisodesScreen(),
+                                fromRight: true,
+                              ),
+                            );
+                          },
                         );
                       },
                     ),
@@ -100,7 +108,7 @@ class HomepageScreen extends ConsumerWidget {
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.errorColor,
+                                    color: AppTheme.primaryColor,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   constraints: const BoxConstraints(
@@ -119,6 +127,23 @@ class HomepageScreen extends ConsumerWidget {
                                 ),
                               ),
                           ],
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    // Settings button
+                    IconButton(
+                      icon: const Icon(
+                        Icons.settings_rounded,
+                        size: 31,
+                        color: AppTheme.textPrimary,
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          CustomPageTransitions.simpleSlide(
+                            const ProfileScreen(),
+                            fromRight: true,
+                          ),
                         );
                       },
                     ),
@@ -235,10 +260,10 @@ class HomepageScreen extends ConsumerWidget {
     return Consumer(
       builder: (context, ref, child) {
         final completedDownloads = ref.watch(completedDownloadsProvider);
-        final hasCompletedDownloads = completedDownloads.length > 1;
+        final hasCompletedDownloads = completedDownloads.length > 0;
         
         if (hasCompletedDownloads) {
-          // Show 3 buttons when there are completed downloads
+          
           return Column(
             children: [
               // First row: New Releases and My Shows
@@ -249,9 +274,6 @@ class HomepageScreen extends ConsumerWidget {
                   _buildMyShowsButton(context),
                 ],
               ),
-              const SizedBox(height: 8),
-              // Second row: Downloaded Episodes (full width)
-              _buildDownloadedEpisodesButton(context, completedDownloads.length),
             ],
           );
         } else {
@@ -458,97 +480,5 @@ class HomepageScreen extends ConsumerWidget {
           delay: const Duration(milliseconds: 100),
         )
         .slideX(begin: 0.1);
-  }
-
-  Widget _buildDownloadedEpisodesButton(BuildContext context, int count) {
-    return Container(
-      height: 60,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.successColor.withOpacity(0.1),
-            AppTheme.successColor.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppTheme.successColor,
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.successColor.withOpacity(0.3),
-            blurRadius: 15,
-            spreadRadius: 0,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            Navigator.of(context).push(
-              CustomPageTransitions.simpleSlide(
-                const DownloadedEpisodesScreen(),
-                fromRight: true,
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppTheme.successColor, AppTheme.successColor.withOpacity(0.8)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.successColor.withOpacity(0.4),
-                        blurRadius: 8,
-                        spreadRadius: 0,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.download_done_rounded,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Downloaded Episodes ($count)',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    )
-        .animate()
-        .fadeIn(
-          duration: AppConstants.shortAnimation,
-          delay: const Duration(milliseconds: 200),
-        )
-        .slideY(begin: 0.2);
   }
 }

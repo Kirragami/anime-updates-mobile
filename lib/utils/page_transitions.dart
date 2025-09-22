@@ -6,14 +6,14 @@ PageRouteBuilder createSlideRoute(Widget page) {
 }
 
 class CustomPageTransitions {
-  // Slide from right with fade - OPTIMIZED
+  // Slide from right with fade - EDGE START, SMOOTH
   static PageRouteBuilder slideFromRight(Widget page) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(0.3, 0.0); // Reduced from 1.0 for faster animation
+        const begin = Offset(1.0, 0.0); // Start fully off-screen at the right edge
         const end = Offset.zero;
-        const curve = Curves.easeOut; // Simpler curve
+        const curve = Curves.easeOutCubic; // Smoother deceleration
 
         var tween = Tween(begin: begin, end: end).chain(
           CurveTween(curve: curve),
@@ -22,7 +22,7 @@ class CustomPageTransitions {
         var offsetAnimation = animation.drive(tween);
         var fadeAnimation = animation.drive(
           Tween(begin: 0.0, end: 1.0).chain(
-            CurveTween(curve: Curves.easeOut),
+            CurveTween(curve: Curves.easeOutCubic),
           ),
         );
 
@@ -34,18 +34,18 @@ class CustomPageTransitions {
           ),
         );
       },
-      transitionDuration: const Duration(milliseconds: 250), // Reduced from 400ms
+      transitionDuration: const Duration(milliseconds: 260),
     );
   }
 
-  // Slide from left with fade - OPTIMIZED
+  // Slide from left with fade - EDGE START, SMOOTH
   static PageRouteBuilder slideFromLeft(Widget page) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(-0.3, 0.0); // Reduced from -1.0 for faster animation
+        const begin = Offset(-1.0, 0.0); // Start fully off-screen at the left edge
         const end = Offset.zero;
-        const curve = Curves.easeOut; // Simpler curve
+        const curve = Curves.easeOutCubic; // Smoother deceleration
 
         var tween = Tween(begin: begin, end: end).chain(
           CurveTween(curve: curve),
@@ -54,7 +54,7 @@ class CustomPageTransitions {
         var offsetAnimation = animation.drive(tween);
         var fadeAnimation = animation.drive(
           Tween(begin: 0.0, end: 1.0).chain(
-            CurveTween(curve: Curves.easeOut),
+            CurveTween(curve: Curves.easeOutCubic),
           ),
         );
 
@@ -66,7 +66,7 @@ class CustomPageTransitions {
           ),
         );
       },
-      transitionDuration: const Duration(milliseconds: 250), // Reduced from 400ms
+      transitionDuration: const Duration(milliseconds: 260),
     );
   }
 
@@ -218,27 +218,32 @@ class CustomPageTransitions {
     );
   }
 
-  // NEW: Simple slide transition for maximum performance
+  // NEW: Simple slide transition from edge with subtle fade
   static PageRouteBuilder simpleSlide(Widget page, {bool fromRight = true}) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final begin = Offset(fromRight ? 0.2 : -0.2, 0.0);
+        final begin = Offset(fromRight ? 1.0 : -1.0, 0.0);
         const end = Offset.zero;
-        const curve = Curves.easeOut;
+        const curve = Curves.easeOutCubic;
 
         var tween = Tween(begin: begin, end: end).chain(
           CurveTween(curve: curve),
         );
 
         var offsetAnimation = animation.drive(tween);
+        var fadeAnimation = animation.drive(
+          Tween(begin: 0.0, end: 1.0).chain(
+            CurveTween(curve: Curves.easeOutCubic),
+          ),
+        );
 
         return SlideTransition(
           position: offsetAnimation,
-          child: child,
+          child: FadeTransition(opacity: fadeAnimation, child: child),
         );
       },
-      transitionDuration: const Duration(milliseconds: 200), // Fast transition
+      transitionDuration: const Duration(milliseconds: 240),
     );
   }
 } 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:like_button/like_button.dart';
 import '../models/anime_item.dart';
 import '../models/download_state.dart';
@@ -12,6 +13,8 @@ import '../services/api_service.dart';
 import '../providers/download_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_heart_button.dart';
+import '../utils/page_transitions.dart';
+import 'download_manager_screen.dart';
 
 class AnimeDetailScreen extends ConsumerStatefulWidget {
   final AnimeItem anime;
@@ -95,7 +98,15 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   Widget build(BuildContext context) {
     final isLoggedIn = ref.watch(isLoggedInProvider);
 
-    return Scaffold(
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
+          Navigator.of(context).push(
+            CustomPageTransitions.slideFromRight(const DownloadManagerScreen()),
+          );
+        }
+      },
+      child: Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: AppTheme.backgroundGradient,
@@ -128,10 +139,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                 background: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Anime Image with Hero Animation
-                    Hero(
-                      tag: 'anime_image_${widget.anime.id}',
-                      child: Container(
+                    // Anime Image (no Hero)
+                    Container(
                         decoration: BoxDecoration(
                           borderRadius: const BorderRadius.only(
                             bottomLeft: Radius.circular(30),
@@ -151,19 +160,23 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             bottomRight: Radius.circular(30),
                           ),
                           child: widget.anime.imageUrl.isNotEmpty
-                              ? Image.network(
-                                  widget.anime.imageUrl,
+                              ? CachedNetworkImage(
+                                  imageUrl: widget.anime.imageUrl,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: AppTheme.surfaceColor,
-                                      child: const Icon(
-                                        Icons.image_not_supported,
-                                        size: 80,
-                                        color: AppTheme.textSecondary,
-                                      ),
-                                    );
-                                  },
+                                  fadeInDuration: Duration.zero,
+                                  placeholderFadeInDuration: Duration.zero,
+                                  useOldImageOnUrlChange: true,
+                                  placeholder: (context, url) => Container(
+                                    color: AppTheme.surfaceColor,
+                                  ),
+                                  errorWidget: (context, url, error) => Container(
+                                    color: AppTheme.surfaceColor,
+                                    child: const Icon(
+                                      Icons.image_not_supported,
+                                      size: 80,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
                                 )
                               : Container(
                                   color: AppTheme.surfaceColor,
@@ -175,7 +188,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                 ),
                         ),
                       ),
-                    ),
                     // Gradient Overlay
                     Container(
                       decoration: BoxDecoration(
@@ -280,79 +292,54 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             Expanded(
                               child: Consumer(
                                 builder: (context, ref, child) {
-                                  // Watch state directly so this widget rebuilds when values change
-                                  final isDownloading = ref.watch(
-                                    downloadStatesNotifierProvider.select(
-                                      (state) =>
-                                          state[
-                                              'downloading_${widget.anime.id}'] ??
-                                          false,
-                                    ),
-                                  );
-                                  final isDownloaded = ref.watch(
-                                    downloadStatesNotifierProvider.select(
-                                      (state) =>
-                                          state[
-                                              'downloaded_${widget.anime.id}'] ??
-                                          false,
-                                    ),
-                                  );
-                                  final downloadProgress = ref.watch(
-                                    downloadProgressNotifierProvider.select(
-                                      (state) => state[widget.anime.id] ?? 0.0,
-                                    ),
-                                  );
+                                  // Use unified download status used across the app
+                                  final status = ref.watch(downloadStatusProvider(widget.anime.id));
+                                  final bool isDownloading = status.isDownloading;
+                                  final bool isDownloaded = status.isCompleted;
+                                  final double progress = status.progress; // 0..100
 
                                   if (isDownloading) {
                                     return Container(
                                       height: 50,
                                       decoration: BoxDecoration(
-                                        color: AppTheme.surfaceColor,
-                                        borderRadius: BorderRadius.circular(16),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: AppTheme.primaryColor
-                                                .withOpacity(0.3),
+                                            color: AppTheme.primaryColor.withOpacity(0.3),
                                             blurRadius: 12,
                                             offset: const Offset(0, 6),
                                           ),
                                         ],
                                       ),
-                                      child: Stack(
-                                        children: [
-                                          // Progress bar background
-                                          Container(
-                                            decoration: BoxDecoration(
-                                              color: AppTheme.surfaceColor,
-                                              borderRadius:
-                                                  BorderRadius.circular(16),
-                                            ),
-                                          ),
-                                          // Progress bar fill
-                                          FractionallySizedBox(
-                                            alignment: Alignment.centerLeft,
-                                            widthFactor: downloadProgress,
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                gradient:
-                                                    AppTheme.primaryGradient,
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            // Progress bar background
+                                            Container(color: AppTheme.surfaceColor),
+                                            // Progress bar fill
+                                            FractionallySizedBox(
+                                              alignment: Alignment.centerLeft,
+                                              widthFactor: (progress / 100).clamp(0.0, 1.0),
+                                              child: Container(
+                                                decoration: const BoxDecoration(
+                                                  gradient: AppTheme.primaryGradient,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                          // Percentage text
-                                          Center(
-                                            child: Text(
-                                              '${(downloadProgress * 100).toInt()}%',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
+                                            // Percentage text
+                                            Center(
+                                              child: Text(
+                                                '${progress.toInt()}%',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     );
                                   }
@@ -608,6 +595,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -808,49 +796,43 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
               ),
             ),
             trailing: SizedBox(
-              width: 80,
+              width: 120,
               height: 40,
               child: isDownloading || isPaused
                   ? Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         // Progress indicator
-                        Stack(
-                          children: [
-                            // Progress background
-                            Container(
-                              decoration: BoxDecoration(
-                                color: AppTheme.surfaceColor,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            // Progress indicator
-                            CircularProgressIndicator(
-                              value: progress / 100.0,
-                              strokeWidth: 2,
-                              backgroundColor: AppTheme.surfaceColor,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppTheme.primaryColor,
-                              ),
-                            ),
-                            // Percentage text
-                            Center(
-                              child: Text(
-                                '${(progress).toInt()}%',
-                                style: AppTheme.body2.copyWith(
-                                  color: AppTheme.primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 6,
+                        SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                value: (progress / 100.0).clamp(0.0, 1.0),
+                                strokeWidth: 3,
+                                backgroundColor: AppTheme.surfaceColor,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppTheme.primaryColor,
                                 ),
                               ),
-                            ),
-                          ],
+                              Text(
+                                '${progress.toInt()}%',
+                                style: AppTheme.body2.copyWith(
+                                  color: AppTheme.primaryColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 9,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 8),
                         // Pause/Resume button
                         Container(
-                          width: 24,
-                          height: 24,
+                          width: 28,
+                          height: 28,
                           decoration: BoxDecoration(
                             gradient: AppTheme.primaryGradient,
                             borderRadius: BorderRadius.circular(6),
@@ -860,12 +842,12 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                 ? const Icon(
                                     Icons.pause_rounded,
                                     color: Colors.white,
-                                    size: 12,
+                                    size: 16,
                                   )
                                 : const Icon(
                                     Icons.play_arrow_rounded,
                                     color: Colors.white,
-                                    size: 12,
+                                    size: 16,
                                   ),
                             onPressed: () async {
                               try {
@@ -881,11 +863,11 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             padding: EdgeInsets.zero,
                           ),
                         ),
-                        const SizedBox(width: 2),
+                        const SizedBox(width: 6),
                         // Delete button
                         Container(
-                          width: 24,
-                          height: 24,
+                          width: 28,
+                          height: 28,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
@@ -901,7 +883,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             icon: const Icon(
                               Icons.delete_rounded,
                               color: Colors.white,
-                              size: 12,
+                              size: 16,
                             ),
                             onPressed: () async {
                               try {
