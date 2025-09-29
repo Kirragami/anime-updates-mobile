@@ -5,7 +5,6 @@ import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../models/anime_item.dart';
 import '../models/download_state.dart';
 import '../providers/anime_providers.dart';
-import '../providers/tracking_provider.dart';
 import '../widgets/anime_grid_view.dart';
 import '../widgets/loading_widget.dart';
 import '../theme/app_theme.dart';

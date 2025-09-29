@@ -50,7 +50,6 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Back button without background - matching anime list style
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: const SizedBox(
@@ -66,7 +65,6 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
             ),
           ),
           const SizedBox(width: 20),
-          // Title section
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,7 +95,6 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
               ],
             ),
           ),
-          // Actions menu
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) async {
@@ -183,12 +180,10 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left: Texts and progress
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title
                   Text(
                     download.showName,
                     style: const TextStyle(
@@ -200,7 +195,6 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  // Episode
                   Text(
                     "Episode " + download.episode,
                     style: TextStyle(
@@ -210,7 +204,6 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Progress info
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -233,7 +226,6 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // Progress bar
                   LinearProgressIndicator(
                     value: download.progress / 100,
                     backgroundColor: Colors.white.withOpacity(0.2),
@@ -243,7 +235,6 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            // Right: Small icon buttons (pause/resume and delete)
             Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,

@@ -39,7 +39,6 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Back button without background - matching anime list style
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: const SizedBox(
@@ -55,7 +54,6 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
             ),
           ),
           const SizedBox(width: 20),
-          // Title section
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,7 +118,6 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title and Episode
             Row(
               children: [
                 Expanded(
@@ -154,7 +151,6 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
 
             const SizedBox(height: 16),
             
-            // Action Buttons
             Row(
               children: [
                 Expanded(
@@ -164,7 +160,6 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                     color: AppTheme.primaryColor,
                     onTap: () async {
                       final success = await ref.read(completedDownloadsProvider.notifier).openFile(download.releaseId);
-                      // File open result - can add handling here if needed
                     },
                   ),
                 ),

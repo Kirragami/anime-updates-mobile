@@ -44,7 +44,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (result['success']) {
         if (mounted) {
           if (widget.destination != null) {
-            // Navigate to destination, with homepage as the previous route
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(builder: (context) => widget.destination!),
               (route) => route.isFirst,
@@ -57,7 +56,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           }
         }
       } else {
-        // Login failed - error handling can be added here if needed
       }
     } finally {
       if (mounted) {
@@ -91,27 +89,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     children: [
                       const SizedBox(height: 60),
 
-                      // App Logo/Title
                       _buildAppHeader(),
 
                       const SizedBox(height: AppConstants.largePadding),
 
-                      // Welcome Text
                       _buildWelcomeText(),
 
                       const SizedBox(height: AppConstants.largePadding),
 
-                      // Login Form
                       _buildLoginForm(),
 
                       const SizedBox(height: AppConstants.largePadding),
 
-                      // Login Button
                       _buildLoginButton(),
 
                       const SizedBox(height: 16),
 
-                      // Register Link
                       _buildRegisterLink(),
 
                       const SizedBox(height: 32),
@@ -142,16 +135,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             );
           },
         ),
-        // const SizedBox(height: 20),
-        // Text(
-        //   'ANIME UPDATES',
-        //   style: TextStyle(
-        //     fontSize: 28,
-        //     fontWeight: FontWeight.w900,
-        //     color: AppTheme.primaryColor,
-        //     letterSpacing: 4,
-        //   ),
-        // ),
       ],
     )
         .animate()
@@ -191,7 +174,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget _buildLoginForm() {
     return Column(
       children: [
-        // Username Field
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
@@ -236,7 +218,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
         const SizedBox(height: 20),
 
-        // Password Field
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),

@@ -4,7 +4,6 @@ import '../services/auth_service.dart';
 import 'package:flutter/foundation.dart';
 import 'anime_providers.dart';
 
-// Authentication state notifier
 class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
   final Ref ref;
   
@@ -12,7 +11,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     _initializeAuth();
   }
 
-  // Initialize authentication state
   Future<void> _initializeAuth() async {
     try {
       await AuthService.restoreSession();
@@ -27,7 +25,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Login
   Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -40,14 +37,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
         password: password,
       );
 
-      if (kDebugMode) {
-        print("Login result");
-        print(result);
-      }
 
       if (result['success']) {
         state = AsyncValue.data(AuthService.currentUser);
-        // Refresh tracked releases when user logs in
         ref.invalidate(trackedReleasesNotifierProvider);
         return result;
       } else {
@@ -64,7 +56,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Register
   Future<Map<String, dynamic>> register({
     required String username,
     required String password,
@@ -77,7 +68,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
         password: password,
       );
 
-      // Registration does not log the user in automatically
       state = const AsyncValue.data(null);
       return result;
     } catch (error, stackTrace) {
@@ -90,12 +80,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Logout
   Future<Map<String, dynamic>> logout() async {
     try {
       final result = await AuthService.logout();
       state = const AsyncValue.data(null);
-      // Clear tracked releases when user logs out
       ref.invalidate(trackedReleasesNotifierProvider);
       return result;
     } catch (error, stackTrace) {
@@ -108,7 +96,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Refresh token
   Future<Map<String, dynamic>> refreshToken() async {
     try {
       final result = await AuthService.refreshAccessToken();
@@ -131,7 +118,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Get profile
   Future<Map<String, dynamic>> getProfile() async {
     try {
       final result = await AuthService.getProfile();
@@ -154,22 +140,17 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  // Check if user is logged in
   bool get isLoggedIn => AuthService.isLoggedIn;
   
-  // Get current user
   User? get currentUser => AuthService.currentUser;
   
-  // Get access token
   String? get accessToken => AuthService.accessToken;
 }
 
-// Authentication provider
 final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>(
   (ref) => AuthNotifier(ref),
 );
 
-// Convenience providers
 final authNotifierProvider = Provider<AuthNotifier>((ref) {
   return ref.read(authProvider.notifier);
 });

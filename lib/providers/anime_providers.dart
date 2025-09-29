@@ -3,8 +3,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'dart:async';
 import '../models/anime_item.dart';
 import '../services/services.dart';
-import 'tracking_provider.dart';
-
 
 part 'anime_providers.g.dart';
 
@@ -139,6 +137,21 @@ class AnimeListNotifier extends _$AnimeListNotifier {
     _isInSearchMode = false;
     refresh(); // This will reset to normal browsing mode
   }
+
+  /// Update tracking state for all anime items with the same animeShowId
+  void updateTrackingForShowId(String animeShowId, bool isTracked) {
+    bool hasChanges = false;
+    for (int i = 0; i < _items.length; i++) {
+      if (_items[i].animeShowId == animeShowId) {
+        _items[i] = _items[i].copyWith(tracked: isTracked);
+        hasChanges = true;
+      }
+    }
+    
+    if (hasChanges && state.hasValue) {
+      state = AsyncData<List<AnimeItem>>(List<AnimeItem>.from(_items));
+    }
+  }
 }
 
 /// Provides the list of tracked releases (authenticated)
@@ -244,12 +257,7 @@ class TrackedReleasesNotifier extends _$TrackedReleasesNotifier {
 
   /// Sync tracking states with the current items
   void syncTrackingStates() {
-    if (state.hasValue) {
-      for (final item in _items) {
-        // Update the tracking state for each item
-        ref.read(animeTrackingProvider(item).notifier).updateTrackingState(item.tracked);
-      }
-    }
+    // No longer needed since we use anime.tracked directly
   }
 }
 

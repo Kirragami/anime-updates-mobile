@@ -17,7 +17,6 @@ class TorrentTestScreen extends StatefulWidget {
 }
 
 class _TorrentTestScreenState extends State<TorrentTestScreen> {
-  // Track status and progress for 3 torrents
   List<String> _statuses = ['Ready', 'Ready', 'Ready'];
   List<double> _progresses = [0.0, 0.0, 0.0];
   List<bool> _isRunning = [false, false, false];
@@ -34,27 +33,15 @@ class _TorrentTestScreenState extends State<TorrentTestScreen> {
       if (Platform.isAndroid) {
         directory = await getExternalStorageDirectory();
 
-        if (kDebugMode) {
-          print('External storage directory: ${directory?.path}');
-        }
 
         if (directory == null) {
           directory = await getApplicationDocumentsDirectory();
-          if (kDebugMode) {
-            print('Using app documents directory: ${directory.path}');
-          }
         }
       } else {
         directory = await getApplicationDocumentsDirectory();
-        if (kDebugMode) {
-          print('Using app documents directory: ${directory.path}');
-        }
       }
 
-      // Path to the torrent file (you need to place a .torrent file at this location)
-      // final torrentPath = '${directory.path}/AnimeDownloads/Dainanaoji.torrent';
       final savePath = '${directory.path}/TorrentFileDownloads';
-      // final fileName = '[SubsPlease] Dainanaoji - 20 (1080p) [95499314].mkv';
 
       final fileName = ['[SubsPlease] Dekin no Mogura - 09 (1080p) [0F4008C6].mkv',
                         '[SubsPlease] Puniru wa Kawaii Slime - 21 (1080p) [2E41DD67].mkv',
@@ -64,17 +51,7 @@ class _TorrentTestScreenState extends State<TorrentTestScreen> {
                          'magnet:?xt=urn:btih:da357ab15da1370a0098ef604f731f07e7682c71&dn=%5BSubsPlease%5D%20Puniru%20wa%20Kawaii%20Slime%20-%2021%20%281080p%29%20%5B2E41DD67%5D.mkv&tr=http%3A%2F%2Fnyaa.tracker.wf%3A7777%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce', 
                          'magnet:?xt=urn:btih:77e74f364dcc8850c98678ec234df73d56b292a9&dn=%5BSubsPlease%5D%20Jibaku%20Shounen%20Hanako-kun%20S2%20-%2021%20%281080p%29%20%5B135C9E17%5D.mkv&tr=http%3A%2F%2Fnyaa.tracker.wf%3A7777%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce'];
       
-      // Check if torrent file exists
-      // final file = File(torrentPath[index]);
-      // if (!await file.exists()) {
-      //   setState(() {
-      //     _statuses[index] = 'Error: Torrent file not found at $torrentPath';
-      //     _isRunning[index] = false;
-      //   });
-      //   return;
-      // }
 
-      // Create download directory if it doesn't exist
       await Directory(savePath).create(recursive: true);
 
       await startTorrent(magnetUrl[index], savePath, fileName[index], index.toString());
@@ -118,7 +95,6 @@ class _TorrentTestScreenState extends State<TorrentTestScreen> {
       return;
     }
 
-    // schedule next poll
     Future.delayed(const Duration(seconds: 1), () => _updateProgress(index));
   }
 
@@ -129,7 +105,6 @@ class _TorrentTestScreenState extends State<TorrentTestScreen> {
       });
       return double.parse(progress.toStringAsFixed(2));
     } catch (e) {
-      print("Error getting progress: $e");
       return 0.0;
     }
   }

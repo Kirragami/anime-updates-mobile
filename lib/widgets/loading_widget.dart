@@ -25,7 +25,6 @@ class LoadingWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title placeholder
                 Container(
                   height: 20,
                   width: double.infinity,
@@ -35,7 +34,6 @@ class LoadingWidget extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Subtitle placeholder
                 Container(
                   height: 14,
                   width: 150,
@@ -45,7 +43,6 @@ class LoadingWidget extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Button placeholder
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -179,7 +176,6 @@ class AnimeGridSkeleton extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Image placeholder
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
@@ -189,7 +185,6 @@ class AnimeGridSkeleton extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // Episode badge placeholder
                   Container(
                     height: 16,
                     width: 48,
@@ -199,7 +194,6 @@ class AnimeGridSkeleton extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Title placeholder (2 lines)
                   Container(
                     height: 12,
                     width: double.infinity,
@@ -218,7 +212,6 @@ class AnimeGridSkeleton extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  // Time ago placeholder
                   Container(
                     height: 10,
                     width: 60,
@@ -228,7 +221,6 @@ class AnimeGridSkeleton extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  // Action button placeholder
                   Container(
                     height: 24,
                     width: double.infinity,

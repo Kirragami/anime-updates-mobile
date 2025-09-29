@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Colors
   static const Color primaryColor = Color(0xFF6366F1);
   static const Color secondaryColor = Color(0xFF8B5CF6);
   static const Color accentColor = Color(0xFF06B6D4);
@@ -14,7 +13,6 @@ class AppTheme {
   static const Color successColor = Color(0xFF10B981);
   static const Color warningColor = Color(0xFFF59E0B);
 
-  // Gradients
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [primaryColor, secondaryColor],
     begin: Alignment.topLeft,
@@ -33,7 +31,6 @@ class AppTheme {
     end: Alignment.bottomCenter,
   );
 
-  // Text Styles
   static const TextStyle heading1 = TextStyle(
     fontSize: 32,
     fontWeight: FontWeight.bold,
@@ -70,13 +67,11 @@ class AppTheme {
     color: textSecondary,
   );
 
-  // Theme Data
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       
-      // Color Scheme
       colorScheme: const ColorScheme.dark(
         primary: primaryColor,
         secondary: secondaryColor,
@@ -90,7 +85,6 @@ class AppTheme {
         onError: textPrimary,
       ),
 
-      // App Bar Theme
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -99,7 +93,6 @@ class AppTheme {
         iconTheme: IconThemeData(color: textPrimary),
       ),
 
-      // Card Theme
       cardTheme: CardTheme(
         color: cardColor,
         elevation: 8,
@@ -109,7 +102,6 @@ class AppTheme {
         ),
       ),
 
-      // Elevated Button Theme
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
@@ -127,7 +119,6 @@ class AppTheme {
         ),
       ),
 
-      // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceColor,
@@ -147,7 +138,6 @@ class AppTheme {
         hintStyle: body2.copyWith(color: textSecondary),
       ),
 
-      // Scaffold Background
       scaffoldBackgroundColor: backgroundColor,
     );
   }

@@ -20,11 +20,10 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _notificationsEnabled = true;
   bool _pushNotificationsEnabled = true;
-  double _downloadSpeedLimit = 0.0; // KB/s (0 = unlimited)
+  double _downloadSpeedLimit = 0.0; 
   final TextEditingController _speedController = TextEditingController();
   bool _isLoadingSpeedLimit = true;
   
-  // Update checking state
   bool _isCheckingUpdate = false;
   bool _updateAvailable = false;
   String _updateStatus = '';
@@ -58,7 +57,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final speedLimitService = ref.read(speedLimitServiceProvider);
       await speedLimitService.setSpeedLimit(_downloadSpeedLimit);
     } catch (e) {
-      // Failed to save speed limit - error handling can be added here if needed
     }
   }
 
@@ -100,7 +98,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Back button without background - matching anime list style
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: const SizedBox(
@@ -134,12 +131,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Column(
         children: [
           const SizedBox(height: 20),
-          // Show profile header only if user is logged in
           if (user != null) _buildProfileHeader(user),
           if (user != null) const SizedBox(height: 20),
           _buildSettingsList(),
           const SizedBox(height: 20),
-          // Show logout section only if user is logged in
           if (user != null) _buildLogoutSection(),
           const SizedBox(height: 40),
         ],
@@ -152,7 +147,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Row(
         children: [
-          // Profile Avatar
           Container(
             width: 60,
             height: 60,
@@ -167,7 +161,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           const SizedBox(width: 16),
-          // User info section
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -463,7 +456,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildCustomSlider() {
   return Row(
     children: [
-      // Minus button
       GestureDetector(
         onTap: () {
           if (_downloadSpeedLimit > 0) {
@@ -479,7 +471,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           width: 24,
           height: 24,
           decoration: const BoxDecoration(
-            color: AppTheme.primaryColor, // same as second image
+            color: AppTheme.primaryColor, 
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -491,7 +483,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
       const SizedBox(width: 12),
 
-      // Slider track
       Expanded(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -527,7 +518,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Stack(
                   alignment: Alignment.centerLeft,
                   children: [
-                    // Track background
                     Container(
                       height: 6,
                       decoration: BoxDecoration(
@@ -535,19 +525,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         color: Colors.grey.shade300,
                       ),
                     ),
-                    // Filled portion
                     Container(
                       width: thumbPosition,
                       height: 6,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(3),
-                        color: AppTheme.primaryColor, // same style as 2nd image
+                        color: AppTheme.primaryColor, 
                       ),
                     ),
-                    // Thumb (circle above the track)
                     Positioned(
-                      left: (thumbPosition - 12).clamp(0.0, trackWidth - 24), // center thumb horizontally, clamp to prevent clipping
-                      top: 8,                 // move it above the line
+                      left: (thumbPosition - 12).clamp(0.0, trackWidth - 24), 
+                      top: 8,                 
                       child: Container(
                         width: 24,
                         height: 24,
@@ -566,7 +554,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
       const SizedBox(width: 12),
 
-      // Plus button
       GestureDetector(
         onTap: () {
           if (_downloadSpeedLimit < 50000) {
@@ -582,7 +569,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           width: 24,
           height: 24,
           decoration: const BoxDecoration(
-            color: AppTheme.primaryColor, // same as second image
+            color: AppTheme.primaryColor, 
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -666,11 +653,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           : _updateStatus,
                       style: TextStyle(
                         color: _updateAvailable 
-                          ? AppTheme.primaryColor // Use exciting color for new version available
+                          ? AppTheme.primaryColor 
                           : Colors.white.withOpacity(0.6),
                         fontSize: 14,
                         fontWeight: _updateAvailable 
-                          ? FontWeight.bold // Make it bold for emphasis
+                          ? FontWeight.bold 
                           : FontWeight.w400,
                       ),
                     ),
@@ -784,7 +771,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     try {
       final updateService = ref.read(updateServiceProvider);
       
-      // First check for updates to get the download URL
       final checkResult = await updateService.checkForUpdate();
       
       if (!checkResult['success'] || !checkResult['needUpdate']) {
@@ -810,27 +796,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       if (downloadResult['success']) {
         final filePath = downloadResult['filePath'];
-        // Install the update
         final installResult = await updateService.installUpdate(filePath);
         
         if (installResult['success']) {
-          // APK opened for installation
         } else {
           if (mounted) {
-            // Check if it's a permission issue
             final message = installResult['message'] as String? ?? 'Unknown error';
             if (message.contains('Permission to install packages is required')) {
-              // Permission issue - can open settings if needed
               openAppSettings();
             }
-            // Installation failed
           }
         }
       } else {
-        // Download failed
       }
     } catch (e) {
-      // Update error - error handling can be added here if needed
     } finally {
       setState(() {
         _isDownloading = false;
@@ -854,7 +833,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Title
                 const Text(
                   'Confirm Sign Out',
                   style: TextStyle(
@@ -864,7 +842,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Message
                 const Padding(
                   padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
                   child: Text(
@@ -878,16 +855,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                // Divider line
                 Container(
                   height: 1,
                   color: AppTheme.textSecondary.withOpacity(0.2),
                 ),
                 const SizedBox(height: 0),
-                // Buttons row
                 Row(
                   children: [
-                    // Cancel button
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.of(dialogContext).pop(),
@@ -909,13 +883,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       ),
                     ),
-                    // Vertical divider
                     Container(
                       width: 1,
                       height: 50,
                       color: AppTheme.textSecondary.withOpacity(0.2),
                     ),
-                    // Sign Out button
                     Expanded(
                       child: TextButton(
                         onPressed: () async {
