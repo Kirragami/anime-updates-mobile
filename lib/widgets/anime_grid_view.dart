@@ -80,7 +80,6 @@ class AnimeGridView extends ConsumerWidget {
         ),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount(context),
-          // childAspectRatio: 0.525,
           mainAxisExtent: 360,
           crossAxisSpacing: 2,
           mainAxisSpacing: 2,
@@ -98,7 +97,6 @@ class AnimeGridView extends ConsumerWidget {
                 showTrackingIndicator: !useTrackedProviders,
               );
             } else {
-              // Skeleton tile for loading more
               return Container(
                 margin: const EdgeInsets.all(AppConstants.smallPadding),
                 decoration: BoxDecoration(

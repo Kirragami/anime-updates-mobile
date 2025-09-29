@@ -15,14 +15,11 @@ class UpdateService {
 
   static String get checkUpdateUrl => '$_baseUrl$_checkUpdateEndpoint';
 
-  /// Check if an update is available
   Future<Map<String, dynamic>> checkForUpdate() async {
     try {
-      // Get the current app version
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
 
-      // Make the API call to check for updates
       final response = await dioClient.post(
         checkUpdateUrl,
         data: {
@@ -47,9 +44,6 @@ class UpdateService {
         };
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('UpdateService.checkForUpdate error: $e');
-      }
       return {
         'success': false,
         'message': 'Network error: ${e.toString()}',
@@ -57,30 +51,20 @@ class UpdateService {
     }
   }
 
-  /// Download the update APK file
   Future<Map<String, dynamic>> downloadUpdate({
     required String downloadUrl,
     required void Function(int, int) onProgress,
   }) async {
     try {
-      // Get cache directory for downloading the APK (better than temporary directory)
       final cacheDir = await getTemporaryDirectory();
       final filePath = '${cacheDir.path}/anime_updates.apk';
 
-      if (kDebugMode) {
-        print('Downloading APK to: $filePath');
-      }
 
-      // Delete any existing file with the same name
       final file = File(filePath);
       if (await file.exists()) {
-        if (kDebugMode) {
-          print('Deleting existing APK file');
-        }
         await file.delete();
       }
 
-      // Download with progress tracking
       final dio = Dio();
       await dio.download(
         downloadUrl,
@@ -93,12 +77,8 @@ class UpdateService {
         ),
       );
 
-      // Verify file was downloaded
       if (await file.exists()) {
         final length = await file.length();
-        if (kDebugMode) {
-          print('APK downloaded successfully. File size: $length bytes');
-        }
         if (length == 0) {
           return {
             'success': false,
@@ -117,9 +97,6 @@ class UpdateService {
         'filePath': filePath,
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('UpdateService.downloadUpdate error: $e');
-      }
       return {
         'success': false,
         'message': 'Download failed: ${e.toString()}',
@@ -127,14 +104,9 @@ class UpdateService {
     }
   }
 
-  /// Open the downloaded APK file for installation
   Future<Map<String, dynamic>> installUpdate(String filePath) async {
     try {
-      if (kDebugMode) {
-        print('Attempting to open APK file: $filePath');
-      }
       
-      // Verify file exists
       final file = File(filePath);
       if (!await file.exists()) {
         return {
@@ -151,17 +123,9 @@ class UpdateService {
         };
       }
       
-      if (kDebugMode) {
-        print('APK file size: $length bytes');
-      }
 
-      // Check and request install packages permission
       final status = await Permission.requestInstallPackages.status;
       if (!status.isGranted) {
-        if (kDebugMode) {
-          print('Install packages permission not granted');
-        }
-        // Try to request the permission
         final result = await Permission.requestInstallPackages.request();
         if (!result.isGranted) {
           return {
@@ -171,14 +135,9 @@ class UpdateService {
         }
       }
 
-      // Try to open the file
       final result = await OpenFile.open(filePath);
       
-      if (kDebugMode) {
-        print('OpenFile result: ${result.message}, type: ${result.type}');
-      }
       
-      // Check if opening was successful
       if (result.type == ResultType.done) {
         return {
           'success': true,
@@ -186,7 +145,6 @@ class UpdateService {
           'message': 'APK opened for installation successfully',
         };
       } else {
-        // Handle specific error cases
         if (result.type == ResultType.error) {
           return {
             'success': false,
@@ -202,9 +160,6 @@ class UpdateService {
         }
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('UpdateService.installUpdate error: $e');
-      }
       return {
         'success': false,
         'message': 'Failed to open file: ${e.toString()}',

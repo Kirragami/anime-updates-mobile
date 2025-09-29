@@ -5,7 +5,6 @@ import '../models/completed_download.dart';
 import '../services/active_downloads_manager.dart';
 import '../services/completed_downloads_manager.dart';
 
-// Provider for active downloads
 final activeDownloadsProvider = StateNotifierProvider<ActiveDownloadsNotifier, Map<String, ActiveDownload>>((ref) {
   return ActiveDownloadsNotifier();
 });
@@ -14,16 +13,11 @@ class ActiveDownloadsNotifier extends StateNotifier<Map<String, ActiveDownload>>
   final ActiveDownloadsManager _manager = ActiveDownloadsManager();
   
   ActiveDownloadsNotifier() : super({}) {
-    // Listen to the manager's state changes
     _manager.stateNotifier.addListener(_onStateChanged);
-    // Initialize with current state
     state = _manager.activeDownloads;
   }
   
   void _onStateChanged() {
-    if (kDebugMode) {
-      print("ActiveDownloadsNotifier: State changed - ${_manager.activeDownloads.length} active downloads");
-    }
     state = _manager.activeDownloads;
   }
   
@@ -74,7 +68,6 @@ class ActiveDownloadsNotifier extends StateNotifier<Map<String, ActiveDownload>>
   }
 }
 
-// Provider for completed downloads
 final completedDownloadsProvider = StateNotifierProvider<CompletedDownloadsNotifier, Map<String, CompletedDownload>>((ref) {
   return CompletedDownloadsNotifier();
 });
@@ -83,9 +76,7 @@ class CompletedDownloadsNotifier extends StateNotifier<Map<String, CompletedDown
   final CompletedDownloadsManager _manager = CompletedDownloadsManager();
   
   CompletedDownloadsNotifier() : super({}) {
-    // Listen to the manager's state changes
     _manager.stateNotifier.addListener(_onStateChanged);
-    // Initialize with current state
     state = _manager.completedDownloads;
   }
   
@@ -128,7 +119,6 @@ class CompletedDownloadsNotifier extends StateNotifier<Map<String, CompletedDown
   }
 }
 
-// Helper provider to get download status for a specific release
 final downloadStatusProvider = Provider.family<DownloadStatus, String>((ref, releaseId) {
   final activeDownloads = ref.watch(activeDownloadsProvider);
   final completedDownloads = ref.watch(completedDownloadsProvider);
@@ -149,7 +139,7 @@ final downloadStatusProvider = Provider.family<DownloadStatus, String>((ref, rel
       isActive: false,
       isCompleted: true,
       progress: 100.0,
-      status: ActiveDownloadStatus.downloading, // Not relevant for completed
+      status: ActiveDownloadStatus.downloading, 
       speed: 0,
     );
   } else {
@@ -157,13 +147,12 @@ final downloadStatusProvider = Provider.family<DownloadStatus, String>((ref, rel
       isActive: false,
       isCompleted: false,
       progress: 0.0,
-      status: ActiveDownloadStatus.downloading, // Not relevant
+      status: ActiveDownloadStatus.downloading, 
       speed: 0,
     );
   }
 });
 
-// Helper class to represent download status
 class DownloadStatus {
   final bool isActive;
   final bool isCompleted;

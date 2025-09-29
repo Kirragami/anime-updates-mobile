@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/anime_item.dart';
 import '../providers/anime_providers.dart';
-import '../providers/tracking_provider.dart';
 import '../providers/download_providers.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
@@ -122,49 +121,38 @@ class AnimeGridCard extends ConsumerWidget {
                                 const SizedBox(width: 6),
                                 const Spacer(),
                                 // Tracking Heart Button
-                                Consumer(
-                                  builder: (context, ref, child) {
-                                    final isTracked =
-                                        ref.watch(animeTrackingProvider(anime));
-
-                                    // Only show heart button when tracked
-                                    if (!isTracked) {
-                                      return const SizedBox.shrink();
-                                    }
-
-                                    return Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            Color(0xFFFF6B9A),
-                                            Color(0xFFFF3366)
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: const Color(0xFFFF3366)
-                                                .withOpacity(0.4),
-                                            blurRadius: 8,
-                                            spreadRadius: 1,
-                                            offset: const Offset(0, 2),
-                                          ),
+                                if (anime.tracked)
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFFFF6B9A),
+                                          Color(0xFFFF3366)
                                         ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
                                       ),
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.favorite,
-                                          color: Colors.white,
-                                          size: 14,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFFFF3366)
+                                              .withOpacity(0.4),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                          offset: const Offset(0, 2),
                                         ),
+                                      ],
+                                    ),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.favorite,
+                                        color: Colors.white,
+                                        size: 14,
                                       ),
-                                    );
-                                  },
-                                ),
+                                    ),
+                                  ),
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -262,10 +250,8 @@ class AnimeGridCard extends ConsumerWidget {
   }
 
   Widget _buildTrackingIndicator(WidgetRef ref) {
-    // Watch the tracking state for this anime item
-    final isTracked = ref.watch(animeTrackingProvider(anime));
-
-    if (!isTracked) {
+    // Use the tracked field directly from the anime item
+    if (!anime.tracked) {
       return const SizedBox.shrink();
     }
 

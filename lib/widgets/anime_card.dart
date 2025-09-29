@@ -74,7 +74,6 @@ class AnimeCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header with title and download button
                       Row(
                         children: [
                           Expanded(
@@ -104,7 +103,6 @@ class AnimeCard extends StatelessWidget {
                         ],
                       ),
 
-                      // Progress indicator
                       if (isDownloading) ...[
                         const SizedBox(height: 12),
                         _buildProgressIndicator(),
@@ -166,7 +164,6 @@ class AnimeCard extends StatelessWidget {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Open Button
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -217,7 +214,6 @@ class AnimeCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // Delete Button
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(

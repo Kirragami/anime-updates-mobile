@@ -7,7 +7,6 @@ import 'fcm_registration_service.dart';
 import 'dio_client.dart';
 
 class AuthService {
-  // Configurable endpoints - change these easily
   static const String _baseUrl = AppConstants.baseUrl;
   static const String _loginEndpoint = AppConstants.loginEndpoint;
   static const String _registerEndpoint = AppConstants.registerEndpoint;
@@ -15,31 +14,26 @@ class AuthService {
   static const String _refreshEndpoint = AppConstants.refreshEndpoint;
   static const String _profileEndpoint = AppConstants.profileEndpoint;
 
-  // Get full URLs
   static String get loginUrl => '$_baseUrl$_loginEndpoint';
   static String get registerUrl => '$_baseUrl$_registerEndpoint';
   static String get logoutUrl => '$_baseUrl$_logoutEndpoint';
   static String get refreshUrl => '$_baseUrl$_refreshEndpoint';
   static String get profileUrl => '$_baseUrl$_profileEndpoint';
 
-  // Authentication token storage
   static String? _accessToken;
   static String? _refreshToken;
   static User? _currentUser;
 
-  // Getters
   static String? get accessToken => _accessToken;
   static String? get refreshToken => _refreshToken;
   static User? get currentUser => _currentUser;
   static bool get isLoggedIn => _accessToken != null;
 
-  // Headers for authenticated requests
   static Map<String, String> get _authHeaders => {
     'Content-Type': 'application/json',
     if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
   };
 
-  // Login method
   static Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -48,7 +42,6 @@ class AuthService {
       final response = await dioClient.post(
         loginUrl,
         data: jsonEncode({
-          // API expects these exact keys
           'userName': username,
           'password': password,
         }),
@@ -60,11 +53,9 @@ class AuthService {
       if ((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300) {
         final data = response.data as Map<String, dynamic>;
 
-        // New response: { accessToken, refreshToken }
         _accessToken = data['accessToken'];
         _refreshToken = data['refreshToken'];
 
-        // Try to derive username from JWT if possible
         String derivedUsername = username;
         final payload = _accessToken != null ? decodeJwtPayload(_accessToken!) : null;
         if (payload != null && payload['username'] is String && (payload['username'] as String).isNotEmpty) {
@@ -79,7 +70,6 @@ class AuthService {
           lastLoginAt: DateTime.now(),
         );
 
-        // Persist tokens and minimal user info
         if (_accessToken != null) {
           await AuthStorage.saveAccessToken(_accessToken!);
         }
@@ -92,9 +82,6 @@ class AuthService {
           'last_login_at': _currentUser!.lastLoginAt?.toIso8601String(),
         });
 
-        // Register FCM token with backend
-        // Run in background, don't block login
-        // Register the stored FCM token
         FcmRegistrationService.registerStoredFcmToken();
 
         return {
@@ -120,7 +107,6 @@ class AuthService {
     }
   }
 
-  // Register method
   static Future<Map<String, dynamic>> register({
     required String username,
     required String password,
@@ -129,7 +115,6 @@ class AuthService {
       final response = await dioClient.post(
         registerUrl,
         data: jsonEncode({
-          // Only username and password are required
           'userName': username,
           'password': password,
         }),
@@ -140,7 +125,6 @@ class AuthService {
 
       if ((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300) {
         final data = response.data as Map<String, dynamic>;
-        // Response only contains success indicator
         return {
           'success': true,
           'message': data['message'] ?? 'Registration successful',
@@ -163,15 +147,12 @@ class AuthService {
     }
   }
 
-  // Logout method
   static Future<Map<String, dynamic>> logout() async {
     try {
-      // Get tokens before clearing them
       final refreshToken = _refreshToken;
       final fcmToken = await AuthStorage.getFcmToken();
       
       if (_accessToken != null) {
-        // Send tokens in request body
         final requestBody = <String, dynamic>{};
         if (refreshToken != null) {
           requestBody['refreshToken'] = refreshToken;
@@ -189,7 +170,6 @@ class AuthService {
         ).timeout(Duration(seconds: 10));
       }
       
-      // Clear local data
       _accessToken = null;
       _refreshToken = null;
       _currentUser = null;
@@ -200,7 +180,6 @@ class AuthService {
         'message': 'Logout successful',
       };
     } catch (e) {
-      // Even if the request fails, clear local data
       _accessToken = null;
       _refreshToken = null;
       _currentUser = null;
@@ -214,26 +193,20 @@ class AuthService {
     }
   }
 
-  // Shared Future for token refresh to prevent multiple concurrent refreshes
   static Future<Map<String, dynamic>>? _refreshFuture;
 
-  // Refresh token method
   static Future<Map<String, dynamic>> refreshAccessToken() {
-    // Return existing refresh future if one is already in progress
     if (_refreshFuture != null) {
       return _refreshFuture!;
     }
 
-    // Create and store the refresh future
     _refreshFuture = _performTokenRefresh().whenComplete(() {
-      // Clear the future when refresh is complete
       _refreshFuture = null;
     });
 
     return _refreshFuture!;
   }
 
-  // Internal method that performs the actual token refresh
   static Future<Map<String, dynamic>> _performTokenRefresh() async {
     try {
       if (_refreshToken == null) {
@@ -244,7 +217,6 @@ class AuthService {
         };
       }
 
-      // Create a new Dio instance for refresh to avoid interceptors
       final refreshDio = Dio();
       
       final response = await refreshDio.post(
@@ -262,7 +234,6 @@ class AuthService {
         _accessToken = data['accessToken'];
         _refreshToken = data['refreshToken'];
         
-        // Save the new tokens
         await AuthStorage.saveAccessToken(_accessToken!);
         await AuthStorage.saveRefreshToken(_refreshToken);
         
@@ -271,7 +242,6 @@ class AuthService {
           'message': 'Token refreshed',
         };
       } else {
-        // Refresh failed, clear tokens
         _accessToken = null;
         _refreshToken = null;
         _currentUser = null;
@@ -291,7 +261,6 @@ class AuthService {
     }
   }
 
-  // Get user profile
   static Future<Map<String, dynamic>> getProfile() async {
     try {
       final response = await dioClient.get(
@@ -327,7 +296,6 @@ class AuthService {
     }
   }
 
-  // Attempt to restore session from secure storage at app start
   static Future<void> restoreSession() async {
     try {
       final storedAccess = await AuthStorage.getAccessToken();
@@ -341,7 +309,6 @@ class AuthService {
           try {
             _currentUser = User.fromJson(storedUser);
           } catch (_) {
-            // Fallback: derive minimal user from JWT
             final payload = decodeJwtPayload(storedAccess);
             final sub = (payload != null && payload['sub'] is String) ? payload['sub'] as String : '';
             _currentUser = User(
@@ -353,7 +320,6 @@ class AuthService {
             );
           }
         } else {
-          // No stored user; derive minimal from JWT
           final payload = decodeJwtPayload(storedAccess);
           final sub = (payload != null && payload['sub'] is String) ? payload['sub'] as String : '';
           _currentUser = User(
@@ -365,7 +331,6 @@ class AuthService {
           );
         }
       } else {
-        // Nothing to restore
         _accessToken = null;
         _refreshToken = null;
         _currentUser = null;
@@ -377,7 +342,6 @@ class AuthService {
     }
   }
 
-  // Check if token is expired (JWT validation)
   static bool get isTokenExpired {
     if (_accessToken == null) return true;
     
@@ -385,11 +349,9 @@ class AuthService {
       final payload = decodeJwtPayload(_accessToken!);
       if (payload == null) return true;
       
-      // Check if 'exp' claim exists and is valid
       final exp = payload['exp'];
       if (exp is int) {
         final expirationTime = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
-        // Consider token expired if it's within 5 minutes of actual expiration
         return DateTime.now().isAfter(expirationTime.subtract(const Duration(minutes: 5)));
       }
       
@@ -399,7 +361,6 @@ class AuthService {
     }
   }
 
-  // Clear all data (for testing or reset)
   static void clearData() {
     _accessToken = null;
     _refreshToken = null;

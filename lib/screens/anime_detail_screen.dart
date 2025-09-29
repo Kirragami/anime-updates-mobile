@@ -7,9 +7,9 @@ import '../models/anime_item.dart';
 import '../models/download_state.dart';
 import '../models/active_download.dart';
 import '../providers/auth_provider.dart';
-import '../providers/tracking_provider.dart';
 import '../providers/anime_providers.dart';
 import '../services/api_service.dart';
+import '../services/tracking_service.dart';
 import '../providers/download_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_heart_button.dart';
@@ -74,6 +74,33 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
+  }
+
+  /// Make tracking API call in background
+  void _makeTrackingApiCall(String animeShowId, bool wasTracked, WidgetRef ref) async {
+    try {
+      final trackingService = TrackingService();
+      Map<String, dynamic> result;
+      
+      if (wasTracked) {
+        // Was tracked, now untracking
+        result = await trackingService.untrackAnime(animeShowId);
+      } else {
+        // Was not tracked, now tracking
+        result = await trackingService.trackAnime(animeShowId);
+      }
+      
+      if (!result['success']) {
+        // Rollback on failure - revert the optimistic update
+        ref.read(animeListNotifierProvider.notifier)
+            .updateTrackingForShowId(animeShowId, wasTracked);
+      }
+      
+    } catch (e) {
+      // Rollback on exception - revert the optimistic update
+      ref.read(animeListNotifierProvider.notifier)
+          .updateTrackingForShowId(animeShowId, wasTracked);
+    }
   }
 
   String _formatReleaseDate(DateTime date) {
@@ -523,12 +550,19 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                               const SizedBox(width: 16),
                               // Track Button (LikeButton)
                               Consumer(builder: (context, ref, child) {
-                                final isTracked = ref
-                                    .watch(animeTrackingProvider(widget.anime));
-                                final trackingNotifier = ref.read(
-                                    animeTrackingProvider(widget.anime)
-                                        .notifier);
-
+                                // Watch the anime list to get the current tracked state
+                                final animeListAsync = ref.watch(animeListNotifierProvider);
+                                bool isTracked = widget.anime.tracked;
+                                
+                                // Find the current anime item in the list to get updated state
+                                animeListAsync.whenData((animeList) {
+                                  final currentAnime = animeList.firstWhere(
+                                    (item) => item.id == widget.anime.id,
+                                    orElse: () => widget.anime,
+                                  );
+                                  isTracked = currentAnime.tracked;
+                                });
+                                
                                 return LikeButton(
                                   size: 50,
                                   isLiked: isTracked,
@@ -572,7 +606,14 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                   },
                                   onTap: (bool liked) async {
                                     final willBeTracked = !liked;
-                                    await trackingNotifier.toggleTracking();
+                                    
+                                    // IMMEDIATE optimistic update - update anime list provider first
+                                    ref.read(animeListNotifierProvider.notifier)
+                                        .updateTrackingForShowId(widget.anime.animeShowId, willBeTracked);
+                                    
+                                    // Make API call in background (don't await)
+                                    _makeTrackingApiCall(widget.anime.animeShowId, liked, ref);
+                                    
                                     if (!mounted) return liked;
                                     return willBeTracked;
                                   },

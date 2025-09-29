@@ -7,21 +7,17 @@ import '../models/active_download.dart';
 class ActiveDownloadsManager {
   static const _channel = MethodChannel("com.aura.anime_updates/torrent");
   
-  // Singleton pattern
   static final ActiveDownloadsManager _instance = ActiveDownloadsManager._internal();
   factory ActiveDownloadsManager() => _instance;
   ActiveDownloadsManager._internal();
   
-  // State management
   final Map<String, ActiveDownload> _activeDownloads = {};
   final ValueNotifier<Map<String, ActiveDownload>> stateNotifier = ValueNotifier({});
   
-  // Getters
   Map<String, ActiveDownload> get activeDownloads => Map.unmodifiable(_activeDownloads);
   int get activeCount => _activeDownloads.length;
   bool get hasActiveDownloads => _activeDownloads.isNotEmpty;
   
-  // Initialize from native managed torrents
   Future<void> initialize() async {
     try {
       await _channel.invokeMethod("startSession");
@@ -39,18 +35,11 @@ class ActiveDownloadsManager {
       
       _notifyListeners();
       
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Initialized with ${_activeDownloads.length} active downloads");
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Error initializing - $e");
-      }
       rethrow;
     }
   }
   
-  // Handle events from native
   void handleEvent(String type, Map<String, dynamic> torrentData) {
     try {
       final releaseId = torrentData['releaseId'] as String;
@@ -78,13 +67,9 @@ class ActiveDownloadsManager {
       
       _notifyListeners();
     } catch (e) {
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Error handling event $type - $e");
-      }
     }
   }
   
-  // Start a new download
   Future<void> startDownload({
     required String releaseId,
     required String magnetUrl,
@@ -115,7 +100,6 @@ class ActiveDownloadsManager {
         "episode": episode,
       });
       
-      // Create initial active download (will be updated by event)
       final activeDownload = ActiveDownload(
         releaseId: releaseId,
         fileName: fileName,
@@ -130,18 +114,11 @@ class ActiveDownloadsManager {
       _activeDownloads[releaseId] = activeDownload;
       _notifyListeners();
       
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Started download for $releaseId");
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Error starting download - $e");
-      }
       rethrow;
     }
   }
   
-  // Pause download
   Future<void> pauseDownload(String releaseId) async {
     try {
       await _channel.invokeMethod("pauseTorrent", {"releaseId": releaseId});
@@ -154,18 +131,11 @@ class ActiveDownloadsManager {
         _notifyListeners();
       }
       
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Paused download $releaseId");
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Error pausing download - $e");
-      }
       rethrow;
     }
   }
   
-  // Resume download
   Future<void> resumeDownload(String releaseId) async {
     try {
       await _channel.invokeMethod("resumeTorrent", {"releaseId": releaseId});
@@ -177,18 +147,11 @@ class ActiveDownloadsManager {
         _notifyListeners();
       }
       
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Resumed download $releaseId");
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Error resuming download - $e");
-      }
       rethrow;
     }
   }
   
-  // Cancel download
   Future<void> cancelDownload(String releaseId) async {
     try {
       await _channel.invokeMethod("deleteTorrentFile", {"releaseId": releaseId});
@@ -196,18 +159,11 @@ class ActiveDownloadsManager {
       _activeDownloads.remove(releaseId);
       _notifyListeners();
       
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Cancelled download $releaseId");
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Error cancelling download - $e");
-      }
       rethrow;
     }
   }
   
-  // Pause all downloads
   Future<void> pauseAllDownloads() async {
     try {
       await _channel.invokeMethod("pauseAllTorrents");
@@ -220,18 +176,11 @@ class ActiveDownloadsManager {
       }
       _notifyListeners();
       
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Paused all downloads");
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Error pausing all downloads - $e");
-      }
       rethrow;
     }
   }
   
-  // Resume all downloads
   Future<void> resumeAllDownloads() async {
     try {
       await _channel.invokeMethod("resumeAllTorrents");
@@ -243,67 +192,40 @@ class ActiveDownloadsManager {
       }
       _notifyListeners();
       
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Resumed all downloads");
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Error resuming all downloads - $e");
-      }
       rethrow;
     }
   }
   
-  // Set download speed limit
   Future<void> setDownloadSpeedLimit(int limitKbps) async {
     try {
       await _channel.invokeMethod("setDownloadSpeedLimit", {"speedLimit": limitKbps});
       
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Set speed limit to ${limitKbps}KB/s");
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print("ActiveDownloadsManager: Error setting speed limit - $e");
-      }
       rethrow;
     }
   }
   
-  // Get download by release ID
   ActiveDownload? getDownload(String releaseId) {
     return _activeDownloads[releaseId];
   }
   
-  // Check if download exists
   bool hasDownload(String releaseId) {
     return _activeDownloads.containsKey(releaseId);
   }
   
-  // Get downloads by status
   List<ActiveDownload> getDownloadsByStatus(ActiveDownloadStatus status) {
     return _activeDownloads.values.where((download) => download.status == status).toList();
   }
   
-  // Private event handlers
   void _handleAdded(Map<String, dynamic> torrentData) {
     final activeDownload = ActiveDownload.fromMap(torrentData);
     _activeDownloads[activeDownload.releaseId] = activeDownload;
     
-    if (kDebugMode) {
-      print("ActiveDownloadsManager: Added download ${activeDownload.releaseId}");
-    }
   }
   
   void _handleProgressed(Map<String, dynamic> torrentData) {
     final releaseId = torrentData['releaseId'] as String;
-    if (kDebugMode) {
-      print("ActiveDownloadsManager: Handling progress for releaseId: $releaseId");
-      print("  - Raw torrent data: $torrentData");
-      print("  - Old progress: ${_activeDownloads[releaseId]?.progress ?? 'N/A'}");
-      print("  - New progress: ${torrentData['progress']}");
-      print("  - Speed: ${torrentData['speed']}");
-    }
     
     if (_activeDownloads.containsKey(releaseId)) {
       _activeDownloads[releaseId] = _activeDownloads[releaseId]!.copyWith(
@@ -312,20 +234,8 @@ class ActiveDownloadsManager {
         status: ActiveDownloadStatus.downloading,
       );
       
-      if (kDebugMode) {
-        print("  - Updated progress: ${_activeDownloads[releaseId]?.progress}");
-      }
     } else {
-      if (kDebugMode) {
-        print("  - releaseId '$releaseId' not found in active downloads");
-        print("  - Active downloads keys: ${_activeDownloads.keys.toList()}");
-        print("  - Checking for partial matches...");
-        for (String key in _activeDownloads.keys) {
-          if (key.contains(releaseId) || releaseId.contains(key)) {
-            print("  - Potential match: '$key'");
-          }
-        }
-      }
+      // Handle case where download is not found
     }
   }
   
@@ -338,9 +248,6 @@ class ActiveDownloadsManager {
       );
     }
     
-    if (kDebugMode) {
-      print("ActiveDownloadsManager: Paused download $releaseId");
-    }
   }
 
   void _handleResumed(Map<String, dynamic> torrentData) {
@@ -352,36 +259,22 @@ class ActiveDownloadsManager {
       );
     }
     
-    if (kDebugMode) {
-      print("ActiveDownloadsManager: Paused download $releaseId");
-    }
   }
   
   void _handleCompleted(String releaseId) {
     _activeDownloads.remove(releaseId);
     
-    if (kDebugMode) {
-      print("ActiveDownloadsManager: Completed download $releaseId - moved to completed");
-    }
   }
   
   void _handleDeleted(String releaseId) {
     _activeDownloads.remove(releaseId);
     
-    if (kDebugMode) {
-      print("ActiveDownloadsManager: Deleted download $releaseId");
-    }
   }
   
   void _notifyListeners() {
-    if (kDebugMode) {
-      print("ActiveDownloadsManager: Notifying listeners of state change");
-      print("  - Active downloads count: ${_activeDownloads.length}");
-    }
     stateNotifier.value = Map<String, ActiveDownload>.from(_activeDownloads);
   }
   
-  // Cleanup
   void dispose() {
     stateNotifier.dispose();
   }

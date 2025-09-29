@@ -30,29 +30,21 @@ class AnimeItem {
   });
 
   factory AnimeItem.fromJson(Map<String, dynamic> json) {
-    // Parse the releasedDate string to DateTime and convert from UTC to local time
     DateTime parseReleasedDate(String? dateString) {
       if (dateString == null) return DateTime.now().toLocal();
       try {
-        // Parse as UTC and then convert to local time
         return DateTime.parse("${dateString}Z").toUtc().toLocal();
       } catch (e) {
         return DateTime.now().toLocal();
       }
     }
     
-    // Parse bool values that might come as strings
     bool parseBool(dynamic value) {
       if (value is bool) return value;
       if (value is String) return value.toLowerCase() == 'true';
       return false;
     }
     
-    // Debug logging for JSON structure
-    if (kDebugMode) {
-      print('Parsing JSON item: $json');
-      print('Available keys: ${json.keys.toList()}');
-    }
     
     return AnimeItem(
       id: json['releaseId']?.toString() ?? '',
@@ -126,7 +118,6 @@ class AnimeItem {
     return 'AnimeItem(id: $id, title: $title, animeShowId: $animeShowId, downloadUrl: $downloadUrl, episode: $episode, releasedDate: $releasedDate, fileName: $fileName, imageUrl: $imageUrl, tracked: $tracked)';
   }
 
-  /// Formats the releasedDate for display in the user's local time zone
   String formatReleasedDate([String pattern = 'yyyy-MM-dd HH:mm']) {
     try {
       return DateFormat(pattern).format(releasedDate);

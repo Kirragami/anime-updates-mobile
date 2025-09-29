@@ -90,27 +90,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     children: [
                       const SizedBox(height: 40),
 
-                      // App Logo/Title
                       _buildAppHeader(),
 
                       const SizedBox(height: AppConstants.largePadding),
 
-                      // Welcome Text
                       _buildWelcomeText(),
 
                       const SizedBox(height: AppConstants.largePadding),
 
-                      // Registration Form
                       _buildRegistrationForm(),
 
                       const SizedBox(height: AppConstants.largePadding),
 
-                      // Register Button
                       _buildRegisterButton(),
 
                       const SizedBox(height: 16),
 
-                      // Login Link
                       _buildLoginLink(),
 
                       const SizedBox(height: 32),
@@ -141,16 +136,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             );
           },
         ),
-        // const SizedBox(height: 20),
-        // Text(
-        //   'ANIME UPDATES',
-        //   style: TextStyle(
-        //     fontSize: 28,
-        //     fontWeight: FontWeight.w900,
-        //     color: AppTheme.primaryColor,
-        //     letterSpacing: 4,
-        //   ),
-        // ),
       ],
     )
         .animate()
@@ -158,41 +143,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         .slideY(begin: -0.3);
   }
 
-  // Widget _buildAppHeader() {
-  //   return Column(
-  //     children: [
-  //       Container(
-  //         padding: const EdgeInsets.all(20),
-  //         decoration: BoxDecoration(
-  //           gradient: AppTheme.secondaryGradient,
-  //           borderRadius: BorderRadius.circular(25),
-  //           boxShadow: [
-  //             BoxShadow(
-  //               color: AppTheme.secondaryColor.withOpacity(0.4),
-  //               blurRadius: 20,
-  //               offset: const Offset(0, 10),
-  //             ),
-  //           ],
-  //         ),
-  //         child: const Icon(
-  //           Icons.person_add_rounded,
-  //           color: Colors.white,
-  //           size: 50,
-  //         ),
-  //       ),
-  //       const SizedBox(height: 20),
-  //       Text(
-  //         'JOIN US',
-  //         style: TextStyle(
-  //           fontSize: 28,
-  //           fontWeight: FontWeight.w900,
-  //           color: AppTheme.secondaryColor,
-  //           letterSpacing: 4,
-  //         ),
-  //       ),
-  //     ],
-  //   ).animate().fadeIn(duration: AppConstants.mediumAnimation).slideY(begin: -0.3);
-  // }
 
   Widget _buildWelcomeText() {
     return Column(
@@ -226,7 +176,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget _buildRegistrationForm() {
     return Column(
       children: [
-        // Username Field
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
@@ -271,7 +220,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
         const SizedBox(height: 20),
 
-        // Password Field
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
@@ -330,7 +278,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ),
 
-        // No confirm password in simplified flow
       ],
     )
         .animate()

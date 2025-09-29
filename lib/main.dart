@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'screens/landing_screen.dart';
+import 'screens/homepage_screen.dart';
 import 'theme/app_theme.dart';
 import 'constants/app_constants.dart';
 import 'services/auth_service.dart';
@@ -167,7 +167,7 @@ class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: LandingScreen(),
+      home: const HomepageScreen(),
     );
   }
 }
