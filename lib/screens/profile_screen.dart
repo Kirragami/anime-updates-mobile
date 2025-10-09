@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/error_widget.dart' as error_widgets;
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
@@ -597,24 +598,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildErrorContent() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: AppTheme.errorColor,
-            size: 60,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Failed to load profile',
-            style: AppTheme.heading3.copyWith(
-              color: AppTheme.textPrimary,
-            ),
-          ),
-        ],
-      ),
+    return error_widgets.CustomErrorWidget(
+      message: 'Failed to load profile',
+      onRetry: () {
+        ref.invalidate(authProvider);
+      },
+      showRetryButton: true,
     );
   }
 
