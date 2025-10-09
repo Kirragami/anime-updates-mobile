@@ -819,7 +819,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
               vertical: 8,
             ),
             title: Text(
-              episode.title,
+              'Episode ${episode.episode}',
               style: AppTheme.heading3.copyWith(
                 fontSize: 14,
               ),
@@ -829,7 +829,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 4.0),
               child: Text(
-                'Episode ${episode.episode} • ${_formatReleaseDate(episode.releasedDate)}',
+                '${_formatReleaseDate(episode.releasedDate)}',
                 style: AppTheme.body2.copyWith(
                   color: AppTheme.textSecondary,
                   fontSize: 12,
