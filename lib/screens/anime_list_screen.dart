@@ -7,6 +7,7 @@ import '../models/download_state.dart';
 import '../providers/anime_providers.dart';
 import '../widgets/anime_grid_view.dart';
 import '../widgets/loading_widget.dart';
+import '../widgets/error_widget.dart' as error_widgets;
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
@@ -407,51 +408,12 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
   }
 
   Widget _buildErrorWidget(Object error) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppConstants.largePadding),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.errorColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(50),
-              ),
-              child: const Icon(
-                Icons.error_outline_rounded,
-                size: 60,
-                color: AppTheme.errorColor,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Oops! Something went wrong',
-              style: AppTheme.heading3.copyWith(
-                color: AppTheme.textPrimary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error.toString(),
-              style: AppTheme.body2.copyWith(
-                color: AppTheme.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                ref.invalidate(animeListNotifierProvider);
-              },
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try Again'),
-            ),
-          ],
-        ),
-      ),
+    return error_widgets.CustomErrorWidget(
+      message: error.toString(),
+      onRetry: () {
+        ref.invalidate(animeListNotifierProvider);
+      },
+      showRetryButton: true,
     );
   }
 }
