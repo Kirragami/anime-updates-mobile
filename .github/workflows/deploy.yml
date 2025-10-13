@@ -86,7 +86,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -p ${{ secrets.SERVER_PORT }} \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
-              chmod 644 "${{ secrets.SERVER_APK_PATH }}/anime-updates-v${{ env.APP_VERSION }}.apk"
+              chmod 444 "${{ secrets.SERVER_APK_PATH }}/anime-updates-v${{ env.APP_VERSION }}.apk"
               ln -sfn "${{ secrets.SERVER_APK_PATH }}/anime-updates-v${{ env.APP_VERSION }}.apk" \
                       "${{ secrets.SERVER_APK_PATH }}/anime-updates-latest.apk"
           EOF
