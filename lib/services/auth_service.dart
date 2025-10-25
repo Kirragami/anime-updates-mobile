@@ -96,6 +96,26 @@ class AuthService {
           'success': false,
           'message': errorData['message'] ?? 'Login failed',
           'error': errorData['error'] ?? 'Unknown error',
+          'code': response.statusCode,
+        };
+      }
+    } on DioException catch (e) {
+      // Handle Dio-specific errors, including server errors like 401
+      if (e.response != null) {
+        // Server responded with an error status code (4xx, 5xx)
+        final errorData = e.response?.data;
+        return {
+          'success': false,
+          'message': errorData?['message'] ?? 'Login failed',
+          'error': errorData?['error'] ?? 'Server error',
+          'code': e.response?.statusCode,
+        };
+      } else {
+        // Network error or other issue
+        return {
+          'success': false,
+          'message': 'Network error',
+          'error': e.toString(),
         };
       }
     } catch (e) {
@@ -136,6 +156,26 @@ class AuthService {
           'success': false,
           'message': errorData['message'] ?? 'Registration failed',
           'error': errorData['error'] ?? 'Unknown error',
+          'code': response.statusCode,
+        };
+      }
+    } on DioException catch (e) {
+      // Handle Dio-specific errors, including server errors like 4xx, 5xx
+      if (e.response != null) {
+        // Server responded with an error status code (4xx, 5xx)
+        final errorData = e.response?.data;
+        return {
+          'success': false,
+          'message': errorData?['message'] ?? 'Registration failed',
+          'error': errorData?['error'] ?? 'Server error',
+          'code': e.response?.statusCode,
+        };
+      } else {
+        // Network error or other issue
+        return {
+          'success': false,
+          'message': 'Network error',
+          'error': e.toString(),
         };
       }
     } catch (e) {
@@ -246,13 +286,46 @@ class AuthService {
         _refreshToken = null;
         _currentUser = null;
         
+        final errorData = response.data;
         return {
           'success': false,
-          'message': 'Token refresh failed',
-          'error': 'Invalid refresh token',
+          'message': errorData?['message'] ?? 'Token refresh failed',
+          'error': errorData?['error'] ?? 'Invalid refresh token',
+          'code': response.statusCode,
+        };
+      }
+    } on DioException catch (e) {
+      // Handle Dio-specific errors for refresh token
+      if (e.response != null) {
+        // Server responded with an error status code (4xx, 5xx)
+        final errorData = e.response?.data;
+        _accessToken = null;
+        _refreshToken = null;
+        _currentUser = null;
+        
+        return {
+          'success': false,
+          'message': errorData?['message'] ?? 'Token refresh failed',
+          'error': errorData?['error'] ?? 'Server error',
+          'code': e.response?.statusCode,
+        };
+      } else {
+        // Network error or other issue
+        _accessToken = null;
+        _refreshToken = null;
+        _currentUser = null;
+        
+        return {
+          'success': false,
+          'message': 'Network error during refresh',
+          'error': e.toString(),
         };
       }
     } catch (e) {
+      _accessToken = null;
+      _refreshToken = null;
+      _currentUser = null;
+      
       return {
         'success': false,
         'message': 'Network error during refresh',
@@ -281,10 +354,31 @@ class AuthService {
           'user': _currentUser,
         };
       } else {
+        final errorData = response.data;
         return {
           'success': false,
-          'message': 'Failed to get profile',
-          'error': 'Profile fetch failed',
+          'message': errorData?['message'] ?? 'Failed to get profile',
+          'error': errorData?['error'] ?? 'Profile fetch failed',
+          'code': response.statusCode,
+        };
+      }
+    } on DioException catch (e) {
+      // Handle Dio-specific errors, including server errors
+      if (e.response != null) {
+        // Server responded with an error status code (4xx, 5xx)
+        final errorData = e.response?.data;
+        return {
+          'success': false,
+          'message': errorData?['message'] ?? 'Failed to get profile',
+          'error': errorData?['error'] ?? 'Server error',
+          'code': e.response?.statusCode,
+        };
+      } else {
+        // Network error or other issue
+        return {
+          'success': false,
+          'message': 'Network error',
+          'error': e.toString(),
         };
       }
     } catch (e) {
