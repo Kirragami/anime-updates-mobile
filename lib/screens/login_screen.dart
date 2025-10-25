@@ -22,6 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -33,7 +34,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null; 
+    });
 
     try {
       final result = await ref.read(authNotifierProvider).login(
@@ -56,6 +60,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           }
         }
       } else {
+        // Set error message from backend response
+        final message = result['message'] ?? 'Login failed';
+        if (mounted) {
+          setState(() {
+            _errorMessage = message;
+          });
+        }
       }
     } finally {
       if (mounted) {
@@ -278,6 +289,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             },
           ),
         ),
+        
+        if (_errorMessage != null)
+          Container(
+            padding: const EdgeInsets.only(top: 8.0),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
       ],
     )
         .animate()
