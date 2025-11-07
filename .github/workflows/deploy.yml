@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Run build and roll script on server
-        uses: appleboy/ssh-action@0.1.7
+        uses: appleboy/ssh-action@v0.1.7
         with: 
           host: ${{ secrets.EC2_HOST }}
           port: ${{ secrets.EC2_PORT }}
