@@ -1,4 +1,4 @@
-name: APK Deployment
+name: Deploy apk and roll update
 
 on:
   push:
@@ -6,89 +6,16 @@ on:
       - apk-deployment
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Restore Firebase config files
-        run: |
-          mkdir -p lib/config
-          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > android/app/google-services.json
-          echo "${{ secrets.FIREBASE_CONFIG_DART }}" | base64 --decode > lib/config/firebase_config.dart
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: 3.22.2
-
-      - name: Cache Flutter & Gradle
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.pub-cache
-            $HOME/flutter/bin/cache
-            ~/.gradle
-          key: ${{ runner.os }}-flutter-3.22.2-${{ hashFiles('**/pubspec.yaml') }}
-
-      - name: Install Android SDK
-        run: |
-          mkdir -p $HOME/android-sdk/cmdline-tools
-          curl -o commandlinetools.zip https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip commandlinetools.zip -d $HOME/android-sdk/cmdline-tools
-          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
-          export ANDROID_SDK_ROOT=$HOME/android-sdk
-          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;34.0.0"
-
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      - name: Get app version
-        id: version
-        run: |
-          APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
-          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-
-      - name: Setup release keystore and env vars
-        run: |
-          # Decode keystore from GitHub Secret into a temporary file
-          echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 --decode > /tmp/key.jks
-
-          echo "KEYSTORE_PATH=/tmp/key.jks" >> $GITHUB_ENV
-          echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-          echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
-          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
-
-      - name: Build APK
-        run: flutter build apk --release -v
-
-      - name: Install rsync
-        run: sudo apt-get update && sudo apt-get install -y rsync
-
-      - name: Prepare SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-      - name: Upload APK via rsync
-        run: |
-          rsync -avz --progress --partial \
-            -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -p ${{ secrets.SERVER_PORT }}" \
-            build/app/outputs/apk/release/anime-updates*.apk \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{secrets.SERVER_APK_PATH}}
-
-      - name: Set permissions and update latest symlink
-        run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -p ${{ secrets.SERVER_PORT }} \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
-              chmod 444 "${{ secrets.SERVER_APK_PATH }}/anime-updates-v${{ env.APP_VERSION }}.apk"
-              ln -sfn "${{ secrets.SERVER_APK_PATH }}/anime-updates-v${{ env.APP_VERSION }}.apk" \
-                      "${{ secrets.SERVER_APK_PATH }}/anime-updates-latest.apk"
-          EOF
-
+      - name: Run build and roll script on server
+        uses: appleboy/ssh-action@0.1.7
+        with: 
+          host: ${{ secrets.EC2_HOST }}
+          port: ${{ secrets.EC2_PORT }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: bash -lc /home/anime-updates/roll-apk-update.sh
 
