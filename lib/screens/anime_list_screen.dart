@@ -10,8 +10,7 @@ import '../widgets/loading_widget.dart';
 import '../widgets/error_widget.dart' as error_widgets;
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
-import '../utils/page_transitions.dart';
-import 'download_manager_screen.dart';
+
 import '../providers/download_providers.dart';
 
 class AnimeListScreen extends ConsumerStatefulWidget {
@@ -105,16 +104,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onHorizontalDragEnd: (details) {
-        // Detect left swipe with sufficient velocity
-        if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
-          Navigator.of(context).push(
-            CustomPageTransitions.slideFromRight(const DownloadManagerScreen()),
-          );
-        }
-      },
-      child: Scaffold(
+    return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: AppTheme.backgroundGradient,
@@ -144,7 +134,6 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
           ),
         ),
       ),
-    ),
     );
   }
 
