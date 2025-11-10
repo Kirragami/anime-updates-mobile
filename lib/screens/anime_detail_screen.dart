@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:like_button/like_button.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/anime_item.dart';
 import '../models/download_state.dart';
 import '../models/active_download.dart';
@@ -17,12 +18,17 @@ import '../utils/page_transitions.dart';
 import 'download_manager_screen.dart';
 
 class AnimeDetailScreen extends ConsumerStatefulWidget {
-  final AnimeItem anime;
+  final AnimeItem? anime;
+  final String? animeShowId;
+  final String? initialImageUrl;  // For showing image while loading from animeShowId
 
   const AnimeDetailScreen({
     super.key,
-    required this.anime,
-  });
+    this.anime,
+    this.animeShowId,
+    this.initialImageUrl,
+  }) : assert(anime != null || animeShowId != null, 
+          "Either anime or animeShowId must be provided");
 
   @override
   ConsumerState<AnimeDetailScreen> createState() => _AnimeDetailScreenState();
@@ -34,10 +40,22 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  late AnimeItem? _animeItem;
+
+  bool _isLoadingFromShowId = false;
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize the anime item based on what was provided
+    if (widget.anime != null) {
+      _animeItem = widget.anime;
+    } else if (widget.animeShowId != null) {
+      _isLoadingFromShowId = true;
+      // Fetch the first episode of the show to display initially
+      _fetchInitialAnimeItem();
+    }
 
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -67,6 +85,33 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
     _fadeController.forward();
     _slideController.forward();
+  }
+
+  /// Fetch initial anime item when only animeShowId is provided
+  Future<void> _fetchInitialAnimeItem() async {
+    try {
+      final episodes = await ApiService().fetchAnimeShowEpisodes(widget.animeShowId!);
+      if (episodes.isNotEmpty) {
+        setState(() {
+          _animeItem = episodes.first;
+          _isLoadingFromShowId = false;
+        });
+      } else {
+        // Even if no episodes, we're done loading
+        _isLoadingFromShowId = false;
+      }
+    } catch (e) {
+      // Handle error appropriately - could show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load anime details: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+      _isLoadingFromShowId = false;
+    }
   }
 
   @override
@@ -124,6 +169,290 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   @override
   Widget build(BuildContext context) {
     final isLoggedIn = ref.watch(isLoggedInProvider);
+
+    // Show skeleton if we're loading from animeShowId
+    if (_isLoadingFromShowId) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: AppTheme.backgroundGradient,
+          ),
+          child: CustomScrollView(
+            slivers: [
+              // Skeleton App Bar with Shimmer effect
+              SliverAppBar(
+                expandedHeight: 400,
+                floating: false,
+                pinned: true,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                leading: IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Shimmer.fromColors(
+                    baseColor: AppTheme.surfaceColor,
+                    highlightColor: AppTheme.cardColor,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(30),
+                          bottomRight: Radius.circular(30),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(30),
+                            bottomRight: Radius.circular(30),
+                          ),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AppTheme.surfaceColor,
+                              AppTheme.cardColor,
+                            ],
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(30),
+                            bottomRight: Radius.circular(30),
+                          ),
+                          child: Container(
+                            color: AppTheme.surfaceColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Skeleton Content Section with Shimmer
+              SliverToBoxAdapter(
+                child: Shimmer.fromColors(
+                  baseColor: AppTheme.surfaceColor,
+                  highlightColor: AppTheme.cardColor,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Skeleton Title
+                        Container(
+                          width: double.infinity,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 200,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceColor,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Skeleton Episode Info
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceColor.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppTheme.primaryColor.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.play_circle_outline,
+                                  color: AppTheme.surfaceColor,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 100,
+                                      height: 14,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.surfaceColor,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      width: 80,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.surfaceColor,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Skeleton Action Buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceColor,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.primaryColor
+                                          .withOpacity(0.3),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (isLoggedIn) ...[
+                              const SizedBox(width: 16),
+                              Container(
+                                height: 50,
+                                width: 50,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceColor,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.06),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Episodes Section Header Skeleton
+                        Container(
+                          width: 120,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceColor,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Skeleton Episode Items
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: 3,
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) => Container(
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceColor.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.primaryColor.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              title: Container(
+                                width: 100,
+                                height: 14,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceColor,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Container(
+                                  width: 60,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceColor,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ),
+                              trailing: Container(
+                                width: 120,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceColor,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return GestureDetector(
       onHorizontalDragEnd: (details) {
@@ -186,9 +515,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             bottomLeft: Radius.circular(30),
                             bottomRight: Radius.circular(30),
                           ),
-                          child: widget.anime.imageUrl.isNotEmpty
+                          child: _isLoadingFromShowId && widget.initialImageUrl != null && widget.initialImageUrl!.isNotEmpty
+                              // Show initial image if loading from show ID with image URL
                               ? CachedNetworkImage(
-                                  imageUrl: widget.anime.imageUrl,
+                                  imageUrl: widget.initialImageUrl!,
                                   fit: BoxFit.cover,
                                   fadeInDuration: Duration.zero,
                                   placeholderFadeInDuration: Duration.zero,
@@ -205,14 +535,33 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                     ),
                                   ),
                                 )
-                              : Container(
-                                  color: AppTheme.surfaceColor,
-                                  child: const Icon(
-                                    Icons.image_not_supported,
-                                    size: 80,
-                                    color: AppTheme.textSecondary,
-                                  ),
-                                ),
+                              : _animeItem?.imageUrl.isNotEmpty == true
+                                  ? CachedNetworkImage(
+                                      imageUrl: _animeItem!.imageUrl,
+                                      fit: BoxFit.cover,
+                                      fadeInDuration: Duration.zero,
+                                      placeholderFadeInDuration: Duration.zero,
+                                      useOldImageOnUrlChange: true,
+                                      placeholder: (context, url) => Container(
+                                        color: AppTheme.surfaceColor,
+                                      ),
+                                      errorWidget: (context, url, error) => Container(
+                                        color: AppTheme.surfaceColor,
+                                        child: const Icon(
+                                          Icons.image_not_supported,
+                                          size: 80,
+                                          color: AppTheme.textSecondary,
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      color: AppTheme.surfaceColor,
+                                      child: const Icon(
+                                        Icons.image_not_supported,
+                                        size: 80,
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                    ),
                         ),
                       ),
                     // Gradient Overlay
@@ -250,7 +599,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                       children: [
                         // Anime Title
                         Text(
-                          widget.anime.title,
+                          _animeItem?.title ?? '',
                           style: AppTheme.heading1.copyWith(
                             fontSize: 20,
                             height: 1.2,
@@ -291,14 +640,14 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Episode ${widget.anime.episode}',
+                                      'Episode ${_animeItem?.episode ?? ''}',
                                       style: AppTheme.body1.copyWith(
                                         color: AppTheme.primaryColor,
                                       ),
                                     ),
                                     Text(
                                       _formatReleaseDate(
-                                          widget.anime.releasedDate),
+                                          _animeItem?.releasedDate ?? DateTime.now()),
                                       style: AppTheme.body2.copyWith(
                                         color: AppTheme.textSecondary,
                                       ),
@@ -320,7 +669,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                               child: Consumer(
                                 builder: (context, ref, child) {
                                   // Use unified download status used across the app
-                                  final status = ref.watch(downloadStatusProvider(widget.anime.id));
+                                  final status = ref.watch(downloadStatusProvider(_animeItem!.id));
                                   final bool isDownloading = status.isDownloading;
                                   final bool isDownloaded = status.isCompleted;
                                   final double progress = status.progress; // 0..100
@@ -403,7 +752,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                               child: InkWell(
                                                 borderRadius: BorderRadius.circular(16),
                                                 onTap: () async {
-                                                  final success = await ref.read(completedDownloadsProvider.notifier).openFile(widget.anime.id);
+                                                  final success = await ref.read(completedDownloadsProvider.notifier).openFile(_animeItem!.id);
                                                   // File open result - can add handling here if needed
                                                 },
                                                 child: Center(
@@ -465,12 +814,12 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                             child: InkWell(
                                               borderRadius: BorderRadius.circular(16),
                                               onTap: () async {
-                                                final downloadStatus = ref.read(downloadStatusProvider(widget.anime.id));
+                                                final downloadStatus = ref.read(downloadStatusProvider(_animeItem!.id));
                                                 
                                                 if (downloadStatus.isActive) {
-                                                  await ref.read(activeDownloadsProvider.notifier).cancelDownload(widget.anime.id);
+                                                  await ref.read(activeDownloadsProvider.notifier).cancelDownload(_animeItem!.id);
                                                 } else if (downloadStatus.isCompleted) {
-                                                  await ref.read(completedDownloadsProvider.notifier).deleteDownload(widget.anime.id);
+                                                  await ref.read(completedDownloadsProvider.notifier).deleteDownload(_animeItem!.id);
                                                 }
                                                 
                                                 // Download deleted
@@ -508,11 +857,11 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                       child: InkWell(
                                         onTap: () async {
                                           await ref.read(activeDownloadsProvider.notifier).startDownload(
-                                            releaseId: widget.anime.id,
-                                            magnetUrl: widget.anime.downloadUrl,
-                                            fileName: widget.anime.fileName,
-                                            showName: widget.anime.title,
-                                            episode: widget.anime.episode,
+                                            releaseId: _animeItem!.id,
+                                            magnetUrl: _animeItem!.downloadUrl,
+                                            fileName: _animeItem!.fileName,
+                                            showName: _animeItem!.title,
+                                            episode: _animeItem!.episode,
                                           );
                                           // Download started
                                         },
@@ -552,13 +901,13 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                               Consumer(builder: (context, ref, child) {
                                 // Watch the anime list to get the current tracked state
                                 final animeListAsync = ref.watch(animeListNotifierProvider);
-                                bool isTracked = widget.anime.tracked;
+                                bool isTracked = _animeItem!.tracked;
                                 
                                 // Find the current anime item in the list to get updated state
                                 animeListAsync.whenData((animeList) {
                                   final currentAnime = animeList.firstWhere(
-                                    (item) => item.id == widget.anime.id,
-                                    orElse: () => widget.anime,
+                                    (item) => item.id == _animeItem!.id,
+                                    orElse: () => _animeItem!,
                                   );
                                   isTracked = currentAnime.tracked;
                                 });
@@ -609,10 +958,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                     
                                     // IMMEDIATE optimistic update - update anime list provider first
                                     ref.read(animeListNotifierProvider.notifier)
-                                        .updateTrackingForShowId(widget.anime.animeShowId, willBeTracked);
+                                        .updateTrackingForShowId(_animeItem!.animeShowId, willBeTracked);
                                     
                                     // Make API call in background (don't await)
-                                    _makeTrackingApiCall(widget.anime.animeShowId, liked, ref);
+                                    _makeTrackingApiCall(_animeItem!.animeShowId, liked, ref);
                                     
                                     if (!mounted) return liked;
                                     return willBeTracked;
@@ -678,7 +1027,9 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
   Widget _buildEpisodesSection() {
     return FutureBuilder<List<AnimeItem>>(
-      future: ApiService().fetchAnimeShowEpisodes(widget.anime.animeShowId),
+      future: ApiService().fetchAnimeShowEpisodes(
+        widget.animeShowId ?? widget.anime!.animeShowId
+      ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Column(

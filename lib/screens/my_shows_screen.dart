@@ -15,6 +15,7 @@ import '../models/anime_item.dart';
 import '../models/anime_show.dart';
 import '../widgets/anime_show_grid_view.dart';
 import '../providers/download_providers.dart';
+import 'anime_detail_screen.dart';
 
 import 'profile_screen.dart';
 
@@ -344,10 +345,16 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
   }
 
   Future<void> _openAnimeShow(AnimeShow animeShow, WidgetRef ref) async {
-    // Navigate to the specific show's details screen
-    // This would need to be implemented with a new screen or similar to AnimeDetailScreen
-    // For now we'll just return (the card currently doesn't navigate directly to show details)
-    // print('Opening anime show: ${animeShow.title}'); // Removed print statement
+    // Navigate to the anime details screen using the anime show ID and initial image
+    Navigator.of(context).push(
+      CustomPageTransitions.simpleSlide(
+        AnimeDetailScreen(
+          animeShowId: animeShow.id,
+          initialImageUrl: animeShow.imageUrl,
+        ),
+        fromRight: true,
+      ),
+    );
   }
 
   void _navigateToProfile(BuildContext context) {
