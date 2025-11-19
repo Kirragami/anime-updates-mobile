@@ -9,11 +9,14 @@ import '../widgets/error_widget.dart' as error_widgets;
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
-import 'download_manager_screen.dart';
+
 import '../widgets/loading_widget.dart';
 import '../models/anime_item.dart';
+import '../models/anime_show.dart';
+import '../widgets/anime_show_grid_view.dart';
 import '../providers/download_providers.dart';
-import 'homepage_screen.dart';
+import 'anime_detail_screen.dart';
+
 import 'profile_screen.dart';
 
 class MyShowsScreen extends ConsumerStatefulWidget {
@@ -43,15 +46,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
   Widget build(BuildContext context) {
     final userAsync = ref.watch(authProvider);
 
-    return GestureDetector(
-      onHorizontalDragEnd: (details) {
-        if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
-          Navigator.of(context).push(
-            CustomPageTransitions.slideFromRight(const DownloadManagerScreen()),
-          );
-        }
-      },
-      child: Scaffold(
+    return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: AppTheme.backgroundGradient,
@@ -66,8 +61,8 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
               ),
               Expanded(
                 child: userAsync.when(
-                  data: (user) => _buildTrackedReleasesList(),
-                  loading: () => const AnimeGridSkeleton(),
+                  data: (user) => _buildTrackedShowsList(),
+                  loading: () => const AnimeShowGridSkeleton(),
                   error: (error, stack) => _buildErrorWidget(context, error),
                 ),
               ),
@@ -75,7 +70,6 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
           ),
         ),
       ),
-    ),
     );
   }
 
@@ -115,8 +109,8 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
                 ),
                 Text(
                   user != null 
-                      ? 'These are your favorite: ${user.username[0].toUpperCase()}${user.username.substring(1)}-sama'
-                      : 'These are your favorite:',
+                      ? 'These are your favorite, ${user.username[0].toUpperCase()}${user.username.substring(1)}-sama'
+                      : 'These are your favorite',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 12,
@@ -159,15 +153,15 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
     );
   }
 
-  Widget _buildTrackedReleasesList() {
+  Widget _buildTrackedShowsList() {
     return Column(
       children: [
         Expanded(
           child: Consumer(
             builder: (context, ref, child) {
-              final trackedAsync = ref.watch(trackedReleasesNotifierProvider);
-              return trackedAsync.when(
-                data: (items) => SmartRefresher(
+              final trackedShowsAsync = ref.watch(trackedShowsNotifierProvider);
+              return trackedShowsAsync.when(
+                data: (shows) => SmartRefresher(
                   controller: _refreshController,
                   enablePullDown: true,
                   enablePullUp: false,
@@ -175,18 +169,15 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
                     waterDropColor: AppTheme.primaryColor,
                   ),
                   onRefresh: () async {
-                    await ref.read(trackedReleasesNotifierProvider.notifier).refresh();
+                    await ref.read(trackedShowsNotifierProvider.notifier).refresh();
                     _refreshController.refreshCompleted();
                   },
-                  child: AnimeGridView(
-                    animeList: items,
-                    onDownload: (anime) => _downloadAnime(anime, ref),
-                    onDelete: (anime) => _deleteAnime(anime, ref),
-                    onOpen: (anime) => _openAnime(anime, ref),
-                    useTrackedProviders: true,
+                  child: AnimeShowGridView(
+                    animeShowList: shows,
+                    onOpen: (animeShow) => _openAnimeShow(animeShow, ref),
                   ),
                 ),
-                loading: () => const AnimeGridSkeleton(),
+                loading: () => const AnimeShowGridSkeleton(),
                 error: (error, stack) => _buildErrorWidget(context, error),
               );
             },
@@ -342,6 +333,19 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
     } catch (e) {
       // Open failed - error handling can be added here if needed
     }
+  }
+
+  Future<void> _openAnimeShow(AnimeShow animeShow, WidgetRef ref) async {
+    // Navigate to the anime details screen using the anime show ID and initial image
+    Navigator.of(context).push(
+      CustomPageTransitions.simpleSlide(
+        AnimeDetailScreen(
+          animeShowId: animeShow.id,
+          initialImageUrl: animeShow.imageUrl,
+        ),
+        fromRight: true,
+      ),
+    );
   }
 
   void _navigateToProfile(BuildContext context) {

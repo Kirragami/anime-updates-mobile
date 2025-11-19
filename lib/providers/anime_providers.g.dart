@@ -1,9 +1,16 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
 
 part of 'anime_providers.dart';
 
+// **************************************************************************
+// RiverpodGenerator
+// **************************************************************************
 
-String _$animeListNotifierHash() => r'b4a0090e2c4daf9086933e857b234964dbeadb92';
+String _$animeListNotifierHash() => r'97f4b31b98ef643239d5b0eb1651829d3c80912d';
 
+/// Provides the list of anime items
+///
+/// Copied from [AnimeListNotifier].
 @ProviderFor(AnimeListNotifier)
 final animeListNotifierProvider = AutoDisposeAsyncNotifierProvider<
     AnimeListNotifier, List<AnimeItem>>.internal(
@@ -18,8 +25,11 @@ final animeListNotifierProvider = AutoDisposeAsyncNotifierProvider<
 
 typedef _$AnimeListNotifier = AutoDisposeAsyncNotifier<List<AnimeItem>>;
 String _$trackedReleasesNotifierHash() =>
-    r'd49aca223680cf556fadef5080e623f3e8af5b2f';
+    r'1d8ef6a7167d7da2c411aeff05a6cfd3cb82e7f1';
 
+/// Provides the list of tracked releases (authenticated)
+///
+/// Copied from [TrackedReleasesNotifier].
 @ProviderFor(TrackedReleasesNotifier)
 final trackedReleasesNotifierProvider = AutoDisposeAsyncNotifierProvider<
     TrackedReleasesNotifier, List<AnimeItem>>.internal(
@@ -36,6 +46,9 @@ typedef _$TrackedReleasesNotifier = AutoDisposeAsyncNotifier<List<AnimeItem>>;
 String _$trackedListLoadingMoreHash() =>
     r'a195d00d59509815f2a52b82db5fb9ba2bbdd378';
 
+/// Exposes whether the tracked releases list is currently loading the next page
+///
+/// Copied from [TrackedListLoadingMore].
 @ProviderFor(TrackedListLoadingMore)
 final trackedListLoadingMoreProvider =
     AutoDisposeNotifierProvider<TrackedListLoadingMore, bool>.internal(
@@ -51,6 +64,9 @@ final trackedListLoadingMoreProvider =
 typedef _$TrackedListLoadingMore = AutoDisposeNotifier<bool>;
 String _$listLoadingMoreHash() => r'b5003a7fc198dec746598fa597f691186a07cf77';
 
+/// Exposes whether the list is currently loading the next page (for UI skeletons)
+///
+/// Copied from [ListLoadingMore].
 @ProviderFor(ListLoadingMore)
 final listLoadingMoreProvider =
     AutoDisposeNotifierProvider<ListLoadingMore, bool>.internal(
@@ -67,6 +83,9 @@ typedef _$ListLoadingMore = AutoDisposeNotifier<bool>;
 String _$downloadProgressNotifierHash() =>
     r'dd5a40a3e0ae8b33cbc78aba7a76365ee487837d';
 
+/// Provides download progress for a specific anime
+///
+/// Copied from [DownloadProgressNotifier].
 @ProviderFor(DownloadProgressNotifier)
 final downloadProgressNotifierProvider = AutoDisposeNotifierProvider<
     DownloadProgressNotifier, Map<String, double>>.internal(
@@ -83,6 +102,9 @@ typedef _$DownloadProgressNotifier = AutoDisposeNotifier<Map<String, double>>;
 String _$downloadStatesNotifierHash() =>
     r'8f07fe97a351ab30c08619c9f7c4be781d7e86b2';
 
+/// Provides download states for anime items
+///
+/// Copied from [DownloadStatesNotifier].
 @ProviderFor(DownloadStatesNotifier)
 final downloadStatesNotifierProvider = AutoDisposeNotifierProvider<
     DownloadStatesNotifier, Map<String, bool>>.internal(
@@ -96,3 +118,24 @@ final downloadStatesNotifierProvider = AutoDisposeNotifierProvider<
 );
 
 typedef _$DownloadStatesNotifier = AutoDisposeNotifier<Map<String, bool>>;
+String _$trackedShowsNotifierHash() =>
+    r'dc430090b1b64c82b9828456a6144768f5309a35';
+
+/// Provides the list of tracked shows
+///
+/// Copied from [TrackedShowsNotifier].
+@ProviderFor(TrackedShowsNotifier)
+final trackedShowsNotifierProvider = AutoDisposeAsyncNotifierProvider<
+    TrackedShowsNotifier, List<AnimeShow>>.internal(
+  TrackedShowsNotifier.new,
+  name: r'trackedShowsNotifierProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$trackedShowsNotifierHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$TrackedShowsNotifier = AutoDisposeAsyncNotifier<List<AnimeShow>>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

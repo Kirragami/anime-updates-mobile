@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'dart:async';
 import '../models/anime_item.dart';
+import '../models/anime_show.dart';
 import '../services/services.dart';
 
 part 'anime_providers.g.dart';
@@ -325,3 +326,73 @@ class DownloadStatesNotifier extends _$DownloadStatesNotifier {
 }
 
  
+/// Provides the list of tracked shows
+@riverpod
+class TrackedShowsNotifier extends _$TrackedShowsNotifier {
+  // Pagination state
+  int _currentPage = 0; // 1-based page index per backend API
+  static const int _pageSize = 10;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+  final List<AnimeShow> _items = [];
+
+  bool get hasMore => _hasMore;
+  bool get isLoadingMore => _isLoadingMore;
+  int get pageSize => _pageSize;
+
+  @override
+  Future<List<AnimeShow>> build() async {
+    final apiService = ref.read(apiServiceProvider);
+
+    // Reset pagination
+    _items.clear();
+    _currentPage = 0;
+    _hasMore = true;
+    _isLoadingMore = false;
+
+    // Fetch first page
+    final result = await apiService.fetchTrackedShowsPage(page: _currentPage, size: _pageSize);
+    final List<dynamic> rawItems = (result['items'] as List<dynamic>);
+    final List<AnimeShow> pageItems = rawItems.map((json) => AnimeShow.fromJson(json)).toList();
+    _hasMore = !(result['last'] as bool);
+    
+    _items.addAll(pageItems);
+    return List<AnimeShow>.from(_items);
+  }
+
+  /// Refresh the tracked shows list
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+  }
+
+  /// Load next page and append to current state
+  Future<void> loadMore() async {
+    if (!_hasMore || _isLoadingMore) return;
+
+    // Notify UI we started loading more
+    ref.read(trackedListLoadingMoreProvider.notifier).setLoading(true);
+    _isLoadingMore = true;
+    final apiService = ref.read(apiServiceProvider);
+    final nextPage = _currentPage + 1;
+
+    try {
+      final result = await apiService.fetchTrackedShowsPage(page: nextPage, size: _pageSize);
+      final List<dynamic> rawItems = (result['items'] as List<dynamic>);
+      final List<AnimeShow> pageItems = rawItems.map((json) => AnimeShow.fromJson(json)).toList();
+      final bool last = result['last'] as bool;
+
+      _items.addAll(pageItems);
+      _currentPage = nextPage;
+      _hasMore = !last && pageItems.isNotEmpty;
+
+      // Publish new combined list
+      state = AsyncData<List<AnimeShow>>(List<AnimeShow>.from(_items));
+    } catch (e, st) {
+      // Keep previous data, but surface error
+      state = AsyncError<List<AnimeShow>>(e, st);
+    } finally {
+      _isLoadingMore = false;
+      ref.read(trackedListLoadingMoreProvider.notifier).setLoading(false);
+    }
+  }
+}

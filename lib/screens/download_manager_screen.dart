@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../providers/download_providers.dart';
 import '../models/active_download.dart';
-import '../utils/page_transitions.dart';
-import 'downloaded_episodes_screen.dart';
+
 
 class DownloadManagerScreen extends ConsumerStatefulWidget {
   const DownloadManagerScreen({super.key});
@@ -17,15 +16,7 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onHorizontalDragEnd: (details) {
-        if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
-          Navigator.of(context).push(
-            CustomPageTransitions.slideFromRight(const DownloadedEpisodesScreen()),
-          );
-        }
-      },
-      child: Scaffold(
+    return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: AppTheme.backgroundGradient,
@@ -41,7 +32,6 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen> {
           ),
         ),
       ),
-    ),
     );
   }
 
