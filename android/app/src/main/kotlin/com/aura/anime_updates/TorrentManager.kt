@@ -1,6 +1,8 @@
 package com.aura.anime_updates
 
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.frostwire.jlibtorrent.*
@@ -76,6 +78,7 @@ class TorrentManager private constructor(private val context: Context) {
     }
 
     fun addTorrent(releaseId: String, magnetUrl: String, savePath: String, fileName: String, showName: String, episode: String) {
+        startForegroundService()
         newTorrents.add(releaseId)
         sessionManager?.download(magnetUrl, File(savePath), torrent_flags_t())
         val mt = ManagedTorrent(releaseId, fileName, showName, episode, "", 0.0, 0, "downloading")
@@ -157,6 +160,16 @@ class TorrentManager private constructor(private val context: Context) {
 
     fun getProgress(releaseId: String): Double {
         return managedTorrents[releaseId]?.progress ?: 0.0
+    }
+
+    private fun startForegroundService() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val intent = Intent(context, TorrentForegroundService::class.java)
+            context.startForegroundService(intent)
+        } else {
+            val intent = Intent(context, TorrentForegroundService::class.java)
+            context.startService(intent)
+        }
     }
 
 

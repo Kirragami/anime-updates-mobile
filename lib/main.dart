@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/homepage_screen.dart';
+import 'screens/download_manager_screen.dart';
 import 'theme/app_theme.dart';
 import 'constants/app_constants.dart';
 import 'services/auth_service.dart';
@@ -85,6 +87,37 @@ class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> {
   void initState() {
     super.initState();
     _initFCM();
+    _initNavigationChannel();
+  }
+
+  Future<void> _initNavigationChannel() async {
+    const navigationChannel = MethodChannel('com.aura.anime_updates/navigation');
+    
+    navigationChannel.setMethodCallHandler((MethodCall call) async {
+      if (call.method == 'navigateToDownloadManager') {
+        // Navigate to download manager screen when notification is tapped
+        if (_navigatorKey.currentContext != null) {
+          _navigateToDownloadManager();
+        }
+      }
+    });
+  }
+
+  void _navigateToDownloadManager() {
+    // Navigate to download manager screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_navigatorKey.currentContext != null) {
+        // Check if we're not already on the download manager screen
+        var currentRoute = ModalRoute.of(_navigatorKey.currentContext!);
+        if (currentRoute?.settings.name != '/download-manager') {
+          Navigator.of(_navigatorKey.currentContext!).push(
+            MaterialPageRoute(
+              builder: (context) => const DownloadManagerScreen(),
+            ),
+          );
+        }
+      }
+    });
   }
 
   Future<void> _initFCM() async {

@@ -102,6 +102,25 @@ class MainActivity : FlutterActivity() {
                 }
             })
 
+        // Navigation method channel for handling notification clicks
+        val NAVIGATION_CHANNEL = "com.aura.anime_updates/navigation"
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NAVIGATION_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "navigateToDownloadManager" -> {
+                    // Send a message that can be listened to by the Flutter side
+                    // The actual navigation will be handled in the Flutter side
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // Handle notification click - if the intent has the download manager action
+        if (intent?.action == "DOWNLOAD_MANAGER") {
+            // Send message to Flutter to navigate to download manager
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NAVIGATION_CHANNEL)
+                .invokeMethod("navigateToDownloadManager", null)
+        }
     }
 
     override fun onStop() {
