@@ -5,17 +5,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:like_button/like_button.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/anime_item.dart';
-import '../models/download_state.dart';
-import '../models/active_download.dart';
 import '../providers/auth_provider.dart';
 import '../providers/anime_providers.dart';
 import '../services/api_service.dart';
 import '../services/tracking_service.dart';
 import '../providers/download_providers.dart';
 import '../theme/app_theme.dart';
-import '../widgets/animated_heart_button.dart';
-import '../utils/page_transitions.dart';
-import 'download_manager_screen.dart';
 
 class AnimeDetailScreen extends ConsumerStatefulWidget {
   final AnimeItem? anime;
@@ -454,15 +449,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
       );
     }
 
-    return GestureDetector(
-      onHorizontalDragEnd: (details) {
-        if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
-          Navigator.of(context).push(
-            CustomPageTransitions.slideFromRight(const DownloadManagerScreen()),
-          );
-        }
-      },
-      child: Scaffold(
+    return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: AppTheme.backgroundGradient,
@@ -985,7 +972,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
           ],
         ),
       ),
-    ),
     );
   }
 
