@@ -102,6 +102,7 @@ class TorrentManager private constructor(private val context: Context) {
                 val handle = sessionManager.find(Sha1Hash(mt?.sha1))
                 val deleteFilesFlag = remove_flags_t.from_int(1)
                 handle?.let { sessionManager.remove(it, deleteFilesFlag) }
+                managedTorrents.remove(releaseId)
                 saveManagedTorrents()
                 return
             }
