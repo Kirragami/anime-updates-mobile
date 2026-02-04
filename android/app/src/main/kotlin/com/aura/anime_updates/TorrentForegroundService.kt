@@ -45,7 +45,7 @@ class TorrentForegroundService : Service() {
                 override fun run() {
                     updateNotification()
                 }
-            }, 0, 2000) // Update every 2 seconds
+            }, 0, 2000)
         }
 
         return START_STICKY
@@ -62,7 +62,7 @@ class TorrentForegroundService : Service() {
                 enableLights(true)
                 lightColor = Color.BLUE
                 enableVibration(false)
-                setSound(null, null) // No sound
+                setSound(null, null)
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -81,7 +81,7 @@ class TorrentForegroundService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Torrent Downloads")
             .setContentText("Initializing...")
-            .setSmallIcon(R.drawable.ic_download_notification) // You'll need to add this icon
+            .setSmallIcon(R.drawable.ic_download_notification)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
@@ -94,15 +94,15 @@ class TorrentForegroundService : Service() {
                     it.status != "completed" && it.status != "deleted" 
                 }
                 
-                // Check for completed torrents separately
+         
                 val activeTorrents = allTorrents.filter { it.status == "downloading" }
                 val pausedTorrents = allTorrents.filter { it.status == "paused" }
                 val completedTorrents = torrentManager.getManagedTorrents().filter { it.status == "completed" }
                 
                 if (activeTorrents.isEmpty() && pausedTorrents.isEmpty()) {
-                    // No active or paused downloads - handle based on completed status
+                 
                     if (completedTorrents.isNotEmpty()) {
-                        // If we have completed torrents, show a completion notification briefly
+                    
                         val intent = Intent(this@TorrentForegroundService, MainActivity::class.java).apply {
                             action = "DOWNLOAD_MANAGER"
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -122,19 +122,19 @@ class TorrentForegroundService : Service() {
                         
                         notificationManager.notify(NOTIFICATION_ID, notification)
                         
-                        // Stop service after a delay to let user see completion notification
+              
                         Handler(Looper.getMainLooper()).postDelayed({
-                            notificationManager.cancel(NOTIFICATION_ID) // Remove the notification
+                            notificationManager.cancel(NOTIFICATION_ID) 
                             stopSelf()
-                        }, 5000) // Stop after 5 seconds
+                        }, 5000) 
                     } else {
-                        // No downloads at all, stop the service immediately
+                    
                         stopSelf()
                     }
                     return@launch
                 }
 
-                // Calculate overall progress
+            
                 val totalProgress = if (allTorrents.isNotEmpty()) {
                     allTorrents.sumOf { it.progress } / allTorrents.size
                 } else 0.0
@@ -163,7 +163,7 @@ class TorrentForegroundService : Service() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
 
-                // Create expanded text showing individual torrents
+          
                 val expandedText = StringBuilder()
                 allTorrents.forEach { torrent ->
                     expandedText.append("${torrent.showName} - E${torrent.episode}: ${String.format("%.1f", torrent.progress)}%\n")
@@ -172,7 +172,7 @@ class TorrentForegroundService : Service() {
 
                 val notification = NotificationCompat.Builder(this@TorrentForegroundService, CHANNEL_ID)
                     .setContentTitle(title)
-                    .setContentText(text)
+                    .setContentText(text) 
                     .setSmallIcon(R.drawable.ic_download_notification)
                     .setContentIntent(pendingIntent)
                     .setOngoing(true)
@@ -183,7 +183,7 @@ class TorrentForegroundService : Service() {
 
                 notificationManager.notify(NOTIFICATION_ID, notification)
             } catch (e: Exception) {
-                // Handle any errors updating the notification
+             
                 e.printStackTrace()
             }
         }

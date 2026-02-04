@@ -27,6 +27,8 @@ class ActiveDownloadsNotifier extends StateNotifier<Map<String, ActiveDownload>>
     required String fileName,
     required String showName,
     required String episode,
+    String? animeShowId,
+    String? imageUrl,
   }) async {
     await _manager.startDownload(
       releaseId: releaseId,
@@ -34,6 +36,8 @@ class ActiveDownloadsNotifier extends StateNotifier<Map<String, ActiveDownload>>
       fileName: fileName,
       showName: showName,
       episode: episode,
+      animeShowId: animeShowId,
+      imageUrl: imageUrl,
     );
   }
   
@@ -110,6 +114,14 @@ class CompletedDownloadsNotifier extends StateNotifier<Map<String, CompletedDown
   
   List<CompletedDownload> getAllDownloadsSorted() {
     return _manager.getAllDownloadsSorted();
+  }
+  
+  Future<String?> getAnimeImagePath(String animeShowId) async {
+    return await _manager.getAnimeImagePath(animeShowId);
+  }
+  
+  Map<String, List<CompletedDownload>> getDownloadsGroupedByShowId() {
+    return _manager.getDownloadsGroupedByShowId();
   }
   
   @override

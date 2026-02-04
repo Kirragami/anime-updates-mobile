@@ -31,7 +31,9 @@ class MainActivity : FlutterActivity() {
                     val fileName = call.argument<String>("fileName")!!
                     val showName = call.argument<String>("showName")!!
                     val episode = call.argument<String>("episode")!!
-                    torrentManager.addTorrent(releaseId, magnetUrl, savePath, fileName, showName, episode)
+                    val animeShowId = call.argument<String>("animeShowId") ?: ""
+                    val imageUrl = call.argument<String>("imageUrl") ?: ""
+                    torrentManager.addTorrent(releaseId, magnetUrl, savePath, fileName, showName, episode, animeShowId, imageUrl)
                     result.success(null)
                 }
                 "pauseTorrent" -> {
@@ -84,6 +86,16 @@ class MainActivity : FlutterActivity() {
                         result.error("GET_ERROR", "Failed to get managed torrents", e.message)
                     }
                 }
+                
+                "getAnimeImagePath" -> {
+                    try {
+                        val animeShowId = call.argument<String>("animeShowId") ?: ""
+                        val imagePath = torrentManager.getAnimeImagePath(animeShowId)
+                        result.success(imagePath)
+                    } catch (e: Exception) {
+                        result.error("GET_IMAGE_ERROR", "Failed to get anime image path", e.message)
+                    }
+                }
 
                 else -> result.notImplemented()
             }
@@ -102,22 +114,20 @@ class MainActivity : FlutterActivity() {
                 }
             })
 
-        // Navigation method channel for handling notification clicks
+      
         val NAVIGATION_CHANNEL = "com.aura.anime_updates/navigation"
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NAVIGATION_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "navigateToDownloadManager" -> {
-                    // Send a message that can be listened to by the Flutter side
-                    // The actual navigation will be handled in the Flutter side
                     result.success(null)
                 }
                 else -> result.notImplemented()
             }
         }
 
-        // Handle notification click - if the intent has the download manager action
+
         if (intent?.action == "DOWNLOAD_MANAGER") {
-            // Send message to Flutter to navigate to download manager
+           
             MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NAVIGATION_CHANNEL)
                 .invokeMethod("navigateToDownloadManager", null)
         }

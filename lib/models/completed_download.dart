@@ -3,12 +3,14 @@ class CompletedDownload {
   final String fileName;
   final String showName;
   final String episode;
+  final String? animeShowId;
 
   const CompletedDownload({
     required this.releaseId,
     required this.fileName,
     required this.showName,
     required this.episode,
+    this.animeShowId,
   });
 
   CompletedDownload copyWith({
@@ -16,12 +18,14 @@ class CompletedDownload {
     String? fileName,
     String? showName,
     String? episode,
+    String? animeShowId,
   }) {
     return CompletedDownload(
       releaseId: releaseId ?? this.releaseId,
       fileName: fileName ?? this.fileName,
       showName: showName ?? this.showName,
       episode: episode ?? this.episode,
+      animeShowId: animeShowId ?? this.animeShowId,
     );
   }
 
@@ -31,6 +35,7 @@ class CompletedDownload {
       fileName: map['fileName'] as String,
       showName: map['showName'] as String,
       episode: map['episode'] as String,
+      animeShowId: map['animeShowId'] as String?,
     );
   }
 
@@ -40,6 +45,7 @@ class CompletedDownload {
       'fileName': fileName,
       'showName': showName,
       'episode': episode,
+      'animeShowId': animeShowId,
     };
   }
 
@@ -50,7 +56,8 @@ class CompletedDownload {
         other.releaseId == releaseId &&
         other.fileName == fileName &&
         other.showName == showName &&
-        other.episode == episode;
+        other.episode == episode &&
+        other.animeShowId == animeShowId;
   }
 
   @override
@@ -60,11 +67,12 @@ class CompletedDownload {
       fileName,
       showName,
       episode,
+      animeShowId,
     );
   }
 
   @override
   String toString() {
-    return 'CompletedDownload(releaseId: $releaseId, fileName: $fileName, showName: $showName, episode: $episode)';
+    return 'CompletedDownload(releaseId: $releaseId, fileName: $fileName, showName: $showName, episode: $episode, animeShowId: $animeShowId)';
   }
 }

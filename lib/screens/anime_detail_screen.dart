@@ -15,7 +15,7 @@ import '../theme/app_theme.dart';
 class AnimeDetailScreen extends ConsumerStatefulWidget {
   final AnimeItem? anime;
   final String? animeShowId;
-  final String? initialImageUrl;  // For showing image while loading from animeShowId
+  final String? initialImageUrl;
 
   const AnimeDetailScreen({
     super.key,
@@ -43,12 +43,12 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   void initState() {
     super.initState();
 
-    // Initialize the anime item based on what was provided
+  
     if (widget.anime != null) {
       _animeItem = widget.anime;
     } else if (widget.animeShowId != null) {
       _isLoadingFromShowId = true;
-      // Fetch the first episode of the show to display initially
+
       _fetchInitialAnimeItem();
     }
 
@@ -82,7 +82,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     _slideController.forward();
   }
 
-  /// Fetch initial anime item when only animeShowId is provided
+  
   Future<void> _fetchInitialAnimeItem() async {
     try {
       final episodes = await ApiService().fetchAnimeShowEpisodes(widget.animeShowId!);
@@ -92,11 +92,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
           _isLoadingFromShowId = false;
         });
       } else {
-        // Even if no episodes, we're done loading
+        
         _isLoadingFromShowId = false;
       }
     } catch (e) {
-      // Handle error appropriately - could show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -116,28 +115,27 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     super.dispose();
   }
 
-  /// Make tracking API call in background
   void _makeTrackingApiCall(String animeShowId, bool wasTracked, WidgetRef ref) async {
     try {
       final trackingService = TrackingService();
       Map<String, dynamic> result;
       
       if (wasTracked) {
-        // Was tracked, now untracking
+      
         result = await trackingService.untrackAnime(animeShowId);
       } else {
-        // Was not tracked, now tracking
+        
         result = await trackingService.trackAnime(animeShowId);
       }
       
       if (!result['success']) {
-        // Rollback on failure - revert the optimistic update
+        
         ref.read(animeListNotifierProvider.notifier)
             .updateTrackingForShowId(animeShowId, wasTracked);
       }
       
     } catch (e) {
-      // Rollback on exception - revert the optimistic update
+      
       ref.read(animeListNotifierProvider.notifier)
           .updateTrackingForShowId(animeShowId, wasTracked);
     }
@@ -165,7 +163,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   Widget build(BuildContext context) {
     final isLoggedIn = ref.watch(isLoggedInProvider);
 
-    // Show skeleton if we're loading from animeShowId
     if (_isLoadingFromShowId) {
       return Scaffold(
         body: Container(
@@ -174,7 +171,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
           ),
           child: CustomScrollView(
             slivers: [
-              // Skeleton App Bar with Shimmer effect
               SliverAppBar(
                 expandedHeight: 400,
                 floating: false,
@@ -244,7 +240,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                 ),
               ),
               
-              // Skeleton Content Section with Shimmer
               SliverToBoxAdapter(
                 child: Shimmer.fromColors(
                   baseColor: AppTheme.surfaceColor,
@@ -254,7 +249,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Skeleton Title
                         Container(
                           width: double.infinity,
                           height: 24,
@@ -275,7 +269,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
                         const SizedBox(height: 16),
 
-                        // Skeleton Episode Info
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
@@ -331,7 +324,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
                         const SizedBox(height: 16),
 
-                        // Skeleton Action Buttons
                         Row(
                           children: [
                             Expanded(
@@ -377,7 +369,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
                         const SizedBox(height: 32),
 
-                        // Episodes Section Header Skeleton
                         Container(
                           width: 120,
                           height: 20,
@@ -388,7 +379,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                         ),
                         const SizedBox(height: 16),
                         
-                        // Skeleton Episode Items
                         ListView.separated(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -456,7 +446,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
         ),
         child: CustomScrollView(
           slivers: [
-            // Custom App Bar with Hero Animation
+    
             SliverAppBar(
               expandedHeight: 400,
               floating: false,
@@ -482,7 +472,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                 background: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Anime Image (no Hero)
+      
                     Container(
                         decoration: BoxDecoration(
                           borderRadius: const BorderRadius.only(
@@ -503,7 +493,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             bottomRight: Radius.circular(30),
                           ),
                           child: _isLoadingFromShowId && widget.initialImageUrl != null && widget.initialImageUrl!.isNotEmpty
-                              // Show initial image if loading from show ID with image URL
+                         
                               ? CachedNetworkImage(
                                   imageUrl: widget.initialImageUrl!,
                                   fit: BoxFit.cover,
@@ -551,7 +541,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                     ),
                         ),
                       ),
-                    // Gradient Overlay
+         
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: const BorderRadius.only(
@@ -573,7 +563,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
               ),
             ),
 
-            // Content Section
+        
             SliverToBoxAdapter(
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -584,7 +574,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Anime Title
+                     
                         Text(
                           _animeItem?.title ?? '',
                           style: AppTheme.heading1.copyWith(
@@ -596,7 +586,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
                         const SizedBox(height: 16),
 
-                        // Episode and Release Info
+
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
@@ -648,18 +638,17 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
                         const SizedBox(height: 16),
 
-                        // Action Buttons
+                      
                         Row(
                           children: [
-                            // Download Button
+                            
                             Expanded(
                               child: Consumer(
                                 builder: (context, ref, child) {
-                                  // Use unified download status used across the app
                                   final status = ref.watch(downloadStatusProvider(_animeItem!.id));
                                   final bool isDownloading = status.isDownloading;
                                   final bool isDownloaded = status.isCompleted;
-                                  final double progress = status.progress; // 0..100
+                                  final double progress = status.progress; 
 
                                   if (isDownloading) {
                                     return Container(
@@ -678,9 +667,9 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                         child: Stack(
                                           fit: StackFit.expand,
                                           children: [
-                                            // Progress bar background
+                                         
                                             Container(color: AppTheme.surfaceColor),
-                                            // Progress bar fill
+                                           
                                             FractionallySizedBox(
                                               alignment: Alignment.centerLeft,
                                               widthFactor: (progress / 100).clamp(0.0, 1.0),
@@ -690,7 +679,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                                 ),
                                               ),
                                             ),
-                                            // Percentage text
+                                        
                                             Center(
                                               child: Text(
                                                 '${progress.toInt()}%',
@@ -740,7 +729,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                                 borderRadius: BorderRadius.circular(16),
                                                 onTap: () async {
                                                   final success = await ref.read(completedDownloadsProvider.notifier).openFile(_animeItem!.id);
-                                                  // File open result - can add handling here if needed
+                                              
                                                 },
                                                 child: Center(
                                                   child: Row(
@@ -809,7 +798,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                                   await ref.read(completedDownloadsProvider.notifier).deleteDownload(_animeItem!.id);
                                                 }
                                                 
-                                                // Download deleted
                                               },
                                               child: Center(
                                                 child: Icon(
@@ -849,8 +837,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                             fileName: _animeItem!.fileName,
                                             showName: _animeItem!.title,
                                             episode: _animeItem!.episode,
+                                            animeShowId: _animeItem!.animeShowId,
+                                            imageUrl: _animeItem!.imageUrl,
                                           );
-                                          // Download started
+
                                         },
                                         borderRadius: BorderRadius.circular(16),
                                         child: const Center(
@@ -884,13 +874,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
                             if (isLoggedIn) ...[
                               const SizedBox(width: 16),
-                              // Track Button (LikeButton)
                               Consumer(builder: (context, ref, child) {
-                                // Watch the anime list to get the current tracked state
                                 final animeListAsync = ref.watch(animeListNotifierProvider);
                                 bool isTracked = _animeItem!.tracked;
                                 
-                                // Find the current anime item in the list to get updated state
                                 animeListAsync.whenData((animeList) {
                                   final currentAnime = animeList.firstWhere(
                                     (item) => item.id == _animeItem!.id,
@@ -943,11 +930,9 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                   onTap: (bool liked) async {
                                     final willBeTracked = !liked;
                                     
-                                    // IMMEDIATE optimistic update - update anime list provider first
                                     ref.read(animeListNotifierProvider.notifier)
                                         .updateTrackingForShowId(_animeItem!.animeShowId, willBeTracked);
                                     
-                                    // Make API call in background (don't await)
                                     _makeTrackingApiCall(_animeItem!.animeShowId, liked, ref);
                                     
                                     if (!mounted) return liked;
@@ -961,7 +946,6 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
                         const SizedBox(height: 32),
 
-                        // Episodes Section
                         _buildEpisodesSection(),
                       ],
                     ),
@@ -1180,7 +1164,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                   ? Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        // Progress indicator
+                    
                         SizedBox(
                           width: 32,
                           height: 32,
@@ -1207,7 +1191,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Pause/Resume button
+                  
                         Container(
                           width: 28,
                           height: 28,
@@ -1235,14 +1219,14 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                   await ref.read(activeDownloadsProvider.notifier).resumeDownload(episode.id);
                                 }
                               } catch (e) {
-                                // Error handling download pause/resume
+                             
                               }
                             },
                             padding: EdgeInsets.zero,
                           ),
                         ),
                         const SizedBox(width: 6),
-                        // Delete button
+                       
                         Container(
                           width: 28,
                           height: 28,
@@ -1270,9 +1254,9 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                 } else if (downloadStatus.isCompleted) {
                                   await ref.read(completedDownloadsProvider.notifier).deleteDownload(episode.id);
                                 }
-                                // Download deleted
+                          
                               } catch (e) {
-                                // Error deleting download
+                          
                               }
                             },
                             padding: EdgeInsets.zero,
@@ -1296,10 +1280,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                               try {
                                 final success = await ref.read(completedDownloadsProvider.notifier).openFile(episode.id);
                                 if (!success) {
-                                  // Failed to open file
+                              
                                 }
                               } catch (e) {
-                                // Error opening file
+                             
                               }
                             },
                             padding: EdgeInsets.zero,
@@ -1324,9 +1308,11 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                   fileName: episode.fileName,
                                   showName: episode.title,
                                   episode: episode.episode,
+                                  animeShowId: episode.animeShowId,
+                                  imageUrl: episode.imageUrl,
                                 );
                               } catch (e) {
-                                // Download failed
+                          
                               }
                             },
                             padding: EdgeInsets.zero,

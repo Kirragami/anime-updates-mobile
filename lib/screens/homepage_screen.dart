@@ -46,14 +46,14 @@ class HomepageScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              // Top right buttons (Settings and Download)
+             
               Positioned(
                 top: 16,
                 right: 16,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Downloaded episodes shortcut (small icon) - visible when there is at least one completed download
+            
                     Consumer(
                       builder: (context, ref, child) {
                         final completedDownloads = ref.watch(completedDownloadsProvider);
@@ -78,7 +78,7 @@ class HomepageScreen extends ConsumerWidget {
                       },
                     ),
                     const SizedBox(width: 8),
-                    // Download button with badge
+                
                     Consumer(
                       builder: (context, ref, child) {
                         final activeDownloads = ref.watch(activeDownloadsProvider);
@@ -131,7 +131,7 @@ class HomepageScreen extends ConsumerWidget {
                       },
                     ),
                     const SizedBox(width: 8),
-                    // Settings button
+               
                     IconButton(
                       icon: const Icon(
                         Icons.settings_rounded,
@@ -157,11 +157,10 @@ class HomepageScreen extends ConsumerWidget {
     );
   }
 
-    Widget _buildAppTitle() {
-    return Column(
+  Widget _buildAppTitle() {
+    return const Column(
       children: [
-        // Animated title - "Anime" on first line
-        const Text(
+        Text(
           'Anime',
           style: TextStyle(
             height: 0.9,
@@ -170,22 +169,9 @@ class HomepageScreen extends ConsumerWidget {
             color: AppTheme.primaryColor,
             letterSpacing: 2,
           ),
-        ).animate(onPlay: (c) => c.repeat()).shimmer(
-          duration: AppConstants.longAnimation,
-          colors: const [
-            AppTheme.primaryColor,
-            AppTheme.secondaryColor,
-            AppTheme.accentColor,
-          ],
-        ).scale(
-          begin: const Offset(0.98, 0.98),
-          end: const Offset(1.0, 1.0),
-          duration: AppConstants.longAnimation,
-          curve: Curves.easeOut,
         ),
-        const SizedBox(height: 8),
-        // "Updates" on second line
-        const Text(
+        SizedBox(height: 8),
+        Text(
           'Updates',
           style: TextStyle(
             height: 0.9,
@@ -194,26 +180,9 @@ class HomepageScreen extends ConsumerWidget {
             color: AppTheme.primaryColor,
             letterSpacing: 2,
           ),
-        ).animate(onPlay: (c) => c.repeat()).shimmer(
-          duration: AppConstants.longAnimation,
-          colors: const [
-            AppTheme.primaryColor,
-            AppTheme.secondaryColor,
-            AppTheme.accentColor,
-          ],
-        ).scale(
-          begin: const Offset(0.98, 0.98),
-          end: const Offset(1.0, 1.0),
-          duration: AppConstants.longAnimation,
-          curve: Curves.easeOut,
         ),
       ],
-    )
-        .animate()
-        .fadeIn(
-          duration: AppConstants.mediumAnimation,
-        )
-        .slideY(begin: -0.5);
+    );
   }
 
   Widget _buildAnimatedGif() {
@@ -266,7 +235,7 @@ class HomepageScreen extends ConsumerWidget {
           
           return Column(
             children: [
-              // First row: New Releases and My Shows
+     
               Row(
                 children: [
                   _buildNewReleasesButton(context),
@@ -277,7 +246,7 @@ class HomepageScreen extends ConsumerWidget {
             ],
           );
         } else {
-          // Show only 2 buttons when no completed downloads
+        
           return Row(
             children: [
               _buildNewReleasesButton(context),
@@ -414,7 +383,7 @@ class HomepageScreen extends ConsumerWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
             onTap: () {
-              // Check if user is logged in
+          
               final isLoggedIn = AuthService.isLoggedIn;
               if (isLoggedIn) {
                 Navigator.of(context).push(
