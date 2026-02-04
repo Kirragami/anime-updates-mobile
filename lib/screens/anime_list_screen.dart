@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 
 import '../providers/download_providers.dart';
+import 'video_player_screen.dart';
 
 class AnimeListScreen extends ConsumerStatefulWidget {
   const AnimeListScreen({super.key});
@@ -385,9 +386,17 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
         },
         onOpen: (anime) async {
           try {
-            final success = await ref.read(completedDownloadsProvider.notifier).openFile(anime.id);
-            
-         
+            final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(anime.id);
+            if (filePath != null && context.mounted) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => VideoPlayerScreen(
+                    filePath: filePath,
+                    title: '${anime.title} - Episode ${anime.episode}',
+                  ),
+                ),
+              );
+            }
           } catch (e) {
          
           }

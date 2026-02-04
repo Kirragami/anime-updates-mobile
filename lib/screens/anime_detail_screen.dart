@@ -11,6 +11,7 @@ import '../services/api_service.dart';
 import '../services/tracking_service.dart';
 import '../providers/download_providers.dart';
 import '../theme/app_theme.dart';
+import 'video_player_screen.dart';
 
 class AnimeDetailScreen extends ConsumerStatefulWidget {
   final AnimeItem? anime;
@@ -728,8 +729,17 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                               child: InkWell(
                                                 borderRadius: BorderRadius.circular(16),
                                                 onTap: () async {
-                                                  final success = await ref.read(completedDownloadsProvider.notifier).openFile(_animeItem!.id);
-                                              
+                                                  final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(_animeItem!.id);
+                                                  if (filePath != null && context.mounted) {
+                                                    Navigator.of(context).push(
+                                                      MaterialPageRoute(
+                                                        builder: (context) => VideoPlayerScreen(
+                                                          filePath: filePath,
+                                                          title: '${_animeItem!.title} - Episode ${_animeItem!.episode}',
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
                                                 },
                                                 child: Center(
                                                   child: Row(
@@ -1278,9 +1288,16 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             ),
                             onPressed: () async {
                               try {
-                                final success = await ref.read(completedDownloadsProvider.notifier).openFile(episode.id);
-                                if (!success) {
-                              
+                                final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(episode.id);
+                                if (filePath != null && context.mounted) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => VideoPlayerScreen(
+                                        filePath: filePath,
+                                        title: '${episode.title} - Episode ${episode.episode}',
+                                      ),
+                                    ),
+                                  );
                                 }
                               } catch (e) {
                              
