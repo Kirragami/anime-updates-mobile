@@ -16,6 +16,7 @@ import '../models/anime_show.dart';
 import '../widgets/anime_show_grid_view.dart';
 import '../providers/download_providers.dart';
 import 'anime_detail_screen.dart';
+import 'video_player_screen.dart';
 
 import 'profile_screen.dart';
 
@@ -330,8 +331,17 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
 
   Future<void> _openAnime(AnimeItem anime, WidgetRef ref) async {
     try {
-      final success = await ref.read(completedDownloadsProvider.notifier).openFile(anime.id);
-   
+      final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(anime.id);
+      if (filePath != null && context.mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => VideoPlayerScreen(
+              filePath: filePath,
+              title: '${anime.title} - Episode ${anime.episode}',
+            ),
+          ),
+        );
+      }
     } catch (e) {
     
     }

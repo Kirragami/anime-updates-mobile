@@ -70,6 +70,9 @@ dependencies:
   # File Operations
   open_file: ^3.3.2
   change_app_package_name: ^1.5.0
+  
+  # Video Player
+  flutter_vlc_player: ^7.4.2
   firebase_core: ^4.0.0
   firebase_messaging: ^16.0.0
   device_info_plus: ^10.1.0

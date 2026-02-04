@@ -8,6 +8,8 @@ import '../providers/download_providers.dart';
 import '../models/completed_download.dart';
 import '../services/completed_downloads_manager.dart';
 import '../constants/app_constants.dart';
+import '../utils/page_transitions.dart';
+import 'video_player_screen.dart';
 
 class DownloadedEpisodesScreen extends ConsumerStatefulWidget {
   const DownloadedEpisodesScreen({super.key});
@@ -150,12 +152,12 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
             const Expanded(
               child: Text(
                 "Downloaded Episodes",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
             ),
             const SizedBox(width: 12),
           ],
@@ -273,8 +275,8 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                         size: 18,
                       ),
                     ),
-                  ),
-                ),
+            ),
+          ),
         ],
       ),
     );
@@ -376,10 +378,10 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
           InkWell(
             onTap: onToggle,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
               child: Row(
-                children: [
+          children: [
              
                   FutureBuilder<String?>(
                     future: imagePathFuture,
@@ -407,40 +409,40 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                   ),
                   const SizedBox(width: 16),
               
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                           showName,
-                          style: const TextStyle(
-                            color: Colors.white,
+                        style: const TextStyle(
+                          color: Colors.white,
                             fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                         const SizedBox(height: 8),
-                        Text(
+                      Text(
                           '${episodes.length} ${episodes.length == 1 ? 'episode' : 'episodes'}',
-                          style: TextStyle(
-                            color: AppTheme.primaryColor,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        style: TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                ),
                
                   Icon(
                     isExpanded ? Icons.expand_less : Icons.expand_more,
                     color: Colors.white,
                     size: 24,
                   ),
-                ],
-              ),
+              ],
+            ),
             ),
           ),
        
@@ -486,27 +488,37 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
           ),
           const SizedBox(width: 8),
           _buildActionButton(
-            icon: Icons.play_arrow_rounded,
+                    icon: Icons.play_arrow_rounded,
             label: 'Play',
-            color: AppTheme.primaryColor,
-            onTap: () async {
-              final success = await ref.read(completedDownloadsProvider.notifier).openFile(episode.releaseId);
-            },
-          ),
-          const SizedBox(width: 8),
-          _buildActionButton(
-            icon: Icons.delete_rounded,
-            label: 'Delete',
-            color: AppTheme.errorColor,
-            onTap: () async {
-              final confirmed = await _showDeleteConfirmation(episode.showName, episode.episode);
-              if (confirmed && context.mounted) {
-                await ref.read(completedDownloadsProvider.notifier).deleteDownload(episode.releaseId);
+                    color: AppTheme.primaryColor,
+                    onTap: () async {
+              final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(episode.releaseId);
+              if (filePath != null && context.mounted) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => VideoPlayerScreen(
+                      filePath: filePath,
+                      title: '${episode.showName} - Episode ${episode.episode}',
+                  ),
+                  ),
+                );
               }
             },
-          ),
-        ],
-      ),
+                ),
+          const SizedBox(width: 8),
+                _buildActionButton(
+                  icon: Icons.delete_rounded,
+                  label: 'Delete',
+                  color: AppTheme.errorColor,
+                  onTap: () async {
+              final confirmed = await _showDeleteConfirmation(episode.showName, episode.episode);
+                    if (confirmed && context.mounted) {
+                await ref.read(completedDownloadsProvider.notifier).deleteDownload(episode.releaseId);
+                    }
+                  },
+                ),
+              ],
+            ),
     );
   }
 
