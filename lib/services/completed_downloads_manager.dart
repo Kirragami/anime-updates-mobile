@@ -210,6 +210,30 @@ class CompletedDownloadsManager {
     return downloads;
   }
   
+  Future<String?> getAnimeImagePath(String animeShowId) async {
+    try {
+      if (animeShowId.isEmpty) return null;
+      final String? imagePath = await _channel.invokeMethod("getAnimeImagePath", {
+        "animeShowId": animeShowId,
+      });
+      return imagePath;
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  Map<String, List<CompletedDownload>> getDownloadsGroupedByShowId() {
+    final Map<String, List<CompletedDownload>> grouped = {};
+    for (final download in _completedDownloads.values) {
+      final showId = download.animeShowId ?? download.showName;
+      if (!grouped.containsKey(showId)) {
+        grouped[showId] = [];
+      }
+      grouped[showId]!.add(download);
+    }
+    return grouped;
+  }
+  
   
   void _handleCompleted(Map<String, dynamic> torrentData) {
     final completedDownload = CompletedDownload.fromMap(torrentData);

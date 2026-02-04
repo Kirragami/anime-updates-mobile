@@ -78,7 +78,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Back button without background - matching anime list style
+         
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: const SizedBox(
@@ -94,7 +94,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
             ),
           ),
           const SizedBox(width: 20),
-          // Title section
+          
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,7 +120,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
               ],
             ),
           ),
-          // Profile button instead of logout
+     
           GestureDetector(
             onTap: () => _navigateToProfile(context),
             child: Container(
@@ -243,7 +243,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
     ).animate().fadeIn(duration: AppConstants.mediumAnimation).slideY(begin: 0.3);
   }
 
-  // Old placeholder content removed in favor of the real list
+
 
   Widget _buildStatCard(String title, String count, IconData icon, Color color) {
     return Container(
@@ -306,9 +306,11 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
         fileName: anime.fileName,
         showName: anime.title,
         episode: anime.episode,
+        animeShowId: anime.animeShowId,
+        imageUrl: anime.imageUrl,
       );
     } catch (e) {
-      // Download failed - error handling can be added here if needed
+   
     }
   }
 
@@ -322,21 +324,21 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
         await ref.read(completedDownloadsProvider.notifier).deleteDownload(anime.id);
       }
     } catch (e) {
-      // Delete failed - error handling can be added here if needed
+  
     }
   }
 
   Future<void> _openAnime(AnimeItem anime, WidgetRef ref) async {
     try {
       final success = await ref.read(completedDownloadsProvider.notifier).openFile(anime.id);
-      // File open result - can add handling here if needed
+   
     } catch (e) {
-      // Open failed - error handling can be added here if needed
+    
     }
   }
 
   Future<void> _openAnimeShow(AnimeShow animeShow, WidgetRef ref) async {
-    // Navigate to the anime details screen using the anime show ID and initial image
+ 
     Navigator.of(context).push(
       CustomPageTransitions.simpleSlide(
         AnimeDetailScreen(

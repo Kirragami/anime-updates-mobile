@@ -27,7 +27,6 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
   final GlobalKey<SmartRefresherState> _refreshKey =
       GlobalKey<SmartRefresherState>();
 
-  // Search focus state
   bool _isSearchFocused = false;
   final FocusNode _searchFocusNode = FocusNode();
 
@@ -46,11 +45,11 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
   void initState() {
     super.initState();
 
-    // Initialize controllers
+  
     _refreshController = RefreshController(initialRefresh: false);
     _searchController = TextEditingController();
 
-    //change placeholder every 2 seconds;
+   
     _placeholderTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (!_isSearchFocused) {
         setState(() {
@@ -77,7 +76,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
       if (!_isSearchFocused) {
         _searchController.clear();
         FocusScope.of(context).unfocus();
-        // Clear search and return to normal browsing mode
+  
         ref.read(animeListNotifierProvider.notifier).clearSearch();
       } else {
         _searchFocusNode.requestFocus();
@@ -86,14 +85,14 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
   }
 
   void _onSearchChanged(String query) {
-    // Cancel previous timer
+
     _debounceTimer?.cancel();
 
-    // Very fast debounce for more responsive search
+ 
     _debounceTimer = Timer(const Duration(milliseconds: 100), () {
       if (query == _searchController.text) {
         if (query.isEmpty) {
-          // Clear search when query is empty
+       
           ref.read(animeListNotifierProvider.notifier).clearSearch();
         } else {
           ref.read(animeListNotifierProvider.notifier).searchAnime(query);
@@ -140,11 +139,10 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
   Widget _buildModernHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
-      // Remove background decoration to make it transparent
+
       child: Row(
         children: [
-          // Back button and optional title
-          // Title is removed when searching so the search bar shifts left
+
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: const SizedBox(
@@ -170,10 +168,10 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
               ),
             ),
           ],
-          // Margin between title (when visible) and search input
+     
           const SizedBox(width: 12),
 
-          // Search bar
+         
           Expanded(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
@@ -224,7 +222,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
                       ),
                       const SizedBox(width: 8),
 
-                      // Search input or placeholder
+               
                       Expanded(
                         child: _isSearchFocused
                             ? TextField(
@@ -252,7 +250,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
                             : _buildRollingPlaceholder(),
                       ),
 
-                      // Close button when searching
+             
                       if (_isSearchFocused) ...[
                         GestureDetector(
                           onTap: _toggleSearch,
@@ -279,7 +277,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
     );
   }
 
-  // Rolling wheel-like animated placeholder when search is not focused
+
   Widget _buildRollingPlaceholder() {
     return ClipRect(
       child: AnimatedSwitcher(
@@ -304,10 +302,10 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
           );
 
           final Animation<Offset> slide = isIncoming
-              // New text comes from bottom to center
+     
               ? Tween<Offset>(begin: const Offset(0, 1.2), end: Offset.zero)
                   .animate(curved)
-              // Old text moves from center to top
+           
               : Tween<Offset>(begin: Offset.zero, end: const Offset(0, -1.2))
                   .animate(curved);
 
@@ -339,7 +337,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
 
   Widget _buildAnimeList(List<AnimeItem> animeList) {
     return SmartRefresher(
-      key: _refreshKey, // Preserve state
+      key: _refreshKey, 
       controller: _refreshController,
       enablePullDown: true,
       enablePullUp: false,
@@ -360,36 +358,38 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
               fileName: anime.fileName,
               showName: anime.title,
               episode: anime.episode,
+              animeShowId: anime.animeShowId,
+              imageUrl: anime.imageUrl,
             );
           } catch (e) {
-            // Download failed - error handling can be added here if needed
+          
           }
         },
         onDelete: (anime) async {
           try {
             final downloadStatus = ref.read(downloadStatusProvider(anime.id));
             
-            // Check if it's an active download
+    
             if (downloadStatus.isActive) {
               await ref.read(activeDownloadsProvider.notifier).cancelDownload(anime.id);
-              // Download cancelled
+          
             }
-            // Check if it's a completed download
+       
             else if (downloadStatus.isCompleted) {
               await ref.read(completedDownloadsProvider.notifier).deleteDownload(anime.id);
-              // Download deleted
+         
             }
           } catch (e) {
-            // Error deleting download - error handling can be added here if needed
+          
           }
         },
         onOpen: (anime) async {
           try {
             final success = await ref.read(completedDownloadsProvider.notifier).openFile(anime.id);
             
-            // File open result - can add handling here if needed
+         
           } catch (e) {
-            // Error opening file - error handling can be added here if needed
+         
           }
         },
       ),

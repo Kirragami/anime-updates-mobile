@@ -76,6 +76,8 @@ class ActiveDownloadsManager {
     required String fileName,
     required String showName,
     required String episode,
+    String? animeShowId,
+    String? imageUrl,
   }) async {
     try {
       Directory? directory;
@@ -98,6 +100,8 @@ class ActiveDownloadsManager {
         "fileName": fileName,
         "showName": showName,
         "episode": episode,
+        "animeShowId": animeShowId ?? "",
+        "imageUrl": imageUrl ?? "",
       });
       
       final activeDownload = ActiveDownload(

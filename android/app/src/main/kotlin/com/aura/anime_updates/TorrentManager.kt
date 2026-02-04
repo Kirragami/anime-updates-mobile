@@ -19,6 +19,10 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import io.flutter.plugin.common.EventChannel
+import java.net.URL
+import java.net.HttpURLConnection
+import java.io.BufferedInputStream
+import java.io.FileOutputStream
 
 
 class TorrentManager private constructor(private val context: Context) {
@@ -42,6 +46,7 @@ class TorrentManager private constructor(private val context: Context) {
     private val managedTorrentsSaveFile = File(context.filesDir, "managedTorrents.json")
     private val completedTorrentsFile = File(context.filesDir, "completedTorrents.json")
     private val torrentFileLocation = File(context.getExternalFilesDir(null), "TorrentFileDownloads")
+    private val animeImagesDir = File(context.getExternalFilesDir(null), "AnimeImages")
     private var isSessionStarted = false
     private val newTorrents = mutableSetOf<String>()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -50,6 +55,9 @@ class TorrentManager private constructor(private val context: Context) {
     init {
         setupListener()
         loadManagedTorrentsSaveFile()
+        if (!animeImagesDir.exists()) {
+            animeImagesDir.mkdirs()
+        }
     }
 
     fun startSession() {
@@ -77,13 +85,65 @@ class TorrentManager private constructor(private val context: Context) {
         isSessionStarted = true
     }
 
-    fun addTorrent(releaseId: String, magnetUrl: String, savePath: String, fileName: String, showName: String, episode: String) {
+    fun addTorrent(releaseId: String, magnetUrl: String, savePath: String, fileName: String, showName: String, episode: String, animeShowId: String, imageUrl: String) {
         startForegroundService()
         newTorrents.add(releaseId)
         sessionManager?.download(magnetUrl, File(savePath), torrent_flags_t())
-        val mt = ManagedTorrent(releaseId, fileName, showName, episode, "", 0.0, 0, "downloading")
+        val mt = ManagedTorrent(releaseId, fileName, showName, episode, "", 0.0, 0, "downloading", animeShowId)
         managedTorrents[releaseId] = mt
         emitManagedTorrentEvent("added", mt)
+        
+  
+        if (animeShowId.isNotEmpty() && imageUrl.isNotEmpty()) {
+            downloadAnimeImage(animeShowId, imageUrl)
+        }
+    }
+    
+    private fun downloadAnimeImage(animeShowId: String, imageUrl: String) {
+        Thread {
+            try {
+                val imageFile = File(animeImagesDir, "$animeShowId.jpg")
+                
+            
+                if (imageFile.exists()) {
+                    Log.d("TorrentManager", "Image already exists for animeShowId: $animeShowId")
+                    return@Thread
+                }
+                
+        
+                val url = URL(imageUrl)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                connection.connect()
+                
+                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                    val inputStream = BufferedInputStream(connection.inputStream)
+                    val outputStream = FileOutputStream(imageFile)
+                    
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        outputStream.write(buffer, 0, bytesRead)
+                    }
+                    
+                    outputStream.close()
+                    inputStream.close()
+                    connection.disconnect()
+                    
+                    Log.d("TorrentManager", "Successfully downloaded image for animeShowId: $animeShowId")
+                } else {
+                    Log.e("TorrentManager", "Failed to download image. Response code: ${connection.responseCode}")
+                }
+            } catch (e: Exception) {
+                Log.e("TorrentManager", "Error downloading anime image: ${e.message}", e)
+            }
+        }.start()
+    }
+    
+    fun getAnimeImagePath(animeShowId: String): String? {
+        val imageFile = File(animeImagesDir, "$animeShowId.jpg")
+        return if (imageFile.exists()) imageFile.absolutePath else null
     }
 
     fun pauseTorrent(releaseId: String) {
@@ -191,7 +251,7 @@ class TorrentManager private constructor(private val context: Context) {
                             newTorrents.remove(mt?.releaseId)
                         }
                         mt?.sha1 = handle.infoHash().toHex()
-                        // emitManagedTorrentEvent("added", mt)
+                      
                     }
 
                     AlertType.BLOCK_FINISHED -> {
@@ -237,7 +297,7 @@ class TorrentManager private constructor(private val context: Context) {
                         emitManagedTorrentEvent("completed", mt)
                         managedTorrents?.remove(mt?.releaseId)
                         saveManagedTorrents()
-                        saveCompletedTorrent(mt?.releaseId, mt?.fileName, mt?.showName, mt?.episode)
+                        saveCompletedTorrent(mt?.releaseId, mt?.fileName, mt?.showName, mt?.episode, mt?.animeShowId)
                     }
 
                     AlertType.TORRENT_DELETED -> {
@@ -315,7 +375,7 @@ class TorrentManager private constructor(private val context: Context) {
         return managedTorrents.values
     }
 
-    fun saveCompletedTorrent(releaseId: String?, fileName: String?, showName: String?, episode:String?) {
+    fun saveCompletedTorrent(releaseId: String?, fileName: String?, showName: String?, episode:String?, animeShowId: String?) {
         try {
             
             val currentList: MutableList<CompletedTorrent> = if (completedTorrentsFile.exists()) {
@@ -323,7 +383,7 @@ class TorrentManager private constructor(private val context: Context) {
             } else {
                 mutableListOf()
             }
-            currentList.add(CompletedTorrent(releaseId, fileName, showName, episode))
+            currentList.add(CompletedTorrent(releaseId, fileName, showName, episode, animeShowId))
             completedTorrentsFile.writeText(Json.encodeToString(currentList))
         } catch (e: Exception) {
             println("Error saving completed torrent: $e")
@@ -361,7 +421,8 @@ data class ManagedTorrent (
     var sha1: String,
     var progress: Double,
     var speed: Int,
-    var status: String
+    var status: String,
+    val animeShowId: String = ""
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "releaseId" to releaseId,
@@ -371,7 +432,8 @@ data class ManagedTorrent (
         "sha1" to sha1,
         "progress" to progress,
         "speed" to speed,
-        "status" to status
+        "status" to status,
+        "animeShowId" to animeShowId
     )
 }
 
@@ -380,12 +442,14 @@ data class CompletedTorrent (
     val releaseId: String?,
     val fileName: String?,
     val showName: String?,
-    val episode: String?
+    val episode: String?,
+    val animeShowId: String? = null
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "releaseId" to releaseId,
         "fileName" to fileName,
         "showName" to showName,
-        "episode" to episode
+        "episode" to episode,
+        "animeShowId" to animeShowId
     )
 }
