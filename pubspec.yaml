@@ -73,6 +73,7 @@ dependencies:
   
   # Video Player
   flutter_vlc_player: ^7.4.2
+  screen_brightness: ^0.2.2+1
   firebase_core: ^4.0.0
   firebase_messaging: ^16.0.0
   device_info_plus: ^10.1.0
