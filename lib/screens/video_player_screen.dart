@@ -54,8 +54,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void initState() {
     super.initState();
 
- 
-    _originalOrientations = [DeviceOrientation.portraitUp];
+    
+    _captureOriginalOrientations();
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
@@ -86,6 +86,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     } catch (e) {
       _brightness = 1.0;
     }
+  }
+
+  void _captureOriginalOrientations() async {
+    
+    
+    _originalOrientations = [
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ];
   }
 
   void _initializePlayer() {
@@ -450,6 +461,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
       ]);
     }
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
