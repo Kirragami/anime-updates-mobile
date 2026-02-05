@@ -365,6 +365,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   
     int amount = 10 + (_consecutiveSeekCount - 1) * 5;
     return amount < 10 ? 10 : (amount > 30 ? 30 : amount);
+  }
 
   void _showSeekIndicator(String text) {
     setState(() {
@@ -372,10 +373,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _seekIndicatorText = text;
     });
 
-  
+    
     _seekIndicatorTimer?.cancel();
 
-
+    
     _seekIndicatorTimer = Timer(const Duration(milliseconds: 1000), () {
       if (mounted) {
         setState(() {
@@ -402,7 +403,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
     _setVolume(_volume);
 
-
+   
     Future.delayed(const Duration(milliseconds: 1000), () {
       if (mounted) {
         setState(() {
@@ -431,7 +432,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _seekIndicatorTimer?.cancel(); 
     _videoPlayerController?.dispose();
 
-  
+   
     SystemChrome.setSystemUIChangeCallback(null);
 
    
@@ -442,11 +443,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       print('[VideoPlayerScreen] Error resetting brightness: $e');
     }
 
-
+  
     if (_originalOrientations != null) {
       SystemChrome.setPreferredOrientations(_originalOrientations!);
     } else {
-  
+      
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
       ]);
@@ -518,7 +519,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         ),
                 ),
 
-              
+               
                 Positioned(
                   left: 0,
                   top: 0,
@@ -531,7 +532,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-          
+               
                 Positioned(
                   right: 0,
                   top: 0,
@@ -544,7 +545,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-            
+           
                 if (_isBrightnessControlVisible)
                   Positioned(
                     left: 0,
@@ -554,7 +555,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     child: _buildBrightnessControl(),
                   ),
 
-         
+             
                 if (_isVolumeControlVisible)
                   Positioned(
                     right: 0,
@@ -564,7 +565,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     child: _buildVolumeControl(),
                   ),
 
-      
+           
                 if (_isSeekIndicatorVisible)
                   Center(
                     child: Container(
@@ -854,7 +855,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           ),
           child: Stack(
             children: [
-            
+              
               Container(
                 width: 4,
                 height: 150,
@@ -863,7 +864,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            
+              
               Positioned(
                 bottom: 0,
                 left: 0,
@@ -896,7 +897,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           ),
           child: Stack(
             children: [
-         
+              
               Container(
                 width: 4,
                 height: 150,
@@ -905,7 +906,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-      
+              
               Positioned(
                 bottom: 0,
                 left: 0,
