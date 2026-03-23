@@ -245,6 +245,7 @@ class TorrentManager private constructor(private val context: Context) {
                         val handle = addAlert.handle()
                         handle.unsetFlags(TorrentFlags.AUTO_MANAGED)
                         handle.pause()
+                        // we can't just assume that handle name will always be equal with file name - this shit needs fixing ASAP
                         val mt = managedTorrents.values.find { it.fileName == handle.name() }
                         if (newTorrents.contains(mt?.releaseId)) {
                             handle.resume()
