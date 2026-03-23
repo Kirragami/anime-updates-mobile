@@ -89,15 +89,16 @@ class TorrentManager private constructor(private val context: Context) {
         startForegroundService()
         newTorrents.add(releaseId)
         sessionManager?.download(magnetUrl, File(savePath), torrent_flags_t())
-        val mt = ManagedTorrent(releaseId, fileName, showName, episode, "", 0.0, 0, "downloading", animeShowId)
+        
+        val mt = ManagedTorrent(releaseId, fileName, showName, episode, TorrentUtils.getSha1FromMagnet(magnetUrl)?.toHex() ?: "", 0.0, 0, "downloading", animeShowId)
         managedTorrents[releaseId] = mt
         emitManagedTorrentEvent("added", mt)
-        
   
         if (animeShowId.isNotEmpty() && imageUrl.isNotEmpty()) {
             downloadAnimeImage(animeShowId, imageUrl)
         }
     }
+    
     
     private fun downloadAnimeImage(animeShowId: String, imageUrl: String) {
         Thread {
@@ -241,23 +242,23 @@ class TorrentManager private constructor(private val context: Context) {
                 when (alert.type()) {
 
                     AlertType.ADD_TORRENT -> {
+                        Log.d("TorrentManager", "Add Event triggered")
                         val addAlert = alert as AddTorrentAlert
                         val handle = addAlert.handle()
                         handle.unsetFlags(TorrentFlags.AUTO_MANAGED)
                         handle.pause()
-                        val mt = managedTorrents.values.find { it.fileName == handle.name() }
+
+                        val mt = managedTorrents.values.find { it.sha1 == handle.infoHash().toHex() }
                         if (newTorrents.contains(mt?.releaseId)) {
                             handle.resume()
                             newTorrents.remove(mt?.releaseId)
                         }
-                        mt?.sha1 = handle.infoHash().toHex()
-                      
                     }
 
                     AlertType.BLOCK_FINISHED -> {
                         val blockAlert = alert as BlockFinishedAlert
                         val handle = blockAlert.handle()
-                        val mt = managedTorrents.values.find { it.fileName == handle.name() }
+                        val mt = managedTorrents.values.find { it.sha1 == handle.infoHash().toHex() }
                         mt?.status = "downloading"
                         mt?.progress = handle.status().progress() * 100.toDouble()
                         mt?.speed = handle.status().downloadRate()
@@ -273,7 +274,7 @@ class TorrentManager private constructor(private val context: Context) {
                     AlertType.TORRENT_PAUSED -> {
                         val pauseAlert = alert as TorrentPausedAlert
                         val handle = pauseAlert.handle()
-                        val mt = managedTorrents.values.find { it.fileName == handle.name() }
+                        val mt = managedTorrents.values.find { it.sha1 == handle.infoHash().toHex() }
                         mt?.speed = 0
                         mt?.status = "paused"
                         emitManagedTorrentEvent("paused", mt)
@@ -282,7 +283,7 @@ class TorrentManager private constructor(private val context: Context) {
                     AlertType.TORRENT_RESUMED -> {
                         val resumeAlert = alert as TorrentResumedAlert
                         val handle = resumeAlert.handle()
-                        val mt = managedTorrents.values.find { it.fileName == handle.name() }
+                        val mt = managedTorrents.values.find { it.sha1 == handle.infoHash().toHex() }
                         mt?.status = "downloading"
                         emitManagedTorrentEvent("resumed", mt)
                     }
@@ -290,7 +291,7 @@ class TorrentManager private constructor(private val context: Context) {
                     AlertType.TORRENT_FINISHED -> {
                         val finishedAlert = alert as TorrentFinishedAlert
                         val handle = finishedAlert.handle()
-                        val mt = managedTorrents.values.find { it.fileName == handle.name() }
+                        val mt = managedTorrents.values.find { it.sha1 == handle.infoHash().toHex() }
                         mt?.progress = 100.0
                         mt?.status = "completed"
                         sessionManager.remove(handle)
@@ -316,7 +317,7 @@ class TorrentManager private constructor(private val context: Context) {
                         val saveAlert = alert as SaveResumeDataAlert
                         val handle = saveAlert.handle()
                         val params = saveAlert.params()
-                        val releaseId = managedTorrents.values.find { it.fileName == handle.name() }?.releaseId
+                        val releaseId = managedTorrents.values.find { it.sha1 == handle.infoHash().toHex() }?.releaseId
                         if (releaseId != null) {
                             persistResumeData(releaseId, AddTorrentParams.writeResumeData(params).bencode())
                         }

@@ -174,15 +174,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Member since 2025',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
               ],
             ),
           ),
@@ -225,13 +216,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 20),
-        _buildSettingsGroup(
-          'Download Settings',
-          [
-            _buildDownloadSpeedItem(),
-          ],
-        ),
+        // const SizedBox(height: 20),
+        // _buildSettingsGroup(
+        //   'Download Settings',
+        //   [
+        //     _buildDownloadSpeedItem(),
+        //   ],
+        // ),
         const SizedBox(height: 20),
         _buildSettingsGroup(
           'App Updates',
