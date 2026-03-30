@@ -5,15 +5,20 @@ import 'package:screen_brightness/screen_brightness.dart';
 import 'dart:async';
 import 'dart:io';
 import '../theme/app_theme.dart';
+import '../models/completed_download.dart';
+import '../services/completed_downloads_manager.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String filePath;
   final String? title;
+  
+  final String? currentReleaseId;
 
   const VideoPlayerScreen({
     super.key,
     required this.filePath,
     this.title,
+    this.currentReleaseId,
   });
 
   @override
@@ -29,33 +34,134 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   Timer? _controlsTimer;
+  Timer? _positionTimer;  
   double _volume = 100.0;
   double _brightness = 1.0;
-  
- 
+
   bool _isVolumeControlVisible = false;
   bool _isBrightnessControlVisible = false;
-  bool _isGestureActive = false; 
+  bool _isGestureActive = false;
   double _gestureStartY = 0.0;
   double _initialVolume = 100.0;
   double _initialBrightness = 1.0;
 
- 
   bool _isSeekIndicatorVisible = false;
   String _seekIndicatorText = '';
   DateTime? _lastSeekTime;
   int _consecutiveSeekCount = 0;
   Timer? _seekIndicatorTimer;
 
-
   List<DeviceOrientation>? _originalOrientations;
+
+  late String _activeFilePath;
+  late String? _activeTitle;
+  late String? _activeReleaseId;
+
+  CompletedDownload? _prevEpisode;
+  CompletedDownload? _nextEpisode;
+  bool _autoAdvancedCalled = false;
+
+  static int? _extractEpisodeNumber(String episode) {
+    final cleaned = episode
+        .toLowerCase()
+        .replaceAll('episode', '')
+        .replaceAll('ep', '')
+        .trim();
+    final match = RegExp(r'\d+').firstMatch(cleaned);
+    if (match != null) return int.tryParse(match.group(0)!);
+    return null;
+  }
+
+  void _resolveAdjacentEpisodes() {
+    final currentId = _activeReleaseId;
+    if (currentId == null) return;
+
+    final manager = CompletedDownloadsManager();
+    final all = manager.completedDownloads.values.toList();
+
+    CompletedDownload? current;
+    try {
+      current = all.firstWhere((e) => e.releaseId == currentId);
+    } catch (_) {
+      return;
+    }
+
+    final showKey = current.animeShowId ?? current.showName;
+    final siblings = all.where((e) {
+      final key = e.animeShowId ?? e.showName;
+      return key == showKey;
+    }).toList();
+
+    final currentNum = _extractEpisodeNumber(current.episode);
+    if (currentNum == null) return;
+
+    final numbered = siblings
+        .map((e) => MapEntry(_extractEpisodeNumber(e.episode), e))
+        .where((e) => e.key != null)
+        .toList()
+      ..sort((a, b) => a.key!.compareTo(b.key!));
+
+    CompletedDownload? prev;
+    CompletedDownload? next;
+    for (final entry in numbered) {
+      if (entry.key! < currentNum) prev = entry.value;
+      if (entry.key! > currentNum && next == null) next = entry.value;
+    }
+
+    if (mounted) {
+      setState(() {
+        _prevEpisode = prev;
+        _nextEpisode = next;
+      });
+    }
+  }
+
+  Future<void> _switchToEpisode(CompletedDownload episode) async {
+    final manager = CompletedDownloadsManager();
+    final filePath = await manager.getFilePath(episode.releaseId);
+    if (filePath == null || !mounted) return;
+
+    _positionTimer?.cancel();
+    _positionTimer = null;
+
+    final old = _videoPlayerController;
+    setState(() {
+      _videoPlayerController = null;
+      _isInitialized = false;
+      _position = Duration.zero;
+      _duration = Duration.zero;
+      _isPlaying = false;
+      _autoAdvancedCalled = false;
+    });
+
+    try { await old?.stop(); }    catch (_) {}
+    try { await old?.dispose(); } catch (_) {}
+
+    if (!mounted) return;
+
+    setState(() {
+      _activeFilePath = filePath;
+      _activeTitle = '${episode.showName} - Episode ${episode.episode}';
+      _activeReleaseId = episode.releaseId;
+    });
+
+    _resolveAdjacentEpisodes();
+
+    _initializePlayer();
+  }
+  // ─────────────────────────────────────────────────────────────────
+
 
   @override
   void initState() {
     super.initState();
 
-    
+    _activeFilePath = widget.filePath;
+    _activeTitle = widget.title;
+    _activeReleaseId = widget.currentReleaseId;
+
     _captureOriginalOrientations();
+    _resolveAdjacentEpisodes();
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
@@ -63,10 +169,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       DeviceOrientation.landscapeRight,
     ]);
 
- 
     SystemChrome.setSystemUIChangeCallback((bool isSystemOverlaysVisible) async {
       if (isSystemOverlaysVisible && mounted) {
-      
         await Future.delayed(const Duration(milliseconds: 500));
         if (mounted) {
           SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -74,7 +178,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       }
     });
 
- 
     _getInitialBrightness();
     _initializePlayer();
   }
@@ -102,7 +205,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void _initializePlayer() {
     try {
 
-      final file = File(widget.filePath);
+      final file = File(_activeFilePath);
 
       final fileUri = file.uri.toString();
       print('[VideoPlayerScreen] Using file URI: $fileUri');
@@ -153,14 +256,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _startPositionUpdates() {
-    Timer.periodic(const Duration(milliseconds: 500), (timer) {
+  
+    _positionTimer?.cancel();
+    _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (!mounted || _videoPlayerController == null) {
-        
-        print('[VideoPlayerScreen] Stopping position updates (disposed)');
         timer.cancel();
+        _positionTimer = null;
         return;
       }
-      
+
       _videoPlayerController!.getPosition().then((position) {
         if (mounted) {
           setState(() {
@@ -168,7 +272,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           });
         }
       });
-      
+
       _videoPlayerController!.getDuration().then((duration) {
         if (mounted) {
           setState(() {
@@ -176,12 +280,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           });
         }
       });
-      
+
       _videoPlayerController!.isPlaying().then((playing) {
-        if (mounted) {
-          setState(() {
-            _isPlaying = playing == true;
-          });
+        if (!mounted) return;
+        setState(() {
+          _isPlaying = playing == true;
+        });
+
+        if (playing == false &&
+            !_autoAdvancedCalled &&
+            _nextEpisode != null &&
+            _duration.inSeconds > 0 &&
+            _position.inSeconds > 0 &&
+            (_duration - _position).inSeconds.abs() <= 5) {
+          _autoAdvancedCalled = true;
+          timer.cancel();
+          _positionTimer = null;
+          _switchToEpisode(_nextEpisode!);
         }
       });
     });
@@ -440,7 +555,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void dispose() async {
     _controlsTimer?.cancel();
-    _seekIndicatorTimer?.cancel(); 
+    _positionTimer?.cancel();
+    _seekIndicatorTimer?.cancel();
     _videoPlayerController?.dispose();
 
    
@@ -682,10 +798,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           const SizedBox(width: 16),
           
           
-          if (widget.title != null)
+          if (_activeTitle != null)
             Expanded(
               child: Text(
-                widget.title!,
+                _activeTitle!,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -778,7 +894,28 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              
+
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 250),
+                opacity: _prevEpisode != null ? 1.0 : 0.0,
+                child: Visibility(
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  visible: _prevEpisode != null,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildEpisodeNavButton(
+                        icon: Icons.skip_previous_rounded,
+                        onTap: () => _switchToEpisode(_prevEpisode!),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                  ),
+                ),
+              ),
+
               _buildControlButton(
                 icon: Icons.replay_10,
                 onTap: () {
@@ -786,10 +923,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   _seekTo(newPosition < Duration.zero ? Duration.zero : newPosition);
                 },
               ),
-              
+
               const SizedBox(width: 24),
-              
-              
+
               GestureDetector(
                 onTap: _togglePlayPause,
                 child: Container(
@@ -813,10 +949,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(width: 24),
-              
-              
+
               _buildControlButton(
                 icon: Icons.forward_10,
                 onTap: () {
@@ -827,6 +962,27 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     _seekTo(_duration);
                   }
                 },
+              ),
+              
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 250),
+                opacity: _nextEpisode != null ? 1.0 : 0.0,
+                child: Visibility(
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  visible: _nextEpisode != null,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 12),
+                      _buildEpisodeNavButton(
+                        icon: Icons.skip_next_rounded,
+                        onTap: () => _switchToEpisode(_nextEpisode!),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -851,6 +1007,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           icon,
           color: Colors.white,
           size: 28,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEpisodeNavButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryColor.withOpacity(0.25),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppTheme.primaryColor.withOpacity(0.6),
+            width: 1.5,
+          ),
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white,
+          size: 26,
         ),
       ),
     );

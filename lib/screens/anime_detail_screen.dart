@@ -736,6 +736,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                                         builder: (context) => VideoPlayerScreen(
                                                           filePath: filePath,
                                                           title: '${_animeItem!.title} - Episode ${_animeItem!.episode}',
+                                                          currentReleaseId: _animeItem!.id,
                                                         ),
                                                       ),
                                                     );
@@ -1295,6 +1296,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                       builder: (context) => VideoPlayerScreen(
                                         filePath: filePath,
                                         title: '${episode.title} - Episode ${episode.episode}',
+                                        currentReleaseId: episode.id,
                                       ),
                                     ),
                                   );

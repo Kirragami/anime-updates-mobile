@@ -393,6 +393,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
                   builder: (context) => VideoPlayerScreen(
                     filePath: filePath,
                     title: '${anime.title} - Episode ${anime.episode}',
+                    currentReleaseId: anime.id,
                   ),
                 ),
               );

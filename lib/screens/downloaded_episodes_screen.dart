@@ -499,6 +499,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                     builder: (context) => VideoPlayerScreen(
                       filePath: filePath,
                       title: '${episode.showName} - Episode ${episode.episode}',
+                      currentReleaseId: episode.releaseId,
                   ),
                   ),
                 );
