@@ -4,6 +4,7 @@ import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../theme/app_theme.dart';
 import '../models/completed_download.dart';
 import '../services/completed_downloads_manager.dart';
@@ -155,6 +156,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
+
+    WakelockPlus.enable();
 
     _activeFilePath = widget.filePath;
     _activeTitle = widget.title;
@@ -554,6 +557,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   void dispose() async {
+    WakelockPlus.disable();
+
     _controlsTimer?.cancel();
     _positionTimer?.cancel();
     _seekIndicatorTimer?.cancel();
