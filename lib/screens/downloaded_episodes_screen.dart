@@ -464,62 +464,67 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
   Widget _buildEpisodeItem(CompletedDownload episode) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppTheme.surfaceColor.withOpacity(0.5),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () async {
+            final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(episode.releaseId);
+            if (filePath != null && context.mounted) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => VideoPlayerScreen(
+                    filePath: filePath,
+                    title: '${episode.showName} - Episode ${episode.episode}',
+                    currentReleaseId: episode.releaseId,
+                  ),
+                ),
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               children: [
-                Text(
-                  "Episode ${episode.episode}",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Episode ${episode.episode}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          _buildActionButton(
-                    icon: Icons.play_arrow_rounded,
-            label: 'Play',
-                    color: AppTheme.primaryColor,
-                    onTap: () async {
-              final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(episode.releaseId);
-              if (filePath != null && context.mounted) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => VideoPlayerScreen(
-                      filePath: filePath,
-                      title: '${episode.showName} - Episode ${episode.episode}',
-                      currentReleaseId: episode.releaseId,
-                  ),
-                  ),
-                );
-              }
-            },
-                ),
-          const SizedBox(width: 8),
-                _buildActionButton(
-                  icon: Icons.delete_rounded,
-                  label: 'Delete',
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.delete_rounded),
                   color: AppTheme.errorColor,
-                  onTap: () async {
-              final confirmed = await _showDeleteConfirmation(episode.showName, episode.episode);
+                  iconSize: 22,
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(),
+                  splashRadius: 20,
+                  onPressed: () async {
+                    final confirmed = await _showDeleteConfirmation(episode.showName, episode.episode);
                     if (confirmed && context.mounted) {
-                await ref.read(completedDownloadsProvider.notifier).deleteDownload(episode.releaseId);
+                      await ref.read(completedDownloadsProvider.notifier).deleteDownload(episode.releaseId);
                     }
                   },
                 ),
               ],
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -545,56 +550,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      height: 36,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withOpacity(0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.3),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, color: Colors.white, size: 14),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildEmptyState({
     required IconData icon,
