@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../providers/download_providers.dart';
 import '../models/completed_download.dart';
 import '../services/completed_downloads_manager.dart';
+import '../services/playback_progress_manager.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
 import 'video_player_screen.dart';
@@ -341,7 +342,9 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
               imagePathFuture: ref.read(completedDownloadsProvider.notifier).getAnimeImagePath(showId),
               onToggle: () {
                 setState(() {
-                  _expandedShows[showId] = !isExpanded;
+                  final wasExpanded = isExpanded;
+                  _expandedShows.clear();
+                  _expandedShows[showId] = !wasExpanded;
                 });
               },
             );
@@ -453,7 +456,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
               ),
               child: Column(
-                children: episodes.map((episode) => _buildEpisodeItem(episode)).toList(),
+                children: episodes.map((episode) => _buildEpisodeItem(episode, showId)).toList(),
               ),
             ),
         ],
@@ -461,15 +464,21 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
     );
   }
 
-  Widget _buildEpisodeItem(CompletedDownload episode) {
+  Widget _buildEpisodeItem(CompletedDownload episode, String showId) {
+    final isLastWatched = PlaybackProgressManager().getLastWatchedReleaseId(showId) == episode.releaseId;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Material(
-        color: Colors.transparent,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceColor.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Material(
+              color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () async {
@@ -525,8 +534,29 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
           ),
         ),
       ),
-    );
-  }
+    ),
+    if (isLastWatched)
+        Positioned(
+          left: -8,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(100),
+              child: Image.asset(
+                'assets/images/pointing.jpg',
+                width: 24,
+                height: 24,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const SizedBox(),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildImagePlaceholder() {
     return Container(

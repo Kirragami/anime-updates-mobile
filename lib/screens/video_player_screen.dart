@@ -8,6 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../theme/app_theme.dart';
 import '../models/completed_download.dart';
 import '../services/completed_downloads_manager.dart';
+import '../services/playback_progress_manager.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String filePath;
@@ -58,6 +59,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late String? _activeTitle;
   late String? _activeReleaseId;
 
+  final FocusNode _focusNode = FocusNode();
+
   CompletedDownload? _prevEpisode;
   CompletedDownload? _nextEpisode;
   bool _autoAdvancedCalled = false;
@@ -71,6 +74,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     final match = RegExp(r'\d+').firstMatch(cleaned);
     if (match != null) return int.tryParse(match.group(0)!);
     return null;
+  }
+
+  String? _getAnimeShowId() {
+    final currentId = _activeReleaseId;
+    if (currentId == null) return null;
+    final manager = CompletedDownloadsManager();
+    final all = manager.completedDownloads.values.toList();
+    try {
+      final current = all.firstWhere((e) => e.releaseId == currentId);
+      return current.animeShowId ?? current.showName;
+    } catch (_) {
+      return null;
+    }
   }
 
   void _resolveAdjacentEpisodes() {
@@ -158,6 +174,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.initState();
 
     WakelockPlus.enable();
+    
+    _focusNode.requestFocus();
 
     _activeFilePath = widget.filePath;
     _activeTitle = widget.title;
@@ -229,8 +247,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       );
 
       _videoPlayerController!.addOnInitListener(() {
-        
-        
         if (mounted) {
           setState(() {
             _isInitialized = true;
@@ -239,10 +255,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted && _videoPlayerController != null) {
               
-              
+              final showId = _getAnimeShowId();
+              if (showId != null && _activeReleaseId != null) {
+                final lastPos = PlaybackProgressManager().getPosition(showId, _activeReleaseId!);
+                if (lastPos > 0) {
+                  _videoPlayerController!.seekTo(Duration(seconds: lastPos));
+                }
+              }
+
               _videoPlayerController!.play().catchError((error) {
-                
-                
               });
             }
           });
@@ -273,6 +294,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           setState(() {
             _position = position;
           });
+          
+          if (_isPlaying && position.inSeconds > 0) {
+            final showId = _getAnimeShowId();
+            if (showId != null && _activeReleaseId != null) {
+              PlaybackProgressManager().saveProgress(showId, _activeReleaseId!, position.inSeconds);
+            }
+          }
         }
       });
 
@@ -563,6 +591,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _positionTimer?.cancel();
     _seekIndicatorTimer?.cancel();
     _videoPlayerController?.dispose();
+    _focusNode.dispose();
 
    
     SystemChrome.setSystemUIChangeCallback(null);
@@ -595,56 +624,47 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: KeyboardListener(
-        focusNode: FocusNode(),
-        onKeyEvent: (KeyEvent event) {
+      body: Focus(
+        focusNode: _focusNode,
+        autofocus: true,
+        onKeyEvent: (FocusNode node, KeyEvent event) {
           if (event is KeyDownEvent) {
             switch (event.logicalKey) {
               case LogicalKeyboardKey.space:
                 _togglePlayPause();
-                break;
+                return KeyEventResult.handled;
               case LogicalKeyboardKey.arrowLeft:
                 _rewind();
-                break;
+                return KeyEventResult.handled;
               case LogicalKeyboardKey.arrowRight:
                 _forward();
-                break;
+                return KeyEventResult.handled;
               case LogicalKeyboardKey.arrowUp:
                 _adjustVolume(true); 
-                break;
+                return KeyEventResult.handled;
               case LogicalKeyboardKey.arrowDown:
                 _adjustVolume(false); 
-                break;
+                return KeyEventResult.handled;
             }
           }
+          return KeyEventResult.ignored;
         },
-        child: Focus(
-          autofocus: true,
-          child: GestureDetector(
-            onTap: _toggleControls,
-            onDoubleTap: _handleDoubleTap,
-            onVerticalDragStart: _onVerticalDragStart,
-            onVerticalDragUpdate: _onVerticalDragUpdate,
-            onVerticalDragEnd: _onVerticalDragEnd,
-            behavior: HitTestBehavior.opaque,
-            child: Stack(
-              children: [
+        child: GestureDetector(
+          onTap: _toggleControls,
+          onDoubleTap: _handleDoubleTap,
+          onVerticalDragStart: _onVerticalDragStart,
+          onVerticalDragUpdate: _onVerticalDragUpdate,
+          onVerticalDragEnd: _onVerticalDragEnd,
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            children: [
 
-                SizedBox.expand(
-                  child: _videoPlayerController != null
-                      ? VlcPlayer(
-                          controller: _videoPlayerController!,
-                          aspectRatio: 16 / 9,
-                          placeholder: Container(
-                            color: Colors.black,
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: AppTheme.primaryColor,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Container(
+              SizedBox.expand(
+                child: _videoPlayerController != null
+                    ? VlcPlayer(
+                        controller: _videoPlayerController!,
+                        aspectRatio: 16 / 9,
+                        placeholder: Container(
                           color: Colors.black,
                           child: const Center(
                             child: CircularProgressIndicator(
@@ -652,97 +672,105 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             ),
                           ),
                         ),
-                ),
+                      )
+                    : Container(
+                        color: Colors.black,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      ),
+              ),
 
-               
+             
+              Positioned(
+                left: 0,
+                top: 0,
+                width: MediaQuery.of(context).size.width * 0.4,
+                bottom: 0,
+                child: GestureDetector(
+                  onDoubleTap: _handleDoubleTapLeft,
+                  behavior: HitTestBehavior.translucent,
+                  child: Container(color: Colors.transparent),
+                ),
+              ),
+
+             
+              Positioned(
+                right: 0,
+                top: 0,
+                width: MediaQuery.of(context).size.width * 0.4,
+                bottom: 0,
+                child: GestureDetector(
+                  onDoubleTap: _handleDoubleTapRight,
+                  behavior: HitTestBehavior.translucent,
+                  child: Container(color: Colors.transparent),
+                ),
+              ),
+
+         
+              if (_isBrightnessControlVisible)
                 Positioned(
                   left: 0,
                   top: 0,
-                  width: MediaQuery.of(context).size.width * 0.4,
                   bottom: 0,
-                  child: GestureDetector(
-                    onDoubleTap: _handleDoubleTapLeft,
-                    behavior: HitTestBehavior.translucent,
-                    child: Container(color: Colors.transparent),
-                  ),
+                  width: MediaQuery.of(context).size.width * 0.3,
+                  child: _buildBrightnessControl(),
                 ),
 
-               
+           
+              if (_isVolumeControlVisible)
                 Positioned(
                   right: 0,
                   top: 0,
-                  width: MediaQuery.of(context).size.width * 0.4,
                   bottom: 0,
-                  child: GestureDetector(
-                    onDoubleTap: _handleDoubleTapRight,
-                    behavior: HitTestBehavior.translucent,
-                    child: Container(color: Colors.transparent),
-                  ),
+                  width: MediaQuery.of(context).size.width * 0.3,
+                  child: _buildVolumeControl(),
                 ),
 
-           
-                if (_isBrightnessControlVisible)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: MediaQuery.of(context).size.width * 0.3,
-                    child: _buildBrightnessControl(),
-                  ),
-
-             
-                if (_isVolumeControlVisible)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: MediaQuery.of(context).size.width * 0.3,
-                    child: _buildVolumeControl(),
-                  ),
-
-           
-                if (_isSeekIndicatorVisible)
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _seekIndicatorText.startsWith('-') ? Icons.replay : Icons.forward,
-                            color: AppTheme.primaryColor,
-                            size: 28,
+         
+              if (_isSeekIndicatorVisible)
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _seekIndicatorText.startsWith('-') ? Icons.replay : Icons.forward,
+                          color: AppTheme.primaryColor,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _seekIndicatorText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            _seekIndicatorText,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-
-
-
-                IgnorePointer(
-                  ignoring: !_isControlsVisible,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: _isControlsVisible ? 1.0 : 0.0,
-                    child: _buildControlsOverlay(),
-                  ),
                 ),
-              ],
-            ),
+
+
+
+              IgnorePointer(
+                ignoring: !_isControlsVisible,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: _isControlsVisible ? 1.0 : 0.0,
+                  child: _buildControlsOverlay(),
+                ),
+              ),
+            ],
           ),
         ),
       ),
