@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../providers/download_providers.dart';
 import '../models/completed_download.dart';
 import '../services/completed_downloads_manager.dart';
+import '../services/playback_progress_manager.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
 import 'video_player_screen.dart';
@@ -341,7 +342,9 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
               imagePathFuture: ref.read(completedDownloadsProvider.notifier).getAnimeImagePath(showId),
               onToggle: () {
                 setState(() {
-                  _expandedShows[showId] = !isExpanded;
+                  final wasExpanded = isExpanded;
+                  _expandedShows.clear();
+                  _expandedShows[showId] = !wasExpanded;
                 });
               },
             );
@@ -453,7 +456,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
               ),
               child: Column(
-                children: episodes.map((episode) => _buildEpisodeItem(episode)).toList(),
+                children: episodes.map((episode) => _buildEpisodeItem(episode, showId)).toList(),
               ),
             ),
         ],
@@ -461,67 +464,99 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
     );
   }
 
-  Widget _buildEpisodeItem(CompletedDownload episode) {
+  Widget _buildEpisodeItem(CompletedDownload episode, String showId) {
+    final isLastWatched = PlaybackProgressManager().getLastWatchedReleaseId(showId) == episode.releaseId;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Episode ${episode.episode}",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceColor.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(8),
             ),
-          ),
-          const SizedBox(width: 8),
-          _buildActionButton(
-                    icon: Icons.play_arrow_rounded,
-            label: 'Play',
-                    color: AppTheme.primaryColor,
-                    onTap: () async {
-              final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(episode.releaseId);
-              if (filePath != null && context.mounted) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => VideoPlayerScreen(
-                      filePath: filePath,
-                      title: '${episode.showName} - Episode ${episode.episode}',
-                      currentReleaseId: episode.releaseId,
+            child: Material(
+              color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () async {
+            final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(episode.releaseId);
+            if (filePath != null && context.mounted) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => VideoPlayerScreen(
+                    filePath: filePath,
+                    title: '${episode.showName} - Episode ${episode.episode}',
+                    currentReleaseId: episode.releaseId,
                   ),
-                  ),
-                );
-              }
-            },
                 ),
-          const SizedBox(width: 8),
-                _buildActionButton(
-                  icon: Icons.delete_rounded,
-                  label: 'Delete',
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Episode ${episode.episode}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.delete_rounded),
                   color: AppTheme.errorColor,
-                  onTap: () async {
-              final confirmed = await _showDeleteConfirmation(episode.showName, episode.episode);
+                  iconSize: 22,
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(),
+                  splashRadius: 20,
+                  onPressed: () async {
+                    final confirmed = await _showDeleteConfirmation(episode.showName, episode.episode);
                     if (confirmed && context.mounted) {
-                await ref.read(completedDownloadsProvider.notifier).deleteDownload(episode.releaseId);
+                      await ref.read(completedDownloadsProvider.notifier).deleteDownload(episode.releaseId);
                     }
                   },
                 ),
               ],
             ),
-    );
-  }
+          ),
+        ),
+      ),
+    ),
+    if (isLastWatched)
+        Positioned(
+          left: -8,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(100),
+              child: Image.asset(
+                'assets/images/pointing.jpg',
+                width: 24,
+                height: 24,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const SizedBox(),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildImagePlaceholder() {
     return Container(
@@ -545,56 +580,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      height: 36,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withOpacity(0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.3),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, color: Colors.white, size: 14),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildEmptyState({
     required IconData icon,

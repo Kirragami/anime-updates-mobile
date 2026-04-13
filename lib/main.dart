@@ -13,6 +13,7 @@ import 'services/notification_service.dart';
 import 'services/active_downloads_manager.dart';
 import 'services/completed_downloads_manager.dart';
 import 'services/download_event_dispatcher.dart';
+import 'services/playback_progress_manager.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'config/firebase_config.dart';
@@ -48,6 +49,10 @@ Future<void> main() async {
   // Initialize managers with native data
   await activeDownloadsManager.initialize();
   await completedDownloadsManager.initialize();
+  
+  // Initialize playback progress
+  final playbackProgressManager = PlaybackProgressManager();
+  await playbackProgressManager.initialize();
   
   // Start listening to events
   downloadEventDispatcher.startListening();
