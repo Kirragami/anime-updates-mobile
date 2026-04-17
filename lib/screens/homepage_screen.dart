@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../providers/download_providers.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../services/auth_service.dart';
+import '../services/services.dart';
 import '../models/download_state.dart';
 import '../utils/page_transitions.dart';
+import '../widgets/update_dialog.dart';
 import 'anime_list_screen.dart';
 import 'my_shows_screen.dart';
 import 'login_screen.dart';
@@ -14,12 +17,47 @@ import 'download_manager_screen.dart';
 import 'downloaded_episodes_screen.dart';
 import 'profile_screen.dart';
 
-class HomepageScreen extends ConsumerWidget {
+class HomepageScreen extends ConsumerStatefulWidget {
   final String? fcmToken;
   const HomepageScreen({super.key, this.fcmToken});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomepageScreen> createState() => _HomepageScreenState();
+}
+
+class _HomepageScreenState extends ConsumerState<HomepageScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForUpdateOnLaunch();
+    });
+  }
+
+  Future<void> _checkForUpdateOnLaunch() async {
+    try {
+      final updateService = ref.read(updateServiceProvider);
+      final result = await updateService.checkForUpdate();
+
+      if (result['success'] == true && result['needUpdate'] == true) {
+        if (!mounted) return;
+        _showUpdateDialog(result['downloadUrl'] as String);
+      }
+    } catch (e) {
+      
+    }
+  }
+
+  void _showUpdateDialog(String downloadUrl) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => UpdateDialog(downloadUrl: downloadUrl),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
