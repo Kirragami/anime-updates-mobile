@@ -54,6 +54,7 @@ class UpdateService {
   Future<Map<String, dynamic>> downloadUpdate({
     required String downloadUrl,
     required void Function(int, int) onProgress,
+    CancelToken? cancelToken,
   }) async {
     try {
       final cacheDir = await getTemporaryDirectory();
@@ -70,6 +71,7 @@ class UpdateService {
         downloadUrl,
         filePath,
         onReceiveProgress: onProgress,
+        cancelToken: cancelToken,
         options: Options(
           responseType: ResponseType.bytes,
           followRedirects: true,

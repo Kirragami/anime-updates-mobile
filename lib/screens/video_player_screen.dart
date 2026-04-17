@@ -267,7 +267,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 }
               }
 
-              _videoPlayerController!.play().catchError((error) {
+              _videoPlayerController!.play().then((_) {
+                if (mounted) _startControlsTimer();
+              }).catchError((error) {
               });
             }
           });
@@ -318,9 +320,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
       _videoPlayerController!.isPlaying().then((playing) {
         if (!mounted) return;
+        
+        bool wasPlaying = _isPlaying;
         setState(() {
           _isPlaying = playing == true;
         });
+
+        if (!wasPlaying && _isPlaying && _isControlsVisible) {
+          _startControlsTimer();
+        }
 
         if (playing == false &&
             !_autoAdvancedCalled &&
@@ -777,7 +785,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 200),
                     opacity: _isControlsVisible ? 1.0 : 0.0,
-                    child: _buildControlsOverlay(),
+                    child: Listener(
+                      onPointerDown: (_) {
+                        if (_isControlsVisible) _startControlsTimer();
+                      },
+                      child: _buildControlsOverlay(),
+                    ),
                   ),
                 ),
               ],
