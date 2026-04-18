@@ -11,6 +11,7 @@ import '../services/playback_progress_manager.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
 import 'video_player_screen.dart';
+import 'anime_detail_screen.dart';
 
 class DownloadedEpisodesScreen extends ConsumerStatefulWidget {
   const DownloadedEpisodesScreen({super.key});
@@ -456,7 +457,10 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
               ),
               child: Column(
-                children: episodes.map((episode) => _buildEpisodeItem(episode, showId)).toList(),
+                children: [
+                  ...episodes.map((episode) => _buildEpisodeItem(episode, showId)).toList(),
+                  _buildDownloadMoreButton(showId),
+                ],
               ),
             ),
         ],
@@ -575,6 +579,50 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
           Icons.image,
           color: AppTheme.primaryColor,
           size: 40,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDownloadMoreButton(String showId) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8).copyWith(bottom: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceColor.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => AnimeDetailScreen(
+                    animeShowId: showId,
+                  ),
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      "Download more",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
