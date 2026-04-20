@@ -46,6 +46,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   double _gestureStartY = 0.0;
   double _initialVolume = 100.0;
   double _initialBrightness = 1.0;
+  double? _doubleTapX;
 
   bool _isSeekIndicatorVisible = false;
   String _seekIndicatorText = '';
@@ -484,12 +485,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
-  void _handleDoubleTap() {
-  
-    setState(() {
-      _isControlsVisible = true;
-    });
-    _startControlsTimer();
+  void _handleDoubleTapCenter() {
+    _togglePlayPause();
   }
 
   void _handleDoubleTapLeft() {
@@ -669,7 +666,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           },
           child: GestureDetector(
             onTap: _toggleControls,
-            onDoubleTap: _handleDoubleTap,
+            onDoubleTapDown: (details) {
+              _doubleTapX = details.globalPosition.dx;
+            },
+            onDoubleTap: () {
+              if (_doubleTapX == null) return;
+              final screenWidth = MediaQuery.of(context).size.width;
+              if (_doubleTapX! < screenWidth * 0.4) {
+                _handleDoubleTapLeft();
+              } else if (_doubleTapX! > screenWidth * 0.6) {
+                _handleDoubleTapRight();
+              } else {
+                _handleDoubleTapCenter();
+              }
+            },
             onVerticalDragStart: _onVerticalDragStart,
             onVerticalDragUpdate: _onVerticalDragUpdate,
             onVerticalDragEnd: _onVerticalDragEnd,
@@ -702,30 +712,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 ),
 
                
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  width: MediaQuery.of(context).size.width * 0.4,
-                  bottom: 0,
-                  child: GestureDetector(
-                    onDoubleTap: _handleDoubleTapLeft,
-                    behavior: HitTestBehavior.translucent,
-                    child: Container(color: Colors.transparent),
-                  ),
-                ),
 
-               
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  width: MediaQuery.of(context).size.width * 0.4,
-                  bottom: 0,
-                  child: GestureDetector(
-                    onDoubleTap: _handleDoubleTapRight,
-                    behavior: HitTestBehavior.translucent,
-                    child: Container(color: Colors.transparent),
-                  ),
-                ),
 
            
                 if (_isBrightnessControlVisible)
