@@ -305,7 +305,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           if (_isPlaying && position.inSeconds > 0) {
             final showId = _getAnimeShowId();
             if (showId != null && _activeReleaseId != null) {
-              PlaybackProgressManager().saveProgress(showId, _activeReleaseId!, position.inSeconds);
+              String? episode;
+              try {
+                final manager = CompletedDownloadsManager();
+                final download = manager.completedDownloads[_activeReleaseId!];
+                episode = download?.episode;
+              } catch (_) {}
+
+              PlaybackProgressManager().saveProgress(
+                showId, 
+                _activeReleaseId!, 
+                position.inSeconds,
+                episode: episode,
+              );
             }
           }
         }
