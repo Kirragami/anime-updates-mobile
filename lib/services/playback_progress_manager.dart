@@ -49,17 +49,21 @@ class PlaybackProgressManager {
     stateNotifier.value = Map<String, dynamic>.from(_progressData);
   }
 
-  Future<void> saveProgress(String showId, String releaseId, int positionSec) async {
+  Future<void> saveProgress(String showId, String releaseId, int positionSec, {String? episode}) async {
     if (!_isInitialized) return;
 
     if (!_progressData.containsKey(showId)) {
       _progressData[showId] = {
         'lastWatchedReleaseId': releaseId,
+        'lastWatchedEpisode': episode,
         'episodes': <String, dynamic>{}
       };
     }
 
     _progressData[showId]['lastWatchedReleaseId'] = releaseId;
+    if (episode != null) {
+      _progressData[showId]['lastWatchedEpisode'] = episode;
+    }
 
     if (_progressData[showId]['episodes'] == null) {
       _progressData[showId]['episodes'] = <String, dynamic>{};
@@ -74,6 +78,11 @@ class PlaybackProgressManager {
   String? getLastWatchedReleaseId(String showId) {
     if (!_isInitialized || !_progressData.containsKey(showId)) return null;
     return _progressData[showId]['lastWatchedReleaseId'] as String?;
+  }
+
+  String? getLastWatchedEpisode(String showId) {
+    if (!_isInitialized || !_progressData.containsKey(showId)) return null;
+    return _progressData[showId]['lastWatchedEpisode'] as String?;
   }
 
   int getPosition(String showId, String releaseId) {
