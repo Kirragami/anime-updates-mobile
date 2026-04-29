@@ -565,12 +565,14 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
               bottom: 0,
               left: 0,
               right: 0,
-              child: Center(
-                child: Image.asset(
-                  'assets/images/pointing.png',
-                  height: 50,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => const SizedBox(),
+              child: IgnorePointer(
+                child: Center(
+                  child: Image.asset(
+                    'assets/images/pointing.png',
+                    height: 50,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const SizedBox(),
+                  ),
                 ),
               ),
             ),
