@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'app_orientation_system_ui.dart';
 import 'screens/homepage_screen.dart';
 import 'screens/download_manager_screen.dart';
 import 'theme/app_theme.dart';
@@ -84,15 +85,29 @@ class AnimeUpdatesApp extends StatefulWidget {
   State<AnimeUpdatesApp> createState() => _AnimeUpdatesAppState();
 }
 
-class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> {
+class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> with WidgetsBindingObserver {
   String? _firebaseToken;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initFCM();
     _initNavigationChannel();
+    WidgetsBinding.instance.addPostFrameCallback((_) => AppOrientationSystemUi.sync());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    AppOrientationSystemUi.sync();
   }
 
   Future<void> _initNavigationChannel() async {
