@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../models/completed_download.dart';
 import '../services/completed_downloads_manager.dart';
 import '../services/playback_progress_manager.dart';
+import '../app_orientation_system_ui.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final String filePath;
@@ -408,14 +409,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
       ]);
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     } else {
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) => AppOrientationSystemUi.sync());
   }
 
 
@@ -637,7 +637,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         DeviceOrientation.landscapeRight,
       ]);
     }
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    AppOrientationSystemUi.sync();
     super.dispose();
   }
 
