@@ -95,6 +95,10 @@ class CompletedDownloadsNotifier extends StateNotifier<Map<String, CompletedDown
   Future<void> deleteDownload(String releaseId) async {
     await _manager.deleteDownload(releaseId);
   }
+
+  Future<void> deleteAllDownloadsForShow(String showId) async {
+    await _manager.deleteAllDownloadsForShow(showId);
+  }
   
   Future<bool> fileExists(String releaseId) async {
     return await _manager.fileExists(releaseId);

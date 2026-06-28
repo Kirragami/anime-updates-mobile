@@ -112,6 +112,21 @@ class CompletedDownloadsManager {
       rethrow;
     }
   }
+
+  Future<void> deleteAllDownloadsForShow(String showId) async {
+    final episodes = getDownloadsGroupedByShowId()[showId];
+    if (episodes == null || episodes.isEmpty) return;
+
+    try {
+      for (final download in List<CompletedDownload>.from(episodes)) {
+        await _channel.invokeMethod("deleteTorrentFile", {"releaseId": download.releaseId});
+        _completedDownloads.remove(download.releaseId);
+      }
+      _notifyListeners();
+    } catch (e) {
+      rethrow;
+    }
+  }
   
   
   Future<bool> fileExists(String releaseId) async {
