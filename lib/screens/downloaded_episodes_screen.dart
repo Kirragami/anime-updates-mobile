@@ -464,6 +464,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          onLongPress: () => _navigateToShowDetails(showId),
           borderRadius: BorderRadius.circular(12),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 280),
@@ -593,7 +594,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildWideStageHeader(context, showName),
+              _buildWideStageHeader(context, showName, showId: showId, episodeCount: episodes.length),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -616,29 +617,56 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
     );
   }
 
-  Widget _buildWideStageHeader(BuildContext context, String showName) {
+  Widget _buildWideStageHeader(
+    BuildContext context,
+    String showName, {
+    required String showId,
+    required int episodeCount,
+  }) {
     final maxRowWidth = MediaQuery.sizeOf(context).width * 0.65 - 32;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 12, 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxRowWidth),
-            child: Text(
-              showName,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxRowWidth),
+                  child: Text(
+                    showName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+          _buildViewShowLink(showId, inline: true),
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_rounded),
+            color: AppTheme.errorColor.withOpacity(0.85),
+            iconSize: 22,
+            padding: const EdgeInsets.all(4),
+            constraints: const BoxConstraints(),
+            splashRadius: 20,
+            tooltip: 'Delete all',
+            onPressed: () => _confirmAndDeleteAllForShow(
+              showId: showId,
+              showName: showName,
+              episodeCount: episodeCount,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -666,10 +694,6 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
               fixedWidthTile: true,
             );
           }),
-          SizedBox(
-            width: _kEpisodeTileMaxWidth,
-            child: _buildDownloadMoreButton(showId, forGrid: true),
-          ),
         ];
 
         return Align(
@@ -714,6 +738,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
         children: [
           InkWell(
             onTap: onToggle,
+            onLongPress: () => _navigateToShowDetails(showId),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -770,6 +795,20 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                       ],
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_sweep_rounded),
+                    color: AppTheme.errorColor.withOpacity(0.85),
+                    iconSize: 22,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(),
+                    splashRadius: 20,
+                    tooltip: 'Delete all',
+                    onPressed: () => _confirmAndDeleteAllForShow(
+                      showId: showId,
+                      showName: showName,
+                      episodeCount: episodes.length,
+                    ),
+                  ),
                   Icon(
                     isExpanded ? Icons.expand_less : Icons.expand_more,
                     color: Colors.white,
@@ -799,7 +838,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                           fixedWidthTile: false,
                         );
                       }),
-                      _buildDownloadMoreButton(showId),
+                      _buildViewShowLink(showId),
                     ],
                   );
                 },
@@ -984,51 +1023,63 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
     );
   }
 
-  Widget _buildDownloadMoreButton(String showId, {bool forGrid = false}) {
-    final margin = forGrid
-        ? const EdgeInsets.only(top: 0, bottom: 8)
-        : const EdgeInsets.symmetric(horizontal: 16, vertical: 8).copyWith(bottom: 16);
-    return Container(
-      margin: margin,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceColor.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => AnimeDetailScreen(
-                    animeShowId: showId,
-                  ),
-                ),
-              );
-            },
-            child: const Padding(
-              padding: EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Download more',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+  void _navigateToShowDetails(String showId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AnimeDetailScreen(
+          animeShowId: showId,
         ),
       ),
     );
+  }
+
+  Widget _buildViewShowLink(String showId, {bool inline = false}) {
+    final button = TextButton.icon(
+      onPressed: () => _navigateToShowDetails(showId),
+      icon: Icon(
+        Icons.open_in_new_rounded,
+        size: inline ? 14 : 13,
+        color: Colors.white.withOpacity(0.5),
+      ),
+      label: Text(
+        'View show',
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.55),
+          fontSize: inline ? 12 : 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      style: TextButton.styleFrom(
+        padding: EdgeInsets.symmetric(horizontal: inline ? 8 : 12, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+
+    if (inline) return button;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Center(child: button),
+    );
+  }
+
+  Future<void> _confirmAndDeleteAllForShow({
+    required String showId,
+    required String showName,
+    required int episodeCount,
+  }) async {
+    final confirmed = await _showDeleteAllConfirmation(showName, episodeCount);
+    if (!confirmed || !mounted) return;
+
+    await ref.read(completedDownloadsProvider.notifier).deleteAllDownloadsForShow(showId);
+
+    if (!mounted) return;
+    setState(() {
+      if (_selectedShowId == showId) {
+        _selectedShowId = null;
+      }
+    });
   }
 
   Widget _buildEmptyState({
@@ -1104,6 +1155,40 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                     foregroundColor: AppTheme.errorColor,
                   ),
                   child: const Text('Delete'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  Future<bool> _showDeleteAllConfirmation(String showName, int episodeCount) async {
+    final episodeLabel = episodeCount == 1 ? 'episode' : 'episodes';
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceColor,
+              title: const Text(
+                'Delete All Downloads',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: Text(
+                'Are you sure you want to delete all $episodeCount downloaded $episodeLabel of "$showName"? This will permanently remove all files.',
+                style: TextStyle(color: Colors.white.withOpacity(0.8)),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.errorColor,
+                  ),
+                  child: const Text('Delete All'),
                 ),
               ],
             );
