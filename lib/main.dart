@@ -11,6 +11,8 @@ import 'services/device_id_service.dart';
 import 'services/fcm_registration_service.dart';
 import 'services/auth_storage.dart';
 import 'services/notification_service.dart';
+import 'services/local_notification_service.dart';
+import 'providers/friends_providers.dart';
 import 'services/active_downloads_manager.dart';
 import 'services/completed_downloads_manager.dart';
 import 'services/download_event_dispatcher.dart';
@@ -78,24 +80,37 @@ Future<void> main() async {
   runApp(const ProviderScope(child: AnimeUpdatesApp()));
 }
 
-class AnimeUpdatesApp extends StatefulWidget {
+class AnimeUpdatesApp extends ConsumerStatefulWidget {
   const AnimeUpdatesApp({super.key});
 
   @override
-  State<AnimeUpdatesApp> createState() => _AnimeUpdatesAppState();
+  ConsumerState<AnimeUpdatesApp> createState() => _AnimeUpdatesAppState();
 }
 
-class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> with WidgetsBindingObserver {
+class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
+    with WidgetsBindingObserver {
   String? _firebaseToken;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  RemoteMessage? _pendingNotificationMessage;
+  String? _pendingNotificationPayload;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _initLocalNotifications();
     _initFCM();
     _initNavigationChannel();
     WidgetsBinding.instance.addPostFrameCallback((_) => AppOrientationSystemUi.sync());
+  }
+
+  Future<void> _initLocalNotifications() async {
+    await LocalNotificationService.initialize(
+      onTap: (payload) {
+        _pendingNotificationPayload = payload;
+        _tryNavigateFromPendingNotification();
+      },
+    );
   }
 
   @override
@@ -140,6 +155,41 @@ class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> with WidgetsBindingOb
     });
   }
 
+  void _scheduleNotificationNavigation(RemoteMessage message) {
+    _pendingNotificationMessage = message;
+    _tryNavigateFromPendingNotification();
+  }
+
+  void _tryNavigateFromPendingNotification() {
+    if (_pendingNotificationMessage == null &&
+        _pendingNotificationPayload == null) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = _navigatorKey.currentContext;
+      if (context == null) {
+        _tryNavigateFromPendingNotification();
+        return;
+      }
+
+      final payload = _pendingNotificationPayload;
+      if (payload != null) {
+        _pendingNotificationPayload = null;
+        LocalNotificationService.handlePayload(context, payload);
+        return;
+      }
+
+      final message = _pendingNotificationMessage;
+      if (message == null) {
+        return;
+      }
+
+      _pendingNotificationMessage = null;
+      NotificationService.handleRemoteMessage(context, message);
+    });
+  }
+
   Future<void> _initFCM() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
 
@@ -179,37 +229,27 @@ class _AnimeUpdatesAppState extends State<AnimeUpdatesApp> with WidgetsBindingOb
       print("Error listening to token refresh: $err");
     });
 
-    // Foreground messages
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("Got a message in foreground: ${message.notification?.title}");
-      print(message.data);
+    // Foreground messages — show as system notifications (FCM won't display them)
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      await LocalNotificationService.showRemoteMessage(message);
+
+      if (NotificationService.isFriendMessage(message) &&
+          AuthService.isLoggedIn) {
+        ref.invalidate(tomodachiNotifierProvider);
+      }
     });
 
     // When user taps notification
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print("User tapped notification: ${message.notification?.title}");
       print(message.data);
-      
-      // Handle navigation to anime detail screen
-      if (_navigatorKey.currentContext != null) {
-        print('Attempting to navigate to anime detail from opened app');
-        NotificationService.handleAnimeNotification(_navigatorKey.currentContext!, message.data);
-      } else {
-        print('Navigator context is null, cannot navigate');
-      }
+      _scheduleNotificationNavigation(message);
     });
 
     RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) {
       print('App launched from notification: ${initialMessage.data}');
-      
-      // Handle navigation to anime detail screen when app is launched from notification
-      if (_navigatorKey.currentContext != null) {
-        print('Attempting to navigate to anime detail from initial message');
-        NotificationService.handleAnimeNotification(_navigatorKey.currentContext!, initialMessage.data);
-      } else {
-        print('Navigator context is null, cannot navigate');
-      }
+      _scheduleNotificationNavigation(initialMessage);
     }
   }
 

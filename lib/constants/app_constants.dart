@@ -14,6 +14,12 @@ class AppConstants {
   static const String trackedShowsListEndpoint = '/api/tracking/get-shows';
   static const String trackShowEndpoint = '/api/tracking/track';
   static const String untrackShowEndpoint = '/api/tracking/untrack';
+
+  static const String friendsEndpoint = '/api/friends';
+  static const String friendsRequestEndpoint = '/api/friends/request';
+  static const String friendsRemoveEndpoint = '/api/friends/remove';
+  static const String friendsDeclineEndpoint = '/api/friends/decline';
+  static const String friendsAcceptEndpoint = '/api/friends/accept';
   
   static const String animeShowEpisodesEndpoint = '/api/anime-show';
   
