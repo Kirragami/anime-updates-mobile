@@ -3,6 +3,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../providers/download_providers.dart';
+import '../providers/auth_provider.dart';
+import '../providers/friends_providers.dart';
 import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../services/auth_service.dart';
@@ -16,6 +18,7 @@ import 'login_screen.dart';
 import 'download_manager_screen.dart';
 import 'downloaded_episodes_screen.dart';
 import 'profile_screen.dart';
+import 'tomodachi_screen.dart';
 
 class HomepageScreen extends ConsumerStatefulWidget {
   final String? fcmToken;
@@ -169,7 +172,54 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
                       },
                     ),
                     const SizedBox(width: 8),
-               
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final isLoggedIn = ref.watch(isLoggedInProvider);
+                        if (!isLoggedIn) return const SizedBox.shrink();
+
+                        final pendingCount =
+                            ref.watch(pendingTomodachiRequestsCountProvider);
+
+                        return Stack(
+                          children: [
+                            IconButton(
+                              tooltip: 'Tomodachi',
+                              icon: const Icon(
+                                Icons.group_rounded,
+                                size: 28,
+                                color: AppTheme.textPrimary,
+                              ),
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  CustomPageTransitions.simpleSlide(
+                                    const TomodachiScreen(),
+                                    fromRight: true,
+                                  ),
+                                );
+                              },
+                            ),
+                            if (pendingCount > 0)
+                              Positioned(
+                                right: 6,
+                                top: 6,
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.errorColor,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AppTheme.backgroundColor,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(
                         Icons.settings_rounded,

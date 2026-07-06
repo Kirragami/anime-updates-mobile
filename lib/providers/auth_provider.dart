@@ -3,6 +3,7 @@ import '../models/user.dart';
 import '../services/auth_service.dart';
 import 'package:flutter/foundation.dart';
 import 'anime_providers.dart';
+import 'friends_providers.dart';
 
 class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
   final Ref ref;
@@ -41,6 +42,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       if (result['success']) {
         state = AsyncValue.data(AuthService.currentUser);
         ref.invalidate(trackedReleasesNotifierProvider);
+        ref.invalidate(tomodachiNotifierProvider);
         return result;
       } else {
         state = const AsyncValue.data(null);
@@ -85,6 +87,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       final result = await AuthService.logout();
       state = const AsyncValue.data(null);
       ref.invalidate(trackedReleasesNotifierProvider);
+      ref.invalidate(tomodachiNotifierProvider);
       return result;
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
