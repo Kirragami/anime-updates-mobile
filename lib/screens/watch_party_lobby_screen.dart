@@ -6,7 +6,7 @@ import '../models/watch_party_models.dart';
 import '../providers/friends_providers.dart';
 import '../providers/watch_party_provider.dart';
 import '../services/auth_service.dart';
-import '../services/watch_party_invite_delivery.dart';
+import '../services/watch_party_app_shell.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
 
@@ -654,7 +654,7 @@ class _WatchPartyInviteLandingScreenState
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      WatchPartyInviteDelivery.deliver(widget.payload);
+      WatchPartyAppShell.deliverInvite(widget.payload);
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const WatchPartyLobbyScreen()),
       );

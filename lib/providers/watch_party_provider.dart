@@ -7,6 +7,7 @@ import '../models/watch_party_models.dart';
 import '../services/auth_service.dart';
 import '../services/watch_party_logger.dart';
 import '../services/watch_party_navigation.dart';
+import '../services/watch_party_app_shell.dart';
 import '../services/watch_party_service.dart';
 import '../services/watch_party_socket_service.dart';
 
@@ -475,6 +476,7 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
     await _socket.disconnect();
 
     WatchPartyNavigation.resetOnPartyLeave();
+    WatchPartyAppShell.resetSession();
     state = const WatchPartySessionState();
   }
 

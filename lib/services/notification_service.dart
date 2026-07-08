@@ -7,7 +7,7 @@ import '../screens/login_screen.dart';
 import '../screens/tomodachi_screen.dart';
 import '../screens/watch_party_lobby_screen.dart';
 import '../services/auth_service.dart';
-import '../services/watch_party_invite_delivery.dart';
+import '../services/watch_party_app_shell.dart';
 import '../utils/page_transitions.dart';
 
 class NotificationService {
@@ -140,7 +140,7 @@ class NotificationService {
     WatchPartyInvitePayload payload,
   ) {
     if (AuthService.isLoggedIn) {
-      WatchPartyInviteDelivery.deliver(payload);
+      WatchPartyAppShell.deliverInvite(payload);
       return;
     }
 

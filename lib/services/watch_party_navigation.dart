@@ -25,7 +25,7 @@ class WatchPartyNavigation {
     _isMemberInPartyPlayer = false;
   }
 
-  static Future<void> openMemberVideoFromLeader({
+  static Future<bool> openMemberVideoFromLeader({
     required WidgetRef ref,
     required BuildContext context,
     required String releaseId,
@@ -33,7 +33,7 @@ class WatchPartyNavigation {
   }) async {
     if (!appInForeground) {
       WatchPartyLogger.warn('auto-open skipped: app not foreground');
-      return;
+      return false;
     }
 
     final party = ref.read(watchPartyProvider);
@@ -41,18 +41,18 @@ class WatchPartyNavigation {
       WatchPartyLogger.warn(
         'auto-open skipped: active=${party.isActive} isLeader=${party.isLeader}',
       );
-      return;
+      return true;
     }
 
     if (_isMemberInPartyPlayer) {
       WatchPartyLogger.info(
         'auto-open skipped: member already in party player releaseId=$releaseId',
       );
-      return;
+      return true;
     }
 
     WatchPartyLogger.info('auto-opening member player releaseId=$releaseId');
-    await openEpisode(
+    return openEpisode(
       ref: ref,
       context: context,
       releaseId: releaseId,
@@ -130,7 +130,7 @@ class WatchPartyNavigation {
           ),
         ),
       );
-      return false;
+      return true;
     }
 
     final downloads = ref.read(completedDownloadsProvider);
