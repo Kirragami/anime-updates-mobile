@@ -23,10 +23,12 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
   
   final String? currentReleaseId;
   final bool watchPartyEnabled;
+  final List<DeviceOrientation> restoreOrientationsOnExit;
 
   const VideoPlayerScreen({
     super.key,
     required this.filePath,
+    required this.restoreOrientationsOnExit,
     this.title,
     this.currentReleaseId,
     this.watchPartyEnabled = false,
@@ -63,7 +65,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   int _consecutiveSeekCount = 0;
   Timer? _seekIndicatorTimer;
 
-  List<DeviceOrientation>? _originalOrientations;
 
   late String _activeFilePath;
   late String? _activeTitle;
@@ -213,7 +214,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _activeTitle = widget.title;
     _activeReleaseId = widget.currentReleaseId;
 
-    _captureOriginalOrientations();
     _resolveAdjacentEpisodes();
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -477,17 +477,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     } catch (e) {
       _brightness = 1.0;
     }
-  }
-
-  void _captureOriginalOrientations() async {
-    
-    
-    _originalOrientations = [
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ];
   }
 
   void _initializePlayer({
@@ -898,8 +887,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     return '${twoDigits(minutes)}:${twoDigits(seconds)}';
   }
 
+  void _resetBrightness() {
+    ScreenBrightness().resetScreenBrightness().catchError((Object e) {
+      print('[VideoPlayerScreen] Error resetting brightness: $e');
+    });
+  }
+
   @override
-  void dispose() async {
+  void dispose() {
+    SystemChrome.setSystemUIChangeCallback(null);
+    SystemChrome.setPreferredOrientations(widget.restoreOrientationsOnExit);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppOrientationSystemUi.sync();
+    });
+
     WakelockPlus.disable();
 
     _partyActionSub?.cancel();
@@ -912,31 +913,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _seekIndicatorTimer?.cancel();
     _videoPlayerController?.dispose();
     _focusNode.dispose();
+    _resetBrightness();
 
-   
-    SystemChrome.setSystemUIChangeCallback(null);
-
-   
-    try {
-      final screenBrightness = ScreenBrightness();
-      await screenBrightness.resetScreenBrightness();
-    } catch (e) {
-      print('[VideoPlayerScreen] Error resetting brightness: $e');
-    }
-
-  
-    if (_originalOrientations != null) {
-      SystemChrome.setPreferredOrientations(_originalOrientations!);
-    } else {
-      
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-    }
-    AppOrientationSystemUi.sync();
     super.dispose();
   }
 

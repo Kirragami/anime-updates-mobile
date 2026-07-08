@@ -5,6 +5,7 @@ import '../models/completed_download.dart';
 import '../models/watch_party_models.dart';
 import '../providers/download_providers.dart';
 import '../providers/watch_party_provider.dart';
+import '../app_orientation_system_ui.dart';
 import '../screens/video_player_screen.dart';
 import 'watch_party_logger.dart';
 
@@ -146,6 +147,8 @@ class WatchPartyNavigation {
       markMemberInPartyPlayer(true);
     }
 
+    final restoreOrientations = AppOrientationSystemUi.orientationsFromContext(context);
+
     WatchPartyLogger.info(
       'pushing VideoPlayerScreen releaseId=$releaseId watchParty=${activeParty.isActive}',
     );
@@ -156,6 +159,7 @@ class WatchPartyNavigation {
           title: title,
           currentReleaseId: releaseId,
           watchPartyEnabled: activeParty.isActive,
+          restoreOrientationsOnExit: restoreOrientations,
         ),
       ),
     );
