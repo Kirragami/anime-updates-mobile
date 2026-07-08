@@ -7,6 +7,7 @@ import '../screens/login_screen.dart';
 import '../screens/tomodachi_screen.dart';
 import '../screens/watch_party_lobby_screen.dart';
 import '../services/auth_service.dart';
+import '../services/watch_party_invite_delivery.dart';
 import '../utils/page_transitions.dart';
 
 class NotificationService {
@@ -139,20 +140,17 @@ class NotificationService {
     WatchPartyInvitePayload payload,
   ) {
     if (AuthService.isLoggedIn) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => WatchPartyInviteLandingScreen(payload: payload),
-        ),
-      );
-    } else {
-      Navigator.of(context).push(
-        CustomPageTransitions.simpleFade(
-          LoginScreen(
-            destination: WatchPartyInviteLandingScreen(payload: payload),
-          ),
-        ),
-      );
+      WatchPartyInviteDelivery.deliver(payload);
+      return;
     }
+
+    Navigator.of(context).push(
+      CustomPageTransitions.simpleFade(
+        LoginScreen(
+          destination: WatchPartyInviteLandingScreen(payload: payload),
+        ),
+      ),
+    );
   }
 
   static void _navigateToAnimeDetail(

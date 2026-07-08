@@ -16,6 +16,7 @@ class WatchPartySessionState {
   final PartyState? partyState;
   final bool isConnected;
   final bool isBusy;
+  final Set<int> invitingFriendIds;
   final String? invitedFriendName;
   final String? errorMessage;
   final String? statusMessage;
@@ -29,6 +30,7 @@ class WatchPartySessionState {
     this.partyState,
     this.isConnected = false,
     this.isBusy = false,
+    this.invitingFriendIds = const {},
     this.invitedFriendName,
     this.errorMessage,
     this.statusMessage,
@@ -44,6 +46,7 @@ class WatchPartySessionState {
     PartyState? partyState,
     bool? isConnected,
     bool? isBusy,
+    Set<int>? invitingFriendIds,
     String? invitedFriendName,
     String? errorMessage,
     String? statusMessage,
@@ -59,6 +62,7 @@ class WatchPartySessionState {
       partyState: partyState ?? this.partyState,
       isConnected: isConnected ?? this.isConnected,
       isBusy: isBusy ?? this.isBusy,
+      invitingFriendIds: invitingFriendIds ?? this.invitingFriendIds,
       invitedFriendName: invitedFriendName ?? this.invitedFriendName,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       statusMessage: clearStatus ? null : (statusMessage ?? this.statusMessage),
@@ -92,17 +96,22 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
       return;
     }
 
-    state = state.copyWith(isBusy: true, clearError: true, clearStatus: true);
+    state = state.copyWith(
+      invitingFriendIds: {...state.invitingFriendIds, friendId},
+      clearError: true,
+      clearStatus: true,
+    );
 
     try {
       final invite = await _api.inviteFriend(friendId);
       final userId = AuthService.currentUserId;
 
+      final invitingFriendIds = {...state.invitingFriendIds}..remove(friendId);
       state = state.copyWith(
         partyId: invite.partyId,
         isLeader: true,
         invitedFriendName: friendUsername,
-        isBusy: false,
+        invitingFriendIds: invitingFriendIds,
         statusMessage: 'Invite sent to $friendUsername',
       );
 
@@ -118,8 +127,9 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
         );
       }
     } catch (e) {
+      final invitingFriendIds = {...state.invitingFriendIds}..remove(friendId);
       state = state.copyWith(
-        isBusy: false,
+        invitingFriendIds: invitingFriendIds,
         errorMessage: e.toString().replaceFirst('Exception: ', ''),
       );
     }

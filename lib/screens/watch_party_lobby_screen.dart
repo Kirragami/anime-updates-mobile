@@ -6,6 +6,7 @@ import '../models/watch_party_models.dart';
 import '../providers/friends_providers.dart';
 import '../providers/watch_party_provider.dart';
 import '../services/auth_service.dart';
+import '../services/watch_party_invite_delivery.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
 
@@ -173,7 +174,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
               children: accepted.map((friend) {
                 return _FriendInviteTile(
                   friend: friend,
-                  isBusy: partyState.isBusy,
+                  isInviting: partyState.invitingFriendIds.contains(friend.id),
                   onInvite: () => _inviteFriend(friend),
                 );
               }).toList(),
@@ -475,12 +476,12 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
 class _FriendInviteTile extends StatelessWidget {
   const _FriendInviteTile({
     required this.friend,
-    required this.isBusy,
+    required this.isInviting,
     required this.onInvite,
   });
 
   final Tomodachi friend;
-  final bool isBusy;
+  final bool isInviting;
   final VoidCallback onInvite;
 
   @override
@@ -513,7 +514,7 @@ class _FriendInviteTile extends StatelessWidget {
           'Tap to invite',
           style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
         ),
-        trailing: isBusy
+        trailing: isInviting
             ? const SizedBox(
                 width: 22,
                 height: 22,
@@ -523,7 +524,7 @@ class _FriendInviteTile extends StatelessWidget {
                 ),
               )
             : Icon(Icons.send_rounded, color: AppTheme.primaryColor.withOpacity(0.9)),
-        onTap: isBusy ? null : onInvite,
+        onTap: isInviting ? null : onInvite,
       ),
     );
   }
@@ -651,14 +652,12 @@ class _WatchPartyInviteLandingScreenState
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      await showWatchPartyInviteDialog(context, ref, widget.payload);
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const WatchPartyLobbyScreen()),
-        );
-      }
+      WatchPartyInviteDelivery.deliver(widget.payload);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const WatchPartyLobbyScreen()),
+      );
     });
   }
 
