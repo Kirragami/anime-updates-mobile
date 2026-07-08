@@ -206,7 +206,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
                       const SizedBox(height: 2),
                       Text(
                         party.isLeader
-                            ? 'Tap an episode to sync playback'
+                            ? 'Tap an episode to sync with the party'
                             : 'Waiting for leader · ${connected ? 'connected' : 'reconnecting'}',
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.72),

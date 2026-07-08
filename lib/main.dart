@@ -273,9 +273,21 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
           _pendingBackgroundWatchPartyInvite = watchPartyInvite;
           await LocalNotificationService.showRemoteMessage(message);
         }
-      } else {
-        await LocalNotificationService.showRemoteMessage(message);
+        return;
       }
+
+      final watchPartyDecline =
+          NotificationService.parseWatchPartyDecline(message.data);
+      if (watchPartyDecline != null) {
+        if (_appShellDelivery.isForegroundInteractive) {
+          WatchPartyAppShell.deliverInviteDeclined(watchPartyDecline);
+        } else {
+          await LocalNotificationService.showRemoteMessage(message);
+        }
+        return;
+      }
+
+      await LocalNotificationService.showRemoteMessage(message);
 
       if (NotificationService.isFriendMessage(message) &&
           AuthService.isLoggedIn) {

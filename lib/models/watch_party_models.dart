@@ -30,8 +30,9 @@ class SyncAction {
   final bool isPlaying;
   final String? videoUrl;
   final String? senderUsername;
-  final String? leaderId;
+  final String? leaderUsername;
   final Set<String>? activeMembers;
+  final Set<String>? members;
 
   const SyncAction({
     required this.action,
@@ -39,8 +40,9 @@ class SyncAction {
     this.isPlaying = false,
     this.videoUrl,
     this.senderUsername,
-    this.leaderId,
+    this.leaderUsername,
     this.activeMembers,
+    this.members,
   });
 
   factory SyncAction.fromJson(Map<String, dynamic> json) {
@@ -54,9 +56,12 @@ class SyncAction {
       isPlaying: json['isPlaying'] == true,
       videoUrl: json['videoUrl']?.toString(),
       senderUsername: json['senderUsername']?.toString(),
-      leaderId: json['leaderId']?.toString(),
+      leaderUsername: json['leaderUsername']?.toString(),
       activeMembers: json.containsKey('activeMembers')
           ? PartyState._parseStringSet(json['activeMembers'])
+          : null,
+      members: json.containsKey('members')
+          ? PartyState._parseStringSet(json['members'])
           : null,
     );
   }
@@ -68,8 +73,9 @@ class SyncAction {
       'isPlaying': isPlaying,
       if (videoUrl != null) 'videoUrl': videoUrl,
       if (senderUsername != null) 'senderUsername': senderUsername,
-      if (leaderId != null) 'leaderId': leaderId,
+      if (leaderUsername != null) 'leaderUsername': leaderUsername,
       if (activeMembers != null) 'activeMembers': activeMembers!.toList(),
+      if (members != null) 'members': members!.toList(),
     };
   }
 
@@ -98,32 +104,58 @@ class PartyInviteResult {
 
 class PartyState {
   final String partyId;
-  final String leaderId;
+  final String leaderUsername;
   final String? videoUrl;
   final double currentTimeStamp;
   final bool isPlaying;
   final Set<String> members;
   final Set<String> activeMembers;
+  final Set<String> pendingInviteUsernames;
 
   const PartyState({
     required this.partyId,
-    required this.leaderId,
+    required this.leaderUsername,
     this.videoUrl,
     this.currentTimeStamp = 0,
     this.isPlaying = false,
     this.members = const {},
     this.activeMembers = const {},
+    this.pendingInviteUsernames = const {},
   });
 
   factory PartyState.fromJson(Map<String, dynamic> json) {
     return PartyState(
       partyId: json['partyId']?.toString() ?? '',
-      leaderId: json['leaderId']?.toString() ?? '',
+      leaderUsername: json['leaderUsername']?.toString() ?? '',
       videoUrl: json['videoUrl']?.toString(),
       currentTimeStamp: SyncAction._parseDouble(json['currentTimeStamp']),
       isPlaying: json['isPlaying'] == true,
       members: _parseStringSet(json['members']),
       activeMembers: _parseStringSet(json['activeMembers']),
+      pendingInviteUsernames: _parseStringSet(json['pendingInviteUsernames']),
+    );
+  }
+
+  PartyState copyWith({
+    String? partyId,
+    String? leaderUsername,
+    String? videoUrl,
+    double? currentTimeStamp,
+    bool? isPlaying,
+    Set<String>? members,
+    Set<String>? activeMembers,
+    Set<String>? pendingInviteUsernames,
+  }) {
+    return PartyState(
+      partyId: partyId ?? this.partyId,
+      leaderUsername: leaderUsername ?? this.leaderUsername,
+      videoUrl: videoUrl ?? this.videoUrl,
+      currentTimeStamp: currentTimeStamp ?? this.currentTimeStamp,
+      isPlaying: isPlaying ?? this.isPlaying,
+      members: members ?? this.members,
+      activeMembers: activeMembers ?? this.activeMembers,
+      pendingInviteUsernames:
+          pendingInviteUsernames ?? this.pendingInviteUsernames,
     );
   }
 
@@ -141,13 +173,11 @@ class PartyState {
 class WatchPartyInvitePayload {
   final String partyId;
   final String inviteToken;
-  final String leaderId;
   final String leaderUsername;
 
   const WatchPartyInvitePayload({
     required this.partyId,
     required this.inviteToken,
-    required this.leaderId,
     required this.leaderUsername,
   });
 
@@ -155,13 +185,33 @@ class WatchPartyInvitePayload {
     return WatchPartyInvitePayload(
       partyId: data['partyId']?.toString() ?? '',
       inviteToken: data['inviteToken']?.toString() ?? '',
-      leaderId: data['leaderId']?.toString() ?? '',
       leaderUsername: data['leaderUsername']?.toString() ?? 'Someone',
     );
   }
 
   bool get isValid =>
-      partyId.isNotEmpty && inviteToken.isNotEmpty && leaderId.isNotEmpty;
+      partyId.isNotEmpty &&
+      inviteToken.isNotEmpty &&
+      leaderUsername.isNotEmpty;
+}
+
+class WatchPartyDeclinePayload {
+  final String partyId;
+  final String declinedUsername;
+
+  const WatchPartyDeclinePayload({
+    required this.partyId,
+    required this.declinedUsername,
+  });
+
+  factory WatchPartyDeclinePayload.fromData(Map<String, dynamic> data) {
+    return WatchPartyDeclinePayload(
+      partyId: data['partyId']?.toString() ?? '',
+      declinedUsername: data['declinedUsername']?.toString() ?? 'Someone',
+    );
+  }
+
+  bool get isValid => partyId.isNotEmpty && declinedUsername.isNotEmpty;
 }
 
 /// Identifies a locally downloaded episode across party members.

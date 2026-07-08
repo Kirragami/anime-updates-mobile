@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -28,6 +30,10 @@ class WatchPartyAppShell {
 
   static void deliverInvite(WatchPartyInvitePayload payload) {
     _instance?.onInviteReceived(payload);
+  }
+
+  static void deliverInviteDeclined(WatchPartyDeclinePayload payload) {
+    _instance?.onInviteDeclined(payload);
   }
 
   static void resetSession() {
@@ -62,6 +68,11 @@ class WatchPartyAppShell {
         }
       },
     );
+  }
+
+  void onInviteDeclined(WatchPartyDeclinePayload payload) {
+    if (!AuthService.isLoggedIn || !payload.isValid) return;
+    unawaited(_ref().read(watchPartyProvider.notifier).handleInviteDeclined(payload));
   }
 
   void onPartyStateChanged(

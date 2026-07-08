@@ -18,9 +18,7 @@ class WatchPartySessionState {
   final PartyState? partyState;
   final bool isConnected;
   final bool isBusy;
-  final Set<int> invitingFriendIds;
-  final Set<int> pendingInviteFriendIds;
-  final String? invitedFriendName;
+  final Set<String> invitingFriendUsernames;
   final String? errorMessage;
   final String? statusMessage;
   /// Bumps when the leader loads a video so members can auto-open reliably.
@@ -33,9 +31,7 @@ class WatchPartySessionState {
     this.partyState,
     this.isConnected = false,
     this.isBusy = false,
-    this.invitingFriendIds = const {},
-    this.pendingInviteFriendIds = const {},
-    this.invitedFriendName,
+    this.invitingFriendUsernames = const {},
     this.errorMessage,
     this.statusMessage,
     this.memberVideoOpenToken = 0,
@@ -50,9 +46,7 @@ class WatchPartySessionState {
     PartyState? partyState,
     bool? isConnected,
     bool? isBusy,
-    Set<int>? invitingFriendIds,
-    Set<int>? pendingInviteFriendIds,
-    String? invitedFriendName,
+    Set<String>? invitingFriendUsernames,
     String? errorMessage,
     String? statusMessage,
     int? memberVideoOpenToken,
@@ -67,10 +61,7 @@ class WatchPartySessionState {
       partyState: partyState ?? this.partyState,
       isConnected: isConnected ?? this.isConnected,
       isBusy: isBusy ?? this.isBusy,
-      invitingFriendIds: invitingFriendIds ?? this.invitingFriendIds,
-      pendingInviteFriendIds:
-          pendingInviteFriendIds ?? this.pendingInviteFriendIds,
-      invitedFriendName: invitedFriendName ?? this.invitedFriendName,
+      invitingFriendUsernames: invitingFriendUsernames ?? this.invitingFriendUsernames,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       statusMessage: clearStatus ? null : (statusMessage ?? this.statusMessage),
       memberVideoOpenToken: memberVideoOpenToken ?? this.memberVideoOpenToken,
@@ -97,7 +88,6 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
   WatchPartySocketService get socket => _socket;
 
   Future<void> inviteFriend({
-    required int friendId,
     required String friendUsername,
   }) async {
     if (!AuthService.isLoggedIn) {
@@ -108,28 +98,31 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
     }
 
     state = state.copyWith(
-      invitingFriendIds: {...state.invitingFriendIds, friendId},
+      invitingFriendUsernames: {...state.invitingFriendUsernames, friendUsername},
       clearError: true,
       clearStatus: true,
     );
 
     try {
-      final invite = await _api.inviteFriend(friendId);
+      final invite = await _api.inviteFriend(friendUsername);
       final isContinuingParty =
           state.isActive && state.isLeader && state.partyId == invite.partyId;
 
-      final invitingFriendIds = {...state.invitingFriendIds}..remove(friendId);
-      final pendingInviteFriendIds = {
-        ...state.pendingInviteFriendIds,
-        friendId,
-      };
+      final invitingFriendUsernames = {...state.invitingFriendUsernames}
+        ..remove(friendUsername);
+      final currentPartyState = state.partyState;
+      final optimisticPartyState = currentPartyState?.copyWith(
+        pendingInviteUsernames: {
+          ...currentPartyState.pendingInviteUsernames,
+          friendUsername,
+        },
+      );
 
       state = state.copyWith(
         partyId: invite.partyId,
         isLeader: true,
-        invitedFriendName: isContinuingParty ? state.invitedFriendName : friendUsername,
-        invitingFriendIds: invitingFriendIds,
-        pendingInviteFriendIds: pendingInviteFriendIds,
+        partyState: optimisticPartyState ?? currentPartyState,
+        invitingFriendUsernames: invitingFriendUsernames,
         statusMessage: 'Invite sent to $friendUsername',
       );
 
@@ -140,9 +133,10 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
         await refreshState();
       }
     } catch (e) {
-      final invitingFriendIds = {...state.invitingFriendIds}..remove(friendId);
+      final invitingFriendUsernames = {...state.invitingFriendUsernames}
+        ..remove(friendUsername);
       state = state.copyWith(
-        invitingFriendIds: invitingFriendIds,
+        invitingFriendUsernames: invitingFriendUsernames,
         errorMessage: e.toString().replaceFirst('Exception: ', ''),
       );
     }
@@ -162,13 +156,12 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
         token: payload.inviteToken,
       );
 
-      final userId = AuthService.currentUserId;
-      final isLeader = userId == payload.leaderId;
+      final username = AuthService.currentUsername;
+      final isLeader = username == payload.leaderUsername;
 
       state = state.copyWith(
         partyId: payload.partyId,
         isLeader: isLeader,
-        invitedFriendName: payload.leaderUsername,
         isBusy: false,
         statusMessage: 'Joined ${payload.leaderUsername}\'s watch party',
       );
@@ -198,20 +191,37 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
     }
   }
 
+  Future<void> handleInviteDeclined(WatchPartyDeclinePayload payload) async {
+    if (!payload.isValid) return;
+    if (!state.isActive || state.partyId != payload.partyId || !state.isLeader) {
+      return;
+    }
+
+    final currentPartyState = state.partyState;
+    final updatedPartyState = currentPartyState?.copyWith(
+      pendingInviteUsernames: currentPartyState.pendingInviteUsernames
+          .where((name) => name != payload.declinedUsername)
+          .toSet(),
+    );
+
+    state = state.copyWith(
+      partyState: updatedPartyState ?? currentPartyState,
+      statusMessage: '${payload.declinedUsername} declined the invite',
+    );
+
+    await refreshState();
+  }
+
   Future<void> refreshState() async {
     final partyId = state.partyId;
     if (partyId == null) return;
 
     try {
       final partyState = await _api.getPartyState(partyId);
-      final userId = AuthService.currentUserId;
+      final username = AuthService.currentUsername;
       state = state.copyWith(
         partyState: partyState,
-        isLeader: userId == partyState.leaderId,
-        pendingInviteFriendIds: _pendingInvitesExcludingMembers(
-          state.pendingInviteFriendIds,
-          partyState.members,
-        ),
+        isLeader: username == partyState.leaderUsername,
         clearError: true,
       );
     } catch (e) {
@@ -219,19 +229,6 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
         errorMessage: e.toString().replaceFirst('Exception: ', ''),
       );
     }
-  }
-
-  Set<int> _pendingInvitesExcludingMembers(
-    Set<int> pendingInviteFriendIds,
-    Set<String> joinedMemberIds,
-  ) {
-    final joinedNumericIds = joinedMemberIds
-        .map(int.tryParse)
-        .whereType<int>()
-        .toSet();
-    return pendingInviteFriendIds
-        .where((friendId) => !joinedNumericIds.contains(friendId))
-        .toSet();
   }
 
   Future<void> _connectSocket(String partyId) async {
@@ -255,15 +252,15 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
 
     await AuthService.ensureFreshAccessToken();
     final partyState = await _api.getPartyState(partyId);
-    final userId = AuthService.currentUserId;
+    final username = AuthService.currentUsername;
     state = state.copyWith(
       partyState: partyState,
-      isLeader: userId == partyState.leaderId,
+      isLeader: username == partyState.leaderUsername,
     );
 
     if (kDebugMode) {
       print(
-        '[WatchParty] connecting socket partyId=$partyId userId=${AuthService.currentUserId}',
+        '[WatchParty] connecting socket partyId=$partyId username=${AuthService.currentUsername}',
       );
     }
 
@@ -275,7 +272,7 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
     switch (action.action) {
       case SyncActionType.join:
       case SyncActionType.leave:
-        await refreshState();
+        _applyMembershipBroadcast(action);
         return;
       case SyncActionType.presence:
         _applyPresenceUpdate(action);
@@ -285,19 +282,13 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
       case SyncActionType.leaderChange:
         final current = state.partyState;
         if (current != null) {
-          final updated = PartyState(
-            partyId: current.partyId,
-            leaderId: action.leaderId ?? current.leaderId,
-            videoUrl: current.videoUrl,
-            currentTimeStamp: current.currentTimeStamp,
-            isPlaying: current.isPlaying,
-            members: current.members,
-            activeMembers: current.activeMembers,
+          final updated = current.copyWith(
+            leaderUsername: action.leaderUsername ?? current.leaderUsername,
           );
-          final userId = AuthService.currentUserId;
+          final username = AuthService.currentUsername;
           state = state.copyWith(
             partyState: updated,
-            isLeader: userId != null && userId == updated.leaderId,
+            isLeader: username != null && username == updated.leaderUsername,
           );
         }
         await refreshState();
@@ -323,14 +314,11 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
     PartyState updated = current;
     switch (action.action) {
       case SyncActionType.loadVideo:
-        updated = PartyState(
-          partyId: current.partyId,
-          leaderId: action.leaderId ?? current.leaderId,
+        updated = current.copyWith(
+          leaderUsername: action.leaderUsername ?? current.leaderUsername,
           videoUrl: action.videoUrl,
           currentTimeStamp: 0,
           isPlaying: false,
-          members: current.members,
-          activeMembers: current.activeMembers,
         );
         if (kDebugMode) {
           WatchPartyLogger.info(
@@ -351,47 +339,29 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
         }
         break;
       case SyncActionType.play:
-        updated = PartyState(
-          partyId: current.partyId,
-          leaderId: current.leaderId,
-          videoUrl: current.videoUrl,
+        updated = current.copyWith(
           currentTimeStamp: action.timestamp,
           isPlaying: true,
-          members: current.members,
-          activeMembers: current.activeMembers,
         );
         break;
       case SyncActionType.pause:
-        updated = PartyState(
-          partyId: current.partyId,
-          leaderId: current.leaderId,
-          videoUrl: current.videoUrl,
+        updated = current.copyWith(
           currentTimeStamp: action.timestamp,
           isPlaying: false,
-          members: current.members,
-          activeMembers: current.activeMembers,
         );
         break;
       case SyncActionType.seek:
-        updated = PartyState(
-          partyId: current.partyId,
-          leaderId: current.leaderId,
-          videoUrl: current.videoUrl,
+        updated = current.copyWith(
           currentTimeStamp: action.timestamp,
           isPlaying: action.isPlaying,
-          members: current.members,
-          activeMembers: current.activeMembers,
         );
         break;
       case SyncActionType.syncRequest:
-        updated = PartyState(
-          partyId: current.partyId,
-          leaderId: action.leaderId ?? current.leaderId,
+        updated = current.copyWith(
+          leaderUsername: action.leaderUsername ?? current.leaderUsername,
           videoUrl: action.videoUrl ?? current.videoUrl,
           currentTimeStamp: action.timestamp,
           isPlaying: action.isPlaying,
-          members: current.members,
-          activeMembers: current.activeMembers,
         );
         if (!state.isLeader) {
           final incomingVideoUrl = action.videoUrl;
@@ -442,14 +412,10 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
     final current = state.partyState;
     if (current != null) {
       state = state.copyWith(
-        partyState: PartyState(
-          partyId: current.partyId,
-          leaderId: current.leaderId,
+        partyState: current.copyWith(
           videoUrl: encoded,
           currentTimeStamp: 0,
           isPlaying: false,
-          members: current.members,
-          activeMembers: current.activeMembers,
         ),
       );
     }
@@ -458,7 +424,7 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
       SyncAction(
         action: SyncActionType.loadVideo,
         videoUrl: encoded,
-        leaderId: AuthService.currentUserId,
+        leaderUsername: AuthService.currentUsername,
       ),
     );
   }
@@ -499,12 +465,12 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
   Future<void> leaveParty() async {
     _cancelReconnect();
     _stopKeepalive();
-    final userId = AuthService.currentUserId;
-    if (state.isActive && userId != null) {
+    final username = AuthService.currentUsername;
+    if (state.isActive && username != null) {
       sendSync(
         SyncAction(
           action: SyncActionType.leave,
-          leaderId: state.partyState?.leaderId,
+          leaderUsername: state.partyState?.leaderUsername,
         ),
       );
     }
@@ -526,16 +492,63 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
     }
 
     state = state.copyWith(
-      partyState: PartyState(
-        partyId: current.partyId,
-        leaderId: current.leaderId,
-        videoUrl: current.videoUrl,
-        currentTimeStamp: current.currentTimeStamp,
-        isPlaying: current.isPlaying,
-        members: current.members,
-        activeMembers: action.activeMembers!,
+      partyState: current.copyWith(activeMembers: action.activeMembers!),
+    );
+  }
+
+  void _applyMembershipBroadcast(SyncAction action) {
+    final current = state.partyState;
+    if (current == null || action.members == null) {
+      unawaited(refreshState());
+      return;
+    }
+
+    final updatedMembers = action.members!;
+    final updatedActiveMembers = action.activeMembers != null
+        ? action.activeMembers!
+        : _activeMembersForRemainingMembers(
+            current.activeMembers,
+            updatedMembers,
+          );
+    final updatedPartyState = current.copyWith(
+      members: updatedMembers,
+      activeMembers: updatedActiveMembers,
+      pendingInviteUsernames: _pendingInvitesExcludingMembers(
+        current.pendingInviteUsernames,
+        updatedMembers,
       ),
     );
+
+    final senderName = action.senderUsername;
+    String? statusMessage;
+    if (senderName != null && senderName.isNotEmpty) {
+      statusMessage = action.action == SyncActionType.join
+          ? '$senderName joined the party'
+          : '$senderName left the party';
+    }
+
+    state = state.copyWith(
+      partyState: updatedPartyState,
+      statusMessage: statusMessage,
+    );
+  }
+
+  Set<String> _pendingInvitesExcludingMembers(
+    Set<String> pendingInviteUsernames,
+    Set<String> joinedMemberUsernames,
+  ) {
+    return pendingInviteUsernames
+        .where((username) => !joinedMemberUsernames.contains(username))
+        .toSet();
+  }
+
+  Set<String> _activeMembersForRemainingMembers(
+    Set<String> activeMembers,
+    Set<String> joinedMemberUsernames,
+  ) {
+    return activeMembers
+        .where((username) => joinedMemberUsernames.contains(username))
+        .toSet();
   }
 
   void _sendKeepalive() {
@@ -558,11 +571,12 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
   }
 
   void _announcePresence() {
-    final leaderId = state.partyState?.leaderId ?? AuthService.currentUserId;
+    final leaderUsername =
+        state.partyState?.leaderUsername ?? AuthService.currentUsername;
     sendSync(
       SyncAction(
         action: SyncActionType.join,
-        leaderId: leaderId,
+        leaderUsername: leaderUsername,
       ),
     );
     if (!state.isLeader) {

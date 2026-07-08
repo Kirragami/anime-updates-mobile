@@ -16,11 +16,11 @@ class WatchPartyService {
     'Accept': 'application/json',
   };
 
-  Future<PartyInviteResult> inviteFriend(int friendId) async {
+  Future<PartyInviteResult> inviteFriend(String friendUsername) async {
     final response = await dioClient
         .post(
           '${AppConstants.baseUrl}${AppConstants.partyInviteEndpoint}',
-          data: jsonEncode({'friendId': friendId}),
+          data: jsonEncode({'friendUsername': friendUsername}),
           options: Options(headers: _headers),
         )
         .timeout(const Duration(seconds: 30));
@@ -63,26 +63,38 @@ class WatchPartyService {
   }
 
   Future<PartyState> getPartyState(String partyId) async {
-    final response = await dioClient
-        .get(
-          '${AppConstants.baseUrl}${AppConstants.partyEndpoint}/$partyId',
-          options: Options(headers: _headers),
-        )
-        .timeout(const Duration(seconds: 30));
+    try {
+      final response = await dioClient
+          .get(
+            '${AppConstants.baseUrl}${AppConstants.partyEndpoint}/$partyId',
+            options: Options(headers: _headers),
+          )
+          .timeout(const Duration(seconds: 30));
 
-    final body = _asMap(response.data);
-    if (body == null || !_isSuccess(body['success'])) {
-      throw Exception(
-        body?['message']?.toString() ?? 'Failed to load party state',
-      );
+      final body = _asMap(response.data);
+      if (body == null || !_isSuccess(body['success'])) {
+        throw Exception(
+          body?['message']?.toString() ?? 'Failed to load party state',
+        );
+      }
+
+      final data = body['data'];
+      if (data is! Map) {
+        throw Exception('Unexpected party state response');
+      }
+
+      return PartyState.fromJson(Map<String, dynamic>.from(data));
+    } on DioException catch (e) {
+      final parsed = _asMap(e.response?.data);
+      final message = parsed?['message']?.toString();
+      if (message != null && message.isNotEmpty) {
+        throw Exception(message);
+      }
+      if (e.response?.statusCode == 404) {
+        throw Exception('Watch party not found.');
+      }
+      rethrow;
     }
-
-    final data = body['data'];
-    if (data is! Map) {
-      throw Exception('Unexpected party state response');
-    }
-
-    return PartyState.fromJson(Map<String, dynamic>.from(data));
   }
 
   Future<void> _postPartyAction({

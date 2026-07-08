@@ -35,6 +35,12 @@ class NotificationService {
       return;
     }
 
+    final watchPartyDecline = parseWatchPartyDecline(data);
+    if (watchPartyDecline != null) {
+      WatchPartyAppShell.deliverInviteDeclined(watchPartyDecline);
+      return;
+    }
+
     if (isFriendNotification(data, body: body)) {
       _navigateToTomodachi(context);
       return;
@@ -60,6 +66,23 @@ class NotificationService {
 
     final payload = WatchPartyInvitePayload.fromData(data);
     return payload.isValid ? payload : null;
+  }
+
+  static WatchPartyDeclinePayload? parseWatchPartyDecline(
+    Map<String, dynamic> data,
+  ) {
+    final type = (data['type'] ?? '').toString().toUpperCase();
+    if (type != 'WATCH_PARTY_DECLINED') {
+      return null;
+    }
+
+    final payload = WatchPartyDeclinePayload.fromData(data);
+    return payload.isValid ? payload : null;
+  }
+
+  static bool isWatchPartyDeclineMessage(RemoteMessage message) {
+    return parseWatchPartyDecline(Map<String, dynamic>.from(message.data)) !=
+        null;
   }
 
   static bool isWatchPartyMessage(RemoteMessage message) {

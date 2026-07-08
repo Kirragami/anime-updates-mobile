@@ -134,9 +134,9 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
       children: [
         _buildInfoCard(
           icon: Icons.groups_rounded,
-          title: 'Watch together',
+          title: 'Start a watch party',
           subtitle:
-              'Invite friends to sync playback on your downloaded episodes. Pick an episode after they join.',
+              'Invite one or more friends to sync playback on your downloaded episodes.',
         ),
         const SizedBox(height: 20),
         _buildFriendInviteList(
@@ -152,7 +152,9 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
     required WatchPartySessionState partyState,
     String title = 'Invite friends',
   }) {
-    final joinedMemberIds = partyState.partyState?.members ?? const {};
+    final joinedMemberUsernames = partyState.partyState?.members ?? const {};
+    final pendingInviteUsernames =
+        partyState.partyState?.pendingInviteUsernames ?? const {};
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,29 +183,28 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
           data: (friends) {
             final invitableFriends = _invitableFriends(
               friends: friends,
-              joinedMemberIds: joinedMemberIds,
+              joinedMemberUsernames: joinedMemberUsernames,
+              pendingInviteUsernames: pendingInviteUsernames,
             );
 
             if (invitableFriends.isEmpty) {
               return _buildEmptyFriends(
                 icon: Icons.check_circle_outline_rounded,
-                title: joinedMemberIds.isEmpty
+                title: joinedMemberUsernames.isEmpty
                     ? 'No friends yet'
                     : 'All friends invited or joined',
-                subtitle: joinedMemberIds.isEmpty
+                subtitle: joinedMemberUsernames.isEmpty
                     ? 'Add tomodachi first, then come back to invite them.'
-                    : 'Everyone available is already in the party or has a pending invite.',
+                    : 'Everyone available is already in the party or waiting on an invite.',
               );
             }
 
             return Column(
               children: invitableFriends.map((friend) {
-                final invitePending =
-                    partyState.pendingInviteFriendIds.contains(friend.id);
                 return _FriendInviteTile(
                   friend: friend,
-                  isInviting: partyState.invitingFriendIds.contains(friend.id),
-                  subtitle: invitePending ? 'Invite sent · tap to resend' : 'Tap to invite',
+                  isInviting: partyState.invitingFriendUsernames.contains(friend.username),
+                  subtitle: 'Tap to invite',
                   onInvite: () => _inviteFriend(friend),
                 );
               }).toList(),
@@ -216,55 +217,68 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
 
   List<Tomodachi> _invitableFriends({
     required List<Tomodachi> friends,
-    required Set<String> joinedMemberIds,
+    required Set<String> joinedMemberUsernames,
+    required Set<String> pendingInviteUsernames,
   }) {
     return friends
         .where(
           (friend) =>
               friend.isAccepted &&
-              !joinedMemberIds.contains(friend.id.toString()),
+              !joinedMemberUsernames.contains(friend.username) &&
+              !pendingInviteUsernames.contains(friend.username),
+        )
+        .toList();
+  }
+
+  List<Tomodachi> _pendingInviteFriends({
+    required List<Tomodachi> friends,
+    required Set<String> pendingInviteUsernames,
+  }) {
+    return friends
+        .where(
+          (friend) => pendingInviteUsernames.contains(friend.username),
         )
         .toList();
   }
 
   String _memberLabel({
-    required String memberId,
-    required List<Tomodachi> friends,
-    required String? leaderId,
+    required String memberUsername,
+    required String? leaderUsername,
   }) {
-    if (memberId == AuthService.currentUserId) {
-      return '${AuthService.currentUsername ?? 'You'} (you)';
+    final currentUsername = AuthService.currentUsername;
+    if (memberUsername == currentUsername) {
+      return '${currentUsername ?? 'You'} (you)';
     }
 
-    for (final friend in friends) {
-      if (friend.id.toString() == memberId) {
-        return friend.username;
-      }
+    if (memberUsername == leaderUsername) {
+      return '$memberUsername (leader)';
     }
 
-    if (memberId == leaderId) {
-      return 'Leader';
-    }
-
-    return 'Member';
+    return memberUsername;
   }
 
   String _leaderUsername({
-    required String? leaderId,
-    required List<Tomodachi> friends,
-    required WatchPartySessionState partyState,
+    required String? leaderUsername,
   }) {
-    if (leaderId == null) {
-      return partyState.invitedFriendName ?? 'your friend';
+    if (leaderUsername == null || leaderUsername.isEmpty) {
+      return 'the leader';
     }
 
-    for (final friend in friends) {
-      if (friend.id.toString() == leaderId) {
-        return friend.username;
-      }
+    if (leaderUsername == AuthService.currentUsername) {
+      return AuthService.currentUsername ?? 'You';
     }
 
-    return partyState.invitedFriendName ?? 'your friend';
+    return leaderUsername;
+  }
+
+  String _partyMemberSummary({
+    required int memberCount,
+    required int onlineCount,
+  }) {
+    final memberLabel = memberCount == 1 ? '1 member' : '$memberCount members';
+    final onlineLabel =
+        onlineCount == 1 ? '1 online' : '$onlineCount online';
+    return '$memberLabel · $onlineLabel';
   }
 
   Widget _buildActiveParty(
@@ -274,9 +288,15 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
   ) {
     final members = partyState.partyState?.members ?? {};
     final activeMembers = partyState.partyState?.activeMembers ?? {};
+    final pendingInviteUsernames =
+        partyState.partyState?.pendingInviteUsernames ?? const {};
     final friends = friendsAsync.maybeWhen(
       data: (value) => value,
       orElse: () => <Tomodachi>[],
+    );
+    final pendingInviteFriends = _pendingInviteFriends(
+      friends: friends,
+      pendingInviteUsernames: pendingInviteUsernames,
     );
 
     return ListView(
@@ -296,18 +316,17 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
         if (members.isEmpty)
           _buildEmptyFriends(
             icon: Icons.hourglass_top_rounded,
-            title: 'Waiting for friends',
-            subtitle: 'Your invite is on the way.',
+            title: 'Waiting for members',
+            subtitle: 'Invited friends will appear here once they join.',
           )
         else
-          ...members.map((memberId) {
+          ...members.map((memberUsername) {
             final label = _memberLabel(
-              memberId: memberId,
-              friends: friends,
-              leaderId: partyState.partyState?.leaderId,
+              memberUsername: memberUsername,
+              leaderUsername: partyState.partyState?.leaderUsername,
             );
-            final isLeader = memberId == partyState.partyState?.leaderId;
-            final isOnline = activeMembers.contains(memberId);
+            final isLeader = memberUsername == partyState.partyState?.leaderUsername;
+            final isOnline = activeMembers.contains(memberUsername);
 
             return _MemberTile(
               label: label,
@@ -315,6 +334,25 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
               isOnline: isOnline,
             );
           }),
+        if (partyState.isLeader && pendingInviteFriends.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text(
+            'Waiting for response',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...pendingInviteFriends.map(
+            (friend) => _PendingInviteTile(
+              friend: friend,
+              isInviting: partyState.invitingFriendUsernames.contains(friend.username),
+              onResend: () => _inviteFriend(friend),
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         if (partyState.isLeader) ...[
           Text(
@@ -360,9 +398,9 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
         ] else ...[
           _buildInfoCard(
             icon: Icons.sync_rounded,
-            title: 'Synced with leader',
+            title: 'Synced with the party',
             subtitle:
-                'When the party leader starts an episode, it will open here automatically.',
+                'When the leader starts an episode, it will open here automatically.',
           ),
         ],
       ],
@@ -375,7 +413,12 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
   ) {
     final connected = partyState.isConnected;
     final memberCount = partyState.partyState?.members.length ?? 1;
-    final leaderId = partyState.partyState?.leaderId;
+    final onlineCount = partyState.partyState?.activeMembers.length ?? 0;
+    final leaderUsername = partyState.partyState?.leaderUsername;
+    final memberSummary = _partyMemberSummary(
+      memberCount: memberCount,
+      onlineCount: onlineCount,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -409,12 +452,10 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
                 const SizedBox(height: 4),
                 Text(
                   partyState.isLeader
-                      ? 'You are the leader · $memberCount member${memberCount == 1 ? '' : 's'}'
-                      : 'Watching with ${_leaderUsername(
-                          leaderId: leaderId,
-                          friends: friends,
-                          partyState: partyState,
-                        )} · $memberCount member${memberCount == 1 ? '' : 's'}',
+                      ? 'You are the leader · $memberSummary'
+                      : 'Leader: ${_leaderUsername(
+                          leaderUsername: leaderUsername,
+                        )} · $memberSummary',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.72),
                     fontSize: 13,
@@ -529,7 +570,6 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
 
   Future<void> _inviteFriend(Tomodachi friend) async {
     await ref.read(watchPartyProvider.notifier).inviteFriend(
-          friendId: friend.id,
           friendUsername: friend.username,
         );
   }
@@ -672,6 +712,76 @@ class _MemberTile extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingInviteTile extends StatelessWidget {
+  const _PendingInviteTile({
+    required this.friend,
+    required this.isInviting,
+    required this.onResend,
+  });
+
+  final Tomodachi friend;
+  final bool isInviting;
+  final VoidCallback onResend;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceColor.withOpacity(0.55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.schedule_rounded,
+            color: Colors.white.withOpacity(0.55),
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  friend.username,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Invite sent · waiting for response',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.62),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: isInviting ? null : onResend,
+            child: isInviting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.primaryColor,
+                    ),
+                  )
+                : const Text('Resend'),
+          ),
         ],
       ),
     );
