@@ -29,6 +29,23 @@ class AuthService {
   static User? get currentUser => _currentUser;
   static bool get isLoggedIn => _accessToken != null;
 
+  static String? get currentUserId {
+    if (_accessToken == null) return null;
+    final payload = decodeJwtPayload(_accessToken!);
+    final sub = payload?['sub']?.toString();
+    if (sub != null && sub.isNotEmpty) return sub;
+    return _currentUser?.id.isNotEmpty == true ? _currentUser!.id : null;
+  }
+
+  static String? get currentUsername {
+    if (_currentUser != null && _currentUser!.username.isNotEmpty) {
+      return _currentUser!.username;
+    }
+    if (_accessToken == null) return null;
+    final payload = decodeJwtPayload(_accessToken!);
+    return payload?['username']?.toString();
+  }
+
   static Map<String, String> get _authHeaders => {
     'Content-Type': 'application/json',
     if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
@@ -452,6 +469,17 @@ class AuthService {
       return true;
     } catch (_) {
       return true;
+    }
+  }
+
+  static Future<void> ensureFreshAccessToken() async {
+    if (!isTokenExpired) {
+      return;
+    }
+
+    final result = await refreshAccessToken();
+    if (result['success'] != true) {
+      throw Exception('Session expired. Please log in again.');
     }
   }
 

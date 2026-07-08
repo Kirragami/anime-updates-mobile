@@ -12,7 +12,11 @@ import 'services/fcm_registration_service.dart';
 import 'services/auth_storage.dart';
 import 'services/notification_service.dart';
 import 'services/local_notification_service.dart';
+import 'services/watch_party_navigation.dart';
 import 'providers/friends_providers.dart';
+import 'providers/watch_party_provider.dart';
+import 'models/watch_party_models.dart';
+import 'screens/watch_party_lobby_screen.dart';
 import 'services/active_downloads_manager.dart';
 import 'services/completed_downloads_manager.dart';
 import 'services/download_event_dispatcher.dart';
@@ -93,6 +97,8 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   RemoteMessage? _pendingNotificationMessage;
   String? _pendingNotificationPayload;
+  AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
+  String? _presentingWatchPartyInvitePartyId;
 
   @override
   void initState() {
@@ -117,6 +123,64 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycleState = state;
+    if (state == AppLifecycleState.resumed) {
+      final party = ref.read(watchPartyProvider);
+      _maybeOpenPartyVideoFromSync(null, party);
+    }
+  }
+
+  void _maybeOpenPartyVideoFromSync(
+    WatchPartySessionState? previous,
+    WatchPartySessionState next,
+  ) {
+    void tryOpen() {
+      if (!mounted) return;
+
+      final context = _navigatorKey.currentContext;
+      if (context == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => tryOpen());
+        return;
+      }
+
+      WatchPartyNavigation.maybeOpenLeaderVideo(
+        ref: ref,
+        context: context,
+        previous: previous,
+        next: next,
+        appInForeground: _lifecycleState == AppLifecycleState.resumed,
+      );
+    }
+
+    tryOpen();
+  }
+
+  void _presentWatchPartyInviteDialog(WatchPartyInvitePayload payload) {
+    if (!AuthService.isLoggedIn || !payload.isValid) return;
+    if (_presentingWatchPartyInvitePartyId == payload.partyId) return;
+
+    void tryShow() {
+      if (!mounted) return;
+
+      final context = _navigatorKey.currentContext;
+      if (context == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => tryShow());
+        return;
+      }
+
+      _presentingWatchPartyInvitePartyId = payload.partyId;
+      showWatchPartyInviteDialog(context, ref, payload).whenComplete(() {
+        if (_presentingWatchPartyInvitePartyId == payload.partyId) {
+          _presentingWatchPartyInvitePartyId = null;
+        }
+      });
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => tryShow());
   }
 
   @override
@@ -229,9 +293,16 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
       print("Error listening to token refresh: $err");
     });
 
-    // Foreground messages — show as system notifications (FCM won't display them)
+    // Foreground messages — show dialog immediately; system notification can follow.
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-      await LocalNotificationService.showRemoteMessage(message);
+      final watchPartyInvite =
+          NotificationService.parseWatchPartyInvite(message.data);
+      if (watchPartyInvite != null &&
+          _lifecycleState == AppLifecycleState.resumed) {
+        _presentWatchPartyInviteDialog(watchPartyInvite);
+      } else {
+        await LocalNotificationService.showRemoteMessage(message);
+      }
 
       if (NotificationService.isFriendMessage(message) &&
           AuthService.isLoggedIn) {
@@ -255,6 +326,13 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<WatchPartySessionState>(watchPartyProvider, (previous, next) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _maybeOpenPartyVideoFromSync(previous, next);
+      });
+    });
+
     return MaterialApp(
       navigatorKey: _navigatorKey,
       title: AppConstants.appName,

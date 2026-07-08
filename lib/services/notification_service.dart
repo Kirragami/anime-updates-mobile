@@ -1,9 +1,11 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import '../models/anime_item.dart';
+import '../models/watch_party_models.dart';
 import '../screens/anime_detail_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/tomodachi_screen.dart';
+import '../screens/watch_party_lobby_screen.dart';
 import '../services/auth_service.dart';
 import '../utils/page_transitions.dart';
 
@@ -26,6 +28,12 @@ class NotificationService {
     String? body,
     Map<String, dynamic> data = const {},
   }) {
+    final watchPartyInvite = parseWatchPartyInvite(data);
+    if (watchPartyInvite != null) {
+      _navigateToWatchPartyInvite(context, watchPartyInvite);
+      return;
+    }
+
     if (isFriendNotification(data, body: body)) {
       _navigateToTomodachi(context);
       return;
@@ -39,6 +47,23 @@ class NotificationService {
       final animeItem = AnimeItem.fromJson(data);
       _navigateToAnimeDetail(context, animeItem);
     } catch (_) {}
+  }
+
+  static WatchPartyInvitePayload? parseWatchPartyInvite(
+    Map<String, dynamic> data,
+  ) {
+    final type = (data['type'] ?? '').toString().toUpperCase();
+    if (type != 'WATCH_PARTY_INVITE') {
+      return null;
+    }
+
+    final payload = WatchPartyInvitePayload.fromData(data);
+    return payload.isValid ? payload : null;
+  }
+
+  static bool isWatchPartyMessage(RemoteMessage message) {
+    return parseWatchPartyInvite(Map<String, dynamic>.from(message.data)) !=
+        null;
   }
 
   static bool isFriendMessage(RemoteMessage message) {
@@ -104,6 +129,27 @@ class NotificationService {
       Navigator.of(context).push(
         CustomPageTransitions.simpleFade(
           LoginScreen(destination: destination),
+        ),
+      );
+    }
+  }
+
+  static void _navigateToWatchPartyInvite(
+    BuildContext context,
+    WatchPartyInvitePayload payload,
+  ) {
+    if (AuthService.isLoggedIn) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => WatchPartyInviteLandingScreen(payload: payload),
+        ),
+      );
+    } else {
+      Navigator.of(context).push(
+        CustomPageTransitions.simpleFade(
+          LoginScreen(
+            destination: WatchPartyInviteLandingScreen(payload: payload),
+          ),
         ),
       );
     }

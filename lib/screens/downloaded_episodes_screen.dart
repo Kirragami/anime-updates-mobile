@@ -8,10 +8,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/completed_download.dart';
 import '../providers/download_providers.dart';
+import '../providers/watch_party_provider.dart';
+import '../services/auth_service.dart';
 import '../services/playback_progress_manager.dart';
+import '../services/watch_party_navigation.dart';
 import '../theme/app_theme.dart';
 import 'anime_detail_screen.dart';
-import 'video_player_screen.dart';
+import 'watch_party_lobby_screen.dart';
 
 const double _kWideLayoutMinWidth = 600;
 const double _kEpisodeTileMaxWidth = 320;
@@ -125,6 +128,8 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
   @override
   Widget build(BuildContext context) {
     final wide = _isWideLayout(context);
+    final party = ref.watch(watchPartyProvider);
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -134,6 +139,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
           child: Column(
             children: [
               _buildHeader(context),
+              if (party.isActive) _buildPartyBanner(context, party),
               Expanded(
                 child: _buildCompletedDownloads(context, wide: wide),
               ),
@@ -141,6 +147,97 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _openPartyEpisode(
+    String releaseId, {
+    bool fromRemoteLoad = false,
+  }) async {
+    await WatchPartyNavigation.openEpisode(
+      ref: ref,
+      context: context,
+      releaseId: releaseId,
+      fromRemoteLoad: fromRemoteLoad,
+    );
+  }
+
+  Widget _buildPartyBanner(BuildContext context, WatchPartySessionState party) {
+    final connected = party.isConnected;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const WatchPartyLobbyScreen()),
+            );
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.16),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.primaryColor.withOpacity(0.45)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.groups_rounded,
+                  color: AppTheme.primaryColor.withOpacity(0.95),
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        party.isLeader ? 'Watch party active' : 'In a watch party',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        party.isLeader
+                            ? 'Tap an episode to sync playback'
+                            : 'Waiting for leader · ${connected ? 'connected' : 'reconnecting'}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.72),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openWatchPartyLobby() {
+    if (!AuthService.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Log in to start a watch party')),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const WatchPartyLobbyScreen()),
     );
   }
 
@@ -178,6 +275,40 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
               ),
             ),
             const SizedBox(width: 12),
+            GestureDetector(
+              onTap: _openWatchPartyLobby,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOutCubic,
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withOpacity(0.3),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.groups_rounded,
+                    color: ref.watch(watchPartyProvider).isActive
+                        ? AppTheme.primaryColor
+                        : AppTheme.primaryColor.withOpacity(0.85),
+                    size: 18,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             GestureDetector(
               onTap: _toggleSearch,
               child: AnimatedContainer(
@@ -874,19 +1005,18 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
               onTap: () async {
-                final filePath =
-                    await ref.read(completedDownloadsProvider.notifier).getFilePath(episode.releaseId);
-                if (!mounted || filePath == null) return;
-                final nav = Navigator.of(context);
-                nav.push(
-                  MaterialPageRoute(
-                    builder: (context) => VideoPlayerScreen(
-                      filePath: filePath,
-                      title: '${episode.showName} - Episode ${episode.episode}',
-                      currentReleaseId: episode.releaseId,
+                final party = ref.read(watchPartyProvider);
+                if (party.isActive && !party.isLeader) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Only the party leader can pick episodes'),
                     ),
-                  ),
-                );
+                  );
+                  return;
+                }
+
+                await _openPartyEpisode(episode.releaseId);
               },
               child: Padding(
                 padding: const EdgeInsets.all(12),
