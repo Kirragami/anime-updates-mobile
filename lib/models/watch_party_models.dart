@@ -8,7 +8,9 @@ enum SyncActionType {
   syncRequest('SYNC_REQUEST'),
   join('JOIN'),
   leave('LEAVE'),
-  leaderChange('LEADER_CHANGE');
+  leaderChange('LEADER_CHANGE'),
+  presence('PRESENCE'),
+  heartbeat('HEARTBEAT');
 
   const SyncActionType(this.apiValue);
   final String apiValue;
@@ -29,6 +31,7 @@ class SyncAction {
   final String? videoUrl;
   final String? senderUsername;
   final String? leaderId;
+  final Set<String>? activeMembers;
 
   const SyncAction({
     required this.action,
@@ -37,6 +40,7 @@ class SyncAction {
     this.videoUrl,
     this.senderUsername,
     this.leaderId,
+    this.activeMembers,
   });
 
   factory SyncAction.fromJson(Map<String, dynamic> json) {
@@ -51,6 +55,9 @@ class SyncAction {
       videoUrl: json['videoUrl']?.toString(),
       senderUsername: json['senderUsername']?.toString(),
       leaderId: json['leaderId']?.toString(),
+      activeMembers: json.containsKey('activeMembers')
+          ? PartyState._parseStringSet(json['activeMembers'])
+          : null,
     );
   }
 
@@ -62,6 +69,7 @@ class SyncAction {
       if (videoUrl != null) 'videoUrl': videoUrl,
       if (senderUsername != null) 'senderUsername': senderUsername,
       if (leaderId != null) 'leaderId': leaderId,
+      if (activeMembers != null) 'activeMembers': activeMembers!.toList(),
     };
   }
 

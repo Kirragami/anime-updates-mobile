@@ -10,6 +10,7 @@ import '../services/watch_party_navigation.dart';
 import '../services/watch_party_app_shell.dart';
 import '../services/watch_party_service.dart';
 import '../services/watch_party_socket_service.dart';
+import '../services/watch_party_sync_config.dart';
 
 class WatchPartySessionState {
   final String? partyId;
@@ -18,6 +19,7 @@ class WatchPartySessionState {
   final bool isConnected;
   final bool isBusy;
   final Set<int> invitingFriendIds;
+  final Set<int> pendingInviteFriendIds;
   final String? invitedFriendName;
   final String? errorMessage;
   final String? statusMessage;
@@ -32,6 +34,7 @@ class WatchPartySessionState {
     this.isConnected = false,
     this.isBusy = false,
     this.invitingFriendIds = const {},
+    this.pendingInviteFriendIds = const {},
     this.invitedFriendName,
     this.errorMessage,
     this.statusMessage,
@@ -48,6 +51,7 @@ class WatchPartySessionState {
     bool? isConnected,
     bool? isBusy,
     Set<int>? invitingFriendIds,
+    Set<int>? pendingInviteFriendIds,
     String? invitedFriendName,
     String? errorMessage,
     String? statusMessage,
@@ -64,6 +68,8 @@ class WatchPartySessionState {
       isConnected: isConnected ?? this.isConnected,
       isBusy: isBusy ?? this.isBusy,
       invitingFriendIds: invitingFriendIds ?? this.invitingFriendIds,
+      pendingInviteFriendIds:
+          pendingInviteFriendIds ?? this.pendingInviteFriendIds,
       invitedFriendName: invitedFriendName ?? this.invitedFriendName,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       statusMessage: clearStatus ? null : (statusMessage ?? this.statusMessage),
@@ -83,6 +89,10 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
 
   StreamSubscription<SyncAction>? _actionSub;
   StreamSubscription<bool>? _connectionSub;
+  Timer? _reconnectTimer;
+  Timer? _keepaliveTimer;
+
+  static const _reconnectDelay = Duration(seconds: 3);
 
   WatchPartySocketService get socket => _socket;
 
@@ -105,27 +115,29 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
 
     try {
       final invite = await _api.inviteFriend(friendId);
-      final userId = AuthService.currentUserId;
+      final isContinuingParty =
+          state.isActive && state.isLeader && state.partyId == invite.partyId;
 
       final invitingFriendIds = {...state.invitingFriendIds}..remove(friendId);
+      final pendingInviteFriendIds = {
+        ...state.pendingInviteFriendIds,
+        friendId,
+      };
+
       state = state.copyWith(
         partyId: invite.partyId,
         isLeader: true,
-        invitedFriendName: friendUsername,
+        invitedFriendName: isContinuingParty ? state.invitedFriendName : friendUsername,
         invitingFriendIds: invitingFriendIds,
+        pendingInviteFriendIds: pendingInviteFriendIds,
         statusMessage: 'Invite sent to $friendUsername',
       );
 
-      await _connectSocket(invite.partyId);
-      await refreshState();
-
-      if (userId != null) {
-        sendSync(
-          SyncAction(
-            action: SyncActionType.join,
-            leaderId: userId,
-          ),
-        );
+      if (isContinuingParty) {
+        await refreshState();
+      } else {
+        await _connectSocket(invite.partyId);
+        await refreshState();
       }
     } catch (e) {
       final invitingFriendIds = {...state.invitingFriendIds}..remove(friendId);
@@ -163,14 +175,6 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
 
       await _connectSocket(payload.partyId);
       await refreshState();
-
-      sendSync(
-        SyncAction(
-          action: SyncActionType.join,
-          leaderId: payload.leaderId,
-        ),
-      );
-      sendSync(const SyncAction(action: SyncActionType.syncRequest));
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
@@ -204,6 +208,10 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
       state = state.copyWith(
         partyState: partyState,
         isLeader: userId == partyState.leaderId,
+        pendingInviteFriendIds: _pendingInvitesExcludingMembers(
+          state.pendingInviteFriendIds,
+          partyState.members,
+        ),
         clearError: true,
       );
     } catch (e) {
@@ -211,6 +219,19 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
         errorMessage: e.toString().replaceFirst('Exception: ', ''),
       );
     }
+  }
+
+  Set<int> _pendingInvitesExcludingMembers(
+    Set<int> pendingInviteFriendIds,
+    Set<String> joinedMemberIds,
+  ) {
+    final joinedNumericIds = joinedMemberIds
+        .map(int.tryParse)
+        .whereType<int>()
+        .toSet();
+    return pendingInviteFriendIds
+        .where((friendId) => !joinedNumericIds.contains(friendId))
+        .toSet();
   }
 
   Future<void> _connectSocket(String partyId) async {
@@ -223,7 +244,12 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
     _connectionSub = _socket.connectionChanges.listen((connected) {
       state = state.copyWith(isConnected: connected);
       if (connected && state.partyId != null) {
+        _announcePresence();
+        _startKeepalive();
         unawaited(refreshState());
+      } else if (!connected && state.partyId != null) {
+        _stopKeepalive();
+        unawaited(_scheduleReconnect());
       }
     });
 
@@ -251,6 +277,11 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
       case SyncActionType.leave:
         await refreshState();
         return;
+      case SyncActionType.presence:
+        _applyPresenceUpdate(action);
+        return;
+      case SyncActionType.heartbeat:
+        return;
       case SyncActionType.leaderChange:
         final current = state.partyState;
         if (current != null) {
@@ -270,6 +301,9 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
           );
         }
         await refreshState();
+        if (!state.isConnected && state.isActive) {
+          unawaited(_scheduleReconnect());
+        }
         return;
       case SyncActionType.loadVideo:
       case SyncActionType.play:
@@ -379,6 +413,8 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
       case SyncActionType.join:
       case SyncActionType.leave:
       case SyncActionType.leaderChange:
+      case SyncActionType.presence:
+      case SyncActionType.heartbeat:
         return;
     }
 
@@ -461,6 +497,8 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
   }
 
   Future<void> leaveParty() async {
+    _cancelReconnect();
+    _stopKeepalive();
     final userId = AuthService.currentUserId;
     if (state.isActive && userId != null) {
       sendSync(
@@ -480,8 +518,87 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
     state = const WatchPartySessionState();
   }
 
+  void _applyPresenceUpdate(SyncAction action) {
+    final current = state.partyState;
+    if (current == null || action.activeMembers == null) {
+      unawaited(refreshState());
+      return;
+    }
+
+    state = state.copyWith(
+      partyState: PartyState(
+        partyId: current.partyId,
+        leaderId: current.leaderId,
+        videoUrl: current.videoUrl,
+        currentTimeStamp: current.currentTimeStamp,
+        isPlaying: current.isPlaying,
+        members: current.members,
+        activeMembers: action.activeMembers!,
+      ),
+    );
+  }
+
+  void _sendKeepalive() {
+    if (!state.isActive || !_socket.isConnected) return;
+    sendSync(const SyncAction(action: SyncActionType.heartbeat));
+  }
+
+  void _startKeepalive() {
+    _stopKeepalive();
+    _sendKeepalive();
+    _keepaliveTimer = Timer.periodic(
+      WatchPartySyncConfig.keepaliveInterval,
+      (_) => _sendKeepalive(),
+    );
+  }
+
+  void _stopKeepalive() {
+    _keepaliveTimer?.cancel();
+    _keepaliveTimer = null;
+  }
+
+  void _announcePresence() {
+    final leaderId = state.partyState?.leaderId ?? AuthService.currentUserId;
+    sendSync(
+      SyncAction(
+        action: SyncActionType.join,
+        leaderId: leaderId,
+      ),
+    );
+    if (!state.isLeader) {
+      sendSync(const SyncAction(action: SyncActionType.syncRequest));
+    }
+  }
+
+  Future<void> _scheduleReconnect() async {
+    if (!state.isActive || _reconnectTimer != null) return;
+
+    _reconnectTimer = Timer(_reconnectDelay, () async {
+      _reconnectTimer = null;
+      final partyId = state.partyId;
+      if (partyId == null) return;
+
+      try {
+        await _socket.connect(partyId);
+        state = state.copyWith(isConnected: _socket.isConnected);
+      } catch (e) {
+        WatchPartyLogger.warn('watch party reconnect failed: $e');
+        if (state.isActive) {
+          unawaited(_scheduleReconnect());
+        }
+      }
+    });
+  }
+
+  void _cancelReconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+  }
+
   @override
   void dispose() {
+    _cancelReconnect();
+    _stopKeepalive();
     _actionSub?.cancel();
     _connectionSub?.cancel();
     _socket.dispose();

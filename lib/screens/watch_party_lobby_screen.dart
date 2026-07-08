@@ -136,11 +136,29 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
           icon: Icons.groups_rounded,
           title: 'Watch together',
           subtitle:
-              'Invite a friend to sync playback on your downloaded episodes. Pick an episode after they join.',
+              'Invite friends to sync playback on your downloaded episodes. Pick an episode after they join.',
         ),
         const SizedBox(height: 20),
+        _buildFriendInviteList(
+          friendsAsync: friendsAsync,
+          partyState: partyState,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFriendInviteList({
+    required AsyncValue<List<Tomodachi>> friendsAsync,
+    required WatchPartySessionState partyState,
+    String title = 'Invite friends',
+  }) {
+    final joinedMemberIds = partyState.partyState?.members ?? const {};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Text(
-          'Invite a friend',
+          title,
           style: TextStyle(
             color: Colors.white.withOpacity(0.9),
             fontSize: 15,
@@ -161,20 +179,31 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
             subtitle: error.toString(),
           ),
           data: (friends) {
-            final accepted = friends.where((f) => f.isAccepted).toList();
-            if (accepted.isEmpty) {
+            final invitableFriends = _invitableFriends(
+              friends: friends,
+              joinedMemberIds: joinedMemberIds,
+            );
+
+            if (invitableFriends.isEmpty) {
               return _buildEmptyFriends(
-                icon: Icons.person_add_alt_1_rounded,
-                title: 'No friends yet',
-                subtitle: 'Add tomodachi first, then come back to invite them.',
+                icon: Icons.check_circle_outline_rounded,
+                title: joinedMemberIds.isEmpty
+                    ? 'No friends yet'
+                    : 'All friends invited or joined',
+                subtitle: joinedMemberIds.isEmpty
+                    ? 'Add tomodachi first, then come back to invite them.'
+                    : 'Everyone available is already in the party or has a pending invite.',
               );
             }
 
             return Column(
-              children: accepted.map((friend) {
+              children: invitableFriends.map((friend) {
+                final invitePending =
+                    partyState.pendingInviteFriendIds.contains(friend.id);
                 return _FriendInviteTile(
                   friend: friend,
                   isInviting: partyState.invitingFriendIds.contains(friend.id),
+                  subtitle: invitePending ? 'Invite sent · tap to resend' : 'Tap to invite',
                   onInvite: () => _inviteFriend(friend),
                 );
               }).toList(),
@@ -183,6 +212,59 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
         ),
       ],
     );
+  }
+
+  List<Tomodachi> _invitableFriends({
+    required List<Tomodachi> friends,
+    required Set<String> joinedMemberIds,
+  }) {
+    return friends
+        .where(
+          (friend) =>
+              friend.isAccepted &&
+              !joinedMemberIds.contains(friend.id.toString()),
+        )
+        .toList();
+  }
+
+  String _memberLabel({
+    required String memberId,
+    required List<Tomodachi> friends,
+    required String? leaderId,
+  }) {
+    if (memberId == AuthService.currentUserId) {
+      return '${AuthService.currentUsername ?? 'You'} (you)';
+    }
+
+    for (final friend in friends) {
+      if (friend.id.toString() == memberId) {
+        return friend.username;
+      }
+    }
+
+    if (memberId == leaderId) {
+      return 'Leader';
+    }
+
+    return 'Member';
+  }
+
+  String _leaderUsername({
+    required String? leaderId,
+    required List<Tomodachi> friends,
+    required WatchPartySessionState partyState,
+  }) {
+    if (leaderId == null) {
+      return partyState.invitedFriendName ?? 'your friend';
+    }
+
+    for (final friend in friends) {
+      if (friend.id.toString() == leaderId) {
+        return friend.username;
+      }
+    }
+
+    return partyState.invitedFriendName ?? 'your friend';
   }
 
   Widget _buildActiveParty(
@@ -200,7 +282,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildStatusCard(partyState),
+        _buildStatusCard(partyState, friends),
         const SizedBox(height: 16),
         Text(
           'Party members',
@@ -219,16 +301,11 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
           )
         else
           ...members.map((memberId) {
-            final friend = friends.cast<Tomodachi?>().firstWhere(
-                  (f) => f?.id.toString() == memberId,
-                  orElse: () => null,
-                );
-            final label = memberId == AuthService.currentUserId
-                ? '${AuthService.currentUsername ?? 'You'} (you)'
-                : (friend?.username ??
-                    (memberId == partyState.partyState?.leaderId
-                        ? partyState.invitedFriendName ?? 'Member'
-                        : 'Member'));
+            final label = _memberLabel(
+              memberId: memberId,
+              friends: friends,
+              leaderId: partyState.partyState?.leaderId,
+            );
             final isLeader = memberId == partyState.partyState?.leaderId;
             final isOnline = activeMembers.contains(memberId);
 
@@ -274,6 +351,12 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 28),
+          _buildFriendInviteList(
+            friendsAsync: friendsAsync,
+            partyState: partyState,
+            title: 'Invite more friends',
+          ),
         ] else ...[
           _buildInfoCard(
             icon: Icons.sync_rounded,
@@ -286,9 +369,13 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
     );
   }
 
-  Widget _buildStatusCard(WatchPartySessionState partyState) {
+  Widget _buildStatusCard(
+    WatchPartySessionState partyState,
+    List<Tomodachi> friends,
+  ) {
     final connected = partyState.isConnected;
     final memberCount = partyState.partyState?.members.length ?? 1;
+    final leaderId = partyState.partyState?.leaderId;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -323,7 +410,11 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
                 Text(
                   partyState.isLeader
                       ? 'You are the leader · $memberCount member${memberCount == 1 ? '' : 's'}'
-                      : 'Watching with ${partyState.invitedFriendName ?? 'your friend'}',
+                      : 'Watching with ${_leaderUsername(
+                          leaderId: leaderId,
+                          friends: friends,
+                          partyState: partyState,
+                        )} · $memberCount member${memberCount == 1 ? '' : 's'}',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.72),
                     fontSize: 13,
@@ -477,11 +568,13 @@ class _FriendInviteTile extends StatelessWidget {
   const _FriendInviteTile({
     required this.friend,
     required this.isInviting,
+    required this.subtitle,
     required this.onInvite,
   });
 
   final Tomodachi friend;
   final bool isInviting;
+  final String subtitle;
   final VoidCallback onInvite;
 
   @override
@@ -511,7 +604,7 @@ class _FriendInviteTile extends StatelessWidget {
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          'Tap to invite',
+          subtitle,
           style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
         ),
         trailing: isInviting

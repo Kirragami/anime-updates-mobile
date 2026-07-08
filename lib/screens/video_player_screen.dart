@@ -15,6 +15,7 @@ import '../services/completed_downloads_manager.dart';
 import '../services/playback_progress_manager.dart';
 import '../services/watch_party_logger.dart';
 import '../services/watch_party_navigation.dart';
+import '../services/watch_party_sync_config.dart';
 import '../app_orientation_system_ui.dart';
 
 class VideoPlayerScreen extends ConsumerStatefulWidget {
@@ -80,7 +81,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   bool _applyingRemoteSync = false;
   bool _partyInitialized = false;
   String? _loadedPartyVideoUrl;
+  bool _periodicSyncPending = false;
   Timer? _partySeekDebounce;
+  Timer? _partyPlaybackSyncTimer;
   SyncAction? _pendingRemoteSync;
 
   bool get _watchPartyActive =>
@@ -279,6 +282,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     _loadedPartyVideoUrl = videoUrl;
     WatchPartyNavigation.markMemberInPartyPlayer(true);
 
+    _stopPartyPlaybackSync();
     _positionTimer?.cancel();
     _positionTimer = null;
 
@@ -290,6 +294,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
       _duration = Duration.zero;
       _isPlaying = false;
       _autoAdvancedCalled = false;
+      _partyInitialized = false;
     });
 
     try { await old?.stop(); } catch (_) {}
@@ -356,6 +361,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         case SyncActionType.leave:
           ref.read(watchPartyProvider.notifier).refreshState();
           break;
+        case SyncActionType.presence:
+          break;
+        case SyncActionType.heartbeat:
+          break;
       }
     }
   }
@@ -380,9 +389,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
         );
         break;
       case SyncActionType.seek:
+        final threshold = _periodicSyncPending
+            ? WatchPartySyncConfig.periodicDriftThresholdMs
+            : WatchPartySyncConfig.eventDriftThresholdMs;
+        _periodicSyncPending = false;
         _applyRemotePlayback(
           timestampSeconds: action.timestamp,
           shouldPlay: action.isPlaying,
+          seekThresholdMs: threshold,
         );
         break;
       default:
@@ -415,6 +429,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   Future<void> _applyRemotePlayback({
     required double timestampSeconds,
     required bool shouldPlay,
+    int seekThresholdMs = WatchPartySyncConfig.eventDriftThresholdMs,
   }) async {
     if (_videoPlayerController == null || !_isInitialized) return;
 
@@ -422,7 +437,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
     try {
       final target = Duration(milliseconds: (timestampSeconds * 1000).round());
       final drift = (_position - target).inMilliseconds.abs();
-      if (drift > 750) {
+      if (drift > seekThresholdMs) {
         await _videoPlayerController!.seekTo(target);
         if (mounted) {
           setState(() => _position = target);
@@ -468,6 +483,30 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
             isPlaying: _isPlaying,
           );
     });
+  }
+
+  void _requestPeriodicPlaybackSync() {
+    if (!_watchPartyActive || _isPartyLeader || !_isInitialized) return;
+    _periodicSyncPending = true;
+    ref.read(watchPartyProvider.notifier).sendSync(
+          const SyncAction(action: SyncActionType.syncRequest),
+        );
+  }
+
+  void _startPartyPlaybackSync() {
+    _partyPlaybackSyncTimer?.cancel();
+    if (!_watchPartyActive || _isPartyLeader) return;
+
+    _partyPlaybackSyncTimer = Timer.periodic(
+      WatchPartySyncConfig.playbackSyncInterval,
+      (_) => _requestPeriodicPlaybackSync(),
+    );
+  }
+
+  void _stopPartyPlaybackSync() {
+    _partyPlaybackSyncTimer?.cancel();
+    _partyPlaybackSyncTimer = null;
+    _periodicSyncPending = false;
   }
   
   Future<void> _getInitialBrightness() async {
@@ -546,6 +585,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
                   ref
                       .read(watchPartyProvider.notifier)
                       .sendSync(const SyncAction(action: SyncActionType.syncRequest));
+                  _startPartyPlaybackSync();
                 }
               }
 
@@ -905,6 +945,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
 
     _partyActionSub?.cancel();
     _partySeekDebounce?.cancel();
+    _stopPartyPlaybackSync();
     if (widget.watchPartyEnabled && !_isPartyLeader) {
       WatchPartyNavigation.markMemberInPartyPlayer(false);
     }
