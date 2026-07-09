@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,15 +12,30 @@ import '../services/watch_party_app_shell.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
 
+enum WatchPartyLobbyMode {
+  /// Invite-focused setup; stays here after sending invites.
+  invite,
+  /// Full party view (members, pick episode, etc.).
+  party,
+}
+
 class WatchPartyLobbyScreen extends ConsumerStatefulWidget {
-  const WatchPartyLobbyScreen({super.key});
+  const WatchPartyLobbyScreen({
+    super.key,
+    this.mode = WatchPartyLobbyMode.invite,
+  });
+
+  final WatchPartyLobbyMode mode;
 
   @override
   ConsumerState<WatchPartyLobbyScreen> createState() =>
       _WatchPartyLobbyScreenState();
 }
 
-class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
+class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
+    with RouteAware {
+  ModalRoute<void>? _route;
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +44,40 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
         ref.read(watchPartyProvider.notifier).refreshState();
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null && route != _route) {
+      _route = route;
+      watchPartyRouteObserver.subscribe(this, route);
+      if (route.isCurrent) {
+        ref.read(watchPartyLobbyVisibleProvider.notifier).state = true;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    watchPartyRouteObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPush() {
+    ref.read(watchPartyLobbyVisibleProvider.notifier).state = true;
+  }
+
+  @override
+  void didPopNext() {
+    ref.read(watchPartyLobbyVisibleProvider.notifier).state = true;
+  }
+
+  @override
+  void didPop() {
+    ref.read(watchPartyLobbyVisibleProvider.notifier).state = false;
   }
 
   @override
@@ -49,15 +100,9 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
           child: Column(
             children: [
               _buildHeader(context, partyState),
-              if (partyState.errorMessage != null)
-                _buildMessageBanner(
-                  partyState.errorMessage!,
-                  isError: true,
-                ),
-              if (partyState.statusMessage != null)
-                _buildMessageBanner(partyState.statusMessage!),
+              _buildAnimatedTopBanners(partyState),
               Expanded(
-                child: partyState.isActive
+                child: _shouldShowActiveParty(partyState)
                     ? _buildActiveParty(context, partyState, friendsAsync)
                     : _buildInviteSection(context, friendsAsync, partyState),
               ),
@@ -100,8 +145,76 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
     );
   }
 
-  Widget _buildMessageBanner(String message, {bool isError = false}) {
+  Widget _buildAnimatedTopBanners(WatchPartySessionState partyState) {
+    final showError = partyState.errorMessage != null;
+    final showStatus = partyState.statusMessage != null &&
+        _shouldShowActiveParty(partyState);
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeInOutCubic,
+      alignment: Alignment.topCenter,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 320),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SizeTransition(
+                  sizeFactor: animation,
+                  axisAlignment: -1,
+                  child: child,
+                ),
+              );
+            },
+            child: showError
+                ? _buildMessageBanner(
+                    key: ValueKey(partyState.errorMessage),
+                    partyState.errorMessage!,
+                    isError: true,
+                  )
+                : const SizedBox.shrink(key: ValueKey('no_error_banner')),
+          ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 320),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SizeTransition(
+                  sizeFactor: animation,
+                  axisAlignment: -1,
+                  child: child,
+                ),
+              );
+            },
+            child: showStatus
+                ? _FadeOutStatusBanner(
+                    key: ValueKey(partyState.statusMessage),
+                    message: partyState.statusMessage!,
+                    onDismissed: () => ref
+                        .read(watchPartyProvider.notifier)
+                        .clearStatusMessage(),
+                  )
+                : const SizedBox.shrink(key: ValueKey('no_status_banner')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageBanner(
+    String message, {
+    Key? key,
+    bool isError = false,
+  }) {
     return Container(
+      key: key,
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -124,6 +237,12 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
     );
   }
 
+  bool _shouldShowActiveParty(WatchPartySessionState partyState) {
+    if (!partyState.isActive) return false;
+    if (!partyState.isLeader) return true;
+    return widget.mode == WatchPartyLobbyMode.party;
+  }
+
   Widget _buildInviteSection(
     BuildContext context,
     AsyncValue<List<Tomodachi>> friendsAsync,
@@ -139,9 +258,79 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
               'Invite one or more friends to sync playback on your downloaded episodes.',
         ),
         const SizedBox(height: 20),
-        _buildFriendInviteList(
+        _buildInviteModeFriendList(
           friendsAsync: friendsAsync,
           partyState: partyState,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInviteModeFriendList({
+    required AsyncValue<List<Tomodachi>> friendsAsync,
+    required WatchPartySessionState partyState,
+  }) {
+    final joinedMemberUsernames = partyState.partyState?.members ?? const {};
+    final pendingInviteUsernames =
+        partyState.partyState?.pendingInviteUsernames ?? const {};
+    final currentUsername = AuthService.currentUsername;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Invite friends',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.9),
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        friendsAsync.when(
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(color: AppTheme.primaryColor),
+            ),
+          ),
+          error: (error, _) => _buildEmptyFriends(
+            icon: Icons.error_outline,
+            title: 'Could not load friends',
+            subtitle: error.toString(),
+          ),
+          data: (friends) {
+            final acceptedFriends =
+                friends.where((friend) => friend.isAccepted).toList();
+
+            if (acceptedFriends.isEmpty) {
+              return _buildEmptyFriends(
+                icon: Icons.person_add_alt_1_rounded,
+                title: 'No friends yet',
+                subtitle: 'Add tomodachi first, then come back to invite them.',
+              );
+            }
+
+            return Column(
+              children: acceptedFriends.map((friend) {
+                final isJoined = joinedMemberUsernames.contains(friend.username) &&
+                    friend.username != currentUsername;
+                final isPending =
+                    pendingInviteUsernames.contains(friend.username);
+                final isInviting = partyState.invitingFriendUsernames
+                    .contains(friend.username);
+
+                return _FriendInviteTile(
+                  friend: friend,
+                  isInviting: isInviting,
+                  isPending: isPending,
+                  isJoined: isJoined,
+                  onInvite: () => _inviteFriend(friend),
+                  onResend: () => _inviteFriend(friend),
+                );
+              }).toList(),
+            );
+          },
         ),
       ],
     );
@@ -443,7 +632,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  connected ? 'Connected to party' : 'Reconnecting…',
+                  connected ? 'Connected to party' : 'Connecting..',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -604,21 +793,133 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen> {
   }
 }
 
+class _FadeOutStatusBanner extends StatefulWidget {
+  const _FadeOutStatusBanner({
+    super.key,
+    required this.message,
+    required this.onDismissed,
+  });
+
+  final String message;
+  final VoidCallback onDismissed;
+
+  @override
+  State<_FadeOutStatusBanner> createState() => _FadeOutStatusBannerState();
+}
+
+class _FadeOutStatusBannerState extends State<_FadeOutStatusBanner> {
+  static const _visibleDuration = Duration(seconds: 4);
+  static const _fadeDuration = Duration(milliseconds: 500);
+
+  double _opacity = 1;
+  double _heightFactor = 1;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleFadeOut();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FadeOutStatusBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message != widget.message) {
+      _timer?.cancel();
+      setState(() {
+        _opacity = 1;
+        _heightFactor = 1;
+      });
+      _scheduleFadeOut();
+    }
+  }
+
+  void _scheduleFadeOut() {
+    _timer = Timer(_visibleDuration, () {
+      if (!mounted) return;
+      setState(() => _opacity = 0);
+      Future<void>.delayed(_fadeDuration, () {
+        if (!mounted) return;
+        setState(() => _heightFactor = 0);
+        Future<void>.delayed(const Duration(milliseconds: 280), () {
+          if (mounted) widget.onDismissed();
+        });
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: AnimatedAlign(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOutCubic,
+        alignment: Alignment.topCenter,
+        heightFactor: _heightFactor,
+        child: AnimatedOpacity(
+          opacity: _opacity,
+          duration: _fadeDuration,
+          curve: Curves.easeOut,
+          child: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.primaryColor.withOpacity(0.45)),
+            ),
+            child: Text(
+              widget.message,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.92),
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FriendInviteTile extends StatelessWidget {
   const _FriendInviteTile({
     required this.friend,
     required this.isInviting,
-    required this.subtitle,
+    this.isPending = false,
+    this.isJoined = false,
+    this.subtitle,
     required this.onInvite,
+    this.onResend,
   });
 
   final Tomodachi friend;
   final bool isInviting;
-  final String subtitle;
+  final bool isPending;
+  final bool isJoined;
+  final String? subtitle;
   final VoidCallback onInvite;
+  final VoidCallback? onResend;
+
+  String get _subtitle {
+    if (subtitle != null) return subtitle!;
+    if (isJoined) return 'In party';
+    if (isPending) return 'Waiting for response';
+    return 'Tap to invite';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final canInvite = !isPending && !isJoined && !isInviting;
+    final canResend = isPending && !isInviting;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -644,22 +945,52 @@ class _FriendInviteTile extends StatelessWidget {
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          subtitle,
+          _subtitle,
           style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
         ),
-        trailing: isInviting
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppTheme.primaryColor,
-                ),
-              )
-            : Icon(Icons.send_rounded, color: AppTheme.primaryColor.withOpacity(0.9)),
-        onTap: isInviting ? null : onInvite,
+        trailing: _buildTrailing(),
+        onTap: canInvite
+            ? onInvite
+            : canResend
+                ? onResend
+                : null,
       ),
     );
+  }
+
+  Widget _buildTrailing() {
+    if (isInviting) {
+      return const SizedBox(
+        width: 22,
+        height: 22,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: AppTheme.primaryColor,
+        ),
+      );
+    }
+
+    if (isJoined) {
+      return Icon(
+        Icons.check_circle_rounded,
+        color: Colors.greenAccent.withOpacity(0.95),
+      );
+    }
+
+    if (isPending) {
+      return TextButton(
+        onPressed: onResend,
+        style: TextButton.styleFrom(
+          foregroundColor: Colors.orangeAccent.withOpacity(0.95),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: const Text('Pending'),
+      );
+    }
+
+    return Icon(Icons.send_rounded, color: AppTheme.primaryColor.withOpacity(0.9));
   }
 }
 
@@ -859,7 +1190,11 @@ class _WatchPartyInviteLandingScreenState
       if (!mounted) return;
       WatchPartyAppShell.deliverInvite(widget.payload);
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const WatchPartyLobbyScreen()),
+        MaterialPageRoute(
+          builder: (_) => const WatchPartyLobbyScreen(
+            mode: WatchPartyLobbyMode.party,
+          ),
+        ),
       );
     });
   }

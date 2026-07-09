@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/watch_party_models.dart';
@@ -609,6 +610,11 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
     _reconnectTimer = null;
   }
 
+  void clearStatusMessage() {
+    if (state.statusMessage == null) return;
+    state = state.copyWith(clearStatus: true);
+  }
+
   @override
   void dispose() {
     _cancelReconnect();
@@ -634,3 +640,16 @@ final watchPartySocketProvider = Provider<WatchPartySocketService>((ref) {
 final watchPartyActiveProvider = Provider<bool>((ref) {
   return ref.watch(watchPartyProvider).isActive;
 });
+
+/// True while [WatchPartyLobbyScreen] is the active route (hides floating panel).
+final watchPartyLobbyVisibleProvider = StateProvider<bool>((ref) => false);
+
+/// True while [VideoPlayerScreen] is the active route (hides floating panel).
+final watchPartyVideoPlayerVisibleProvider = StateProvider<bool>((ref) => false);
+
+final watchPartyRouteObserver = RouteObserver<ModalRoute<void>>();
+
+bool watchPartyPanelHiddenForCurrentRoute(WidgetRef ref) {
+  return ref.read(watchPartyLobbyVisibleProvider) ||
+      ref.read(watchPartyVideoPlayerVisibleProvider);
+}

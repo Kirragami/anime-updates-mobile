@@ -24,6 +24,7 @@ import 'services/playback_progress_manager.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'config/firebase_config.dart';
+import 'widgets/watch_party_floating_panel.dart';
 
 /// Background handler for push notifications
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -317,10 +318,20 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
 
     return MaterialApp(
       navigatorKey: _navigatorKey,
+      navigatorObservers: [watchPartyRouteObserver],
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: const HomepageScreen(),
+      builder: (context, child) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (child != null) child,
+            WatchPartyFloatingPanel(navigatorKey: _navigatorKey),
+          ],
+        );
+      },
     );
   }
 }

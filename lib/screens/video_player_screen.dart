@@ -39,7 +39,10 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
+class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
+    with RouteAware {
+  ModalRoute<void>? _route;
+
   VlcPlayerController? _videoPlayerController;
   bool _isInitialized = false;
   bool _isPlaying = false;
@@ -934,7 +937,36 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null && route != _route) {
+      _route = route;
+      watchPartyRouteObserver.subscribe(this, route);
+      if (route.isCurrent) {
+        ref.read(watchPartyVideoPlayerVisibleProvider.notifier).state = true;
+      }
+    }
+  }
+
+  @override
+  void didPush() {
+    ref.read(watchPartyVideoPlayerVisibleProvider.notifier).state = true;
+  }
+
+  @override
+  void didPopNext() {
+    ref.read(watchPartyVideoPlayerVisibleProvider.notifier).state = true;
+  }
+
+  @override
+  void didPop() {
+    ref.read(watchPartyVideoPlayerVisibleProvider.notifier).state = false;
+  }
+
+  @override
   void dispose() {
+    watchPartyRouteObserver.unsubscribe(this);
     SystemChrome.setSystemUIChangeCallback(null);
     SystemChrome.setPreferredOrientations(widget.restoreOrientationsOnExit);
     WidgetsBinding.instance.addPostFrameCallback((_) {

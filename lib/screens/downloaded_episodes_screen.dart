@@ -128,7 +128,6 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
   @override
   Widget build(BuildContext context) {
     final wide = _isWideLayout(context);
-    final party = ref.watch(watchPartyProvider);
 
     return Scaffold(
       body: Container(
@@ -139,7 +138,6 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
           child: Column(
             children: [
               _buildHeader(context),
-              if (party.isActive) _buildPartyBanner(context, party),
               Expanded(
                 child: _buildCompletedDownloads(context, wide: wide),
               ),
@@ -159,72 +157,6 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
       context: context,
       releaseId: releaseId,
       fromRemoteLoad: fromRemoteLoad,
-    );
-  }
-
-  Widget _buildPartyBanner(BuildContext context, WatchPartySessionState party) {
-    final connected = party.isConnected;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const WatchPartyLobbyScreen()),
-            );
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.16),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primaryColor.withOpacity(0.45)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.groups_rounded,
-                  color: AppTheme.primaryColor.withOpacity(0.95),
-                  size: 22,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        party.isLeader ? 'Watch party active' : 'In a watch party',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        party.isLeader
-                            ? 'Tap an episode to sync with the party'
-                            : 'Waiting for leader · ${connected ? 'connected' : 'reconnecting'}',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.72),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.white.withOpacity(0.7),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 
