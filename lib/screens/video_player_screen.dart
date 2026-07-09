@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'dart:async';
@@ -7,28 +8,43 @@ import 'dart:io';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../theme/app_theme.dart';
 import '../models/completed_download.dart';
+import '../models/watch_party_models.dart';
+import '../providers/watch_party_provider.dart';
+import '../services/auth_service.dart';
 import '../services/completed_downloads_manager.dart';
 import '../services/playback_progress_manager.dart';
+import '../services/watch_party_logger.dart';
+import '../services/watch_party_navigation.dart';
+import '../services/watch_party_app_shell.dart';
+import '../services/watch_party_sync_config.dart';
+import '../widgets/watch_party_invite_friends_sheet.dart';
 import '../app_orientation_system_ui.dart';
 
-class VideoPlayerScreen extends StatefulWidget {
+class VideoPlayerScreen extends ConsumerStatefulWidget {
   final String filePath;
   final String? title;
   
   final String? currentReleaseId;
+  final bool watchPartyEnabled;
+  final List<DeviceOrientation> restoreOrientationsOnExit;
 
   const VideoPlayerScreen({
     super.key,
     required this.filePath,
+    required this.restoreOrientationsOnExit,
     this.title,
     this.currentReleaseId,
+    this.watchPartyEnabled = false,
   });
 
   @override
-  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+  ConsumerState<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
+    with RouteAware {
+  ModalRoute<void>? _route;
+
   VlcPlayerController? _videoPlayerController;
   bool _isInitialized = false;
   bool _isPlaying = false;
@@ -55,7 +71,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   int _consecutiveSeekCount = 0;
   Timer? _seekIndicatorTimer;
 
-  List<DeviceOrientation>? _originalOrientations;
 
   late String _activeFilePath;
   late String? _activeTitle;
@@ -66,6 +81,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   CompletedDownload? _prevEpisode;
   CompletedDownload? _nextEpisode;
   bool _autoAdvancedCalled = false;
+
+  StreamSubscription<SyncAction>? _partyActionSub;
+  bool _applyingRemoteSync = false;
+  bool _partyInitialized = false;
+  String? _loadedPartyVideoUrl;
+  bool _watchPartyExitHandled = false;
+  bool _periodicSyncPending = false;
+  Timer? _partySeekDebounce;
+  Timer? _partyPlaybackSyncTimer;
+  SyncAction? _pendingRemoteSync;
+
+  bool get _watchPartyActive =>
+      widget.watchPartyEnabled && ref.read(watchPartyProvider).isActive;
+
+  bool get _isPartyLeader =>
+      _watchPartyActive && ref.read(watchPartyProvider).isLeader;
 
   static int? _extractEpisodeNumber(String episode) {
     final cleaned = episode
@@ -140,6 +171,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     final filePath = await manager.getFilePath(episode.releaseId);
     if (filePath == null || !mounted) return;
 
+    if (_isPartyLeader) {
+      ref.read(watchPartyProvider.notifier).notifyLoadVideo(episode.releaseId);
+      _loadedPartyVideoUrl = WatchPartyVideoRef(episode.releaseId).encode();
+    }
+
     _positionTimer?.cancel();
     _positionTimer = null;
 
@@ -187,7 +223,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _activeTitle = widget.title;
     _activeReleaseId = widget.currentReleaseId;
 
-    _captureOriginalOrientations();
     _resolveAdjacentEpisodes();
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -207,6 +242,275 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
     _getInitialBrightness();
     _initializePlayer();
+    _setupWatchPartySync();
+  }
+
+  void _setupWatchPartySync() {
+    if (!widget.watchPartyEnabled) return;
+
+    _partyActionSub = ref
+        .read(watchPartySocketProvider)
+        .actions
+        .listen(_handlePartySyncAction);
+
+    ref.listen<WatchPartySessionState>(watchPartyProvider, (previous, next) {
+      if (!widget.watchPartyEnabled || !next.isActive) return;
+      final videoUrl = next.partyState?.videoUrl;
+      if (videoUrl == null || videoUrl.isEmpty) return;
+      if (_isPartyLeader) return;
+      if (videoUrl == _loadedPartyVideoUrl) return;
+
+      final videoRef = WatchPartyVideoRef.decode(videoUrl);
+      if (videoRef == null) return;
+      if (videoRef.releaseId == _activeReleaseId) {
+        _loadedPartyVideoUrl = videoUrl;
+        return;
+      }
+
+      _loadPartyEpisode(videoRef.releaseId, videoUrl);
+    });
+  }
+
+  Future<void> _loadPartyEpisode(String releaseId, String videoUrl) async {
+    final manager = CompletedDownloadsManager();
+    final filePath = await manager.getFilePath(releaseId);
+    if (filePath == null || !mounted) {
+      return;
+    }
+
+    _loadedPartyVideoUrl = videoUrl;
+    WatchPartyNavigation.markMemberInPartyPlayer(true);
+
+    _stopPartyPlaybackSync();
+    _positionTimer?.cancel();
+    _positionTimer = null;
+
+    final old = _videoPlayerController;
+    setState(() {
+      _videoPlayerController = null;
+      _isInitialized = false;
+      _position = Duration.zero;
+      _duration = Duration.zero;
+      _isPlaying = false;
+      _autoAdvancedCalled = false;
+      _partyInitialized = false;
+    });
+
+    try { await old?.stop(); } catch (_) {}
+    try { await old?.dispose(); } catch (_) {}
+
+    if (!mounted) return;
+
+    final download = manager.completedDownloads[releaseId];
+    setState(() {
+      _activeFilePath = filePath;
+      _activeTitle = download == null
+          ? 'Watch party'
+          : '${download.showName} - Episode ${download.episode}';
+      _activeReleaseId = releaseId;
+    });
+
+    _resolveAdjacentEpisodes();
+    _initializePlayer(initialSeekSeconds: 0, autoPlay: false);
+  }
+
+  void _handlePartySyncAction(SyncAction action) {
+    if (!_watchPartyActive || _applyingRemoteSync) return;
+
+    final myUsername = AuthService.currentUsername;
+    if (myUsername != null &&
+        action.senderUsername == myUsername &&
+        action.action != SyncActionType.syncRequest) {
+      return;
+    }
+
+    WatchPartyLogger.info(
+      'player received ${action.action.apiValue} ts=${action.timestamp} '
+      'playing=${action.isPlaying} leader=$_isPartyLeader',
+    );
+
+    if (_isPartyLeader && action.action == SyncActionType.syncRequest) {
+      _respondToSyncRequest();
+      return;
+    }
+
+    if (!_isPartyLeader) {
+      switch (action.action) {
+        case SyncActionType.loadVideo:
+          final videoRef = WatchPartyVideoRef.decode(action.videoUrl);
+          if (videoRef != null) {
+            _loadPartyEpisode(videoRef.releaseId, action.videoUrl ?? '');
+          }
+          break;
+        case SyncActionType.stopVideo:
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+          break;
+        case SyncActionType.syncRequest:
+          final videoRef = WatchPartyVideoRef.decode(action.videoUrl);
+          if (videoRef != null && videoRef.releaseId != _activeReleaseId) {
+            _loadPartyEpisode(videoRef.releaseId, action.videoUrl ?? '');
+          }
+          break;
+        case SyncActionType.play:
+        case SyncActionType.pause:
+        case SyncActionType.seek:
+          _queueOrApplyRemoteSync(action);
+          break;
+        case SyncActionType.leaderChange:
+          ref.read(watchPartyProvider.notifier).refreshState();
+          break;
+        case SyncActionType.join:
+        case SyncActionType.leave:
+          ref.read(watchPartyProvider.notifier).refreshState();
+          break;
+        case SyncActionType.presence:
+          break;
+        case SyncActionType.heartbeat:
+          break;
+      }
+    }
+  }
+
+  void _queueOrApplyRemoteSync(SyncAction action) {
+    if (_videoPlayerController == null || !_isInitialized) {
+      _pendingRemoteSync = action;
+      return;
+    }
+
+    switch (action.action) {
+      case SyncActionType.play:
+        _applyRemotePlayback(
+          timestampSeconds: action.timestamp,
+          shouldPlay: true,
+        );
+        break;
+      case SyncActionType.pause:
+        _applyRemotePlayback(
+          timestampSeconds: action.timestamp,
+          shouldPlay: false,
+        );
+        break;
+      case SyncActionType.seek:
+        final threshold = _periodicSyncPending
+            ? WatchPartySyncConfig.periodicDriftThresholdMs
+            : WatchPartySyncConfig.eventDriftThresholdMs;
+        _periodicSyncPending = false;
+        _applyRemotePlayback(
+          timestampSeconds: action.timestamp,
+          shouldPlay: action.isPlaying,
+          seekThresholdMs: threshold,
+        );
+        break;
+      default:
+        break;
+    }
+  }
+
+  void _flushPendingRemoteSync() {
+    final pending = _pendingRemoteSync;
+    if (pending == null) return;
+    _pendingRemoteSync = null;
+    _queueOrApplyRemoteSync(pending);
+  }
+
+  void _respondToSyncRequest() {
+    if (!_isPartyLeader || _videoPlayerController == null || !_isInitialized) {
+      return;
+    }
+
+    final seconds = _position.inMilliseconds / 1000.0;
+    ref.read(watchPartyProvider.notifier).sendSync(
+          SyncAction(
+            action: SyncActionType.seek,
+            timestamp: seconds,
+            isPlaying: _isPlaying,
+          ),
+        );
+  }
+
+  Future<void> _applyRemotePlayback({
+    required double timestampSeconds,
+    required bool shouldPlay,
+    int seekThresholdMs = WatchPartySyncConfig.eventDriftThresholdMs,
+  }) async {
+    if (_videoPlayerController == null || !_isInitialized) return;
+
+    _applyingRemoteSync = true;
+    try {
+      final target = Duration(milliseconds: (timestampSeconds * 1000).round());
+      final drift = (_position - target).inMilliseconds.abs();
+      if (drift > seekThresholdMs) {
+        await _videoPlayerController!.seekTo(target);
+        if (mounted) {
+          setState(() => _position = target);
+        }
+      }
+
+      if (shouldPlay && !_isPlaying) {
+        await _videoPlayerController!.play();
+      } else if (!shouldPlay && _isPlaying) {
+        await _videoPlayerController!.pause();
+      }
+    } finally {
+      _applyingRemoteSync = false;
+    }
+  }
+
+  void _emitPartyPlayState({required bool playing}) {
+    if (!_isPartyLeader || _applyingRemoteSync) return;
+
+    _videoPlayerController?.getPosition().then((pos) {
+      if (!mounted || !_isPartyLeader || _applyingRemoteSync) return;
+      final seconds = pos.inMilliseconds / 1000.0;
+      WatchPartyLogger.info(
+        'leader emit ${playing ? 'PLAY' : 'PAUSE'} ts=$seconds',
+      );
+      if (playing) {
+        ref.read(watchPartyProvider.notifier).notifyPlay(seconds);
+      } else {
+        ref.read(watchPartyProvider.notifier).notifyPause(seconds);
+      }
+    });
+  }
+
+  void _emitPartySeek({Duration? at}) {
+    if (!_isPartyLeader || _applyingRemoteSync) return;
+    _partySeekDebounce?.cancel();
+    _partySeekDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted || !_isPartyLeader || _applyingRemoteSync) return;
+      final seconds = (at ?? _position).inMilliseconds / 1000.0;
+      WatchPartyLogger.info('leader emit SEEK ts=$seconds playing=$_isPlaying');
+      ref.read(watchPartyProvider.notifier).notifySeek(
+            seconds,
+            isPlaying: _isPlaying,
+          );
+    });
+  }
+
+  void _requestPeriodicPlaybackSync() {
+    if (!_watchPartyActive || _isPartyLeader || !_isInitialized) return;
+    _periodicSyncPending = true;
+    ref.read(watchPartyProvider.notifier).sendSync(
+          const SyncAction(action: SyncActionType.syncRequest),
+        );
+  }
+
+  void _startPartyPlaybackSync() {
+    _partyPlaybackSyncTimer?.cancel();
+    if (!_watchPartyActive || _isPartyLeader) return;
+
+    _partyPlaybackSyncTimer = Timer.periodic(
+      WatchPartySyncConfig.playbackSyncInterval,
+      (_) => _requestPeriodicPlaybackSync(),
+    );
+  }
+
+  void _stopPartyPlaybackSync() {
+    _partyPlaybackSyncTimer?.cancel();
+    _partyPlaybackSyncTimer = null;
+    _periodicSyncPending = false;
   }
   
   Future<void> _getInitialBrightness() async {
@@ -218,18 +522,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
-  void _captureOriginalOrientations() async {
-    
-    
-    _originalOrientations = [
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ];
-  }
-
-  void _initializePlayer() {
+  void _initializePlayer({
+    double? initialSeekSeconds,
+    bool? autoPlay,
+  }) {
     try {
 
       final file = File(_activeFilePath);
@@ -258,21 +554,46 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             _isInitialized = true;
           });
           
-          Future.delayed(const Duration(milliseconds: 500), () {
+          Future.delayed(const Duration(milliseconds: 500), () async {
             if (mounted && _videoPlayerController != null) {
-              
-              final showId = _getAnimeShowId();
-              if (showId != null && _activeReleaseId != null) {
-                final lastPos = PlaybackProgressManager().getPosition(showId, _activeReleaseId!);
-                if (lastPos > 0) {
-                  _videoPlayerController!.seekTo(Duration(seconds: lastPos));
+              final shouldAutoPlay = autoPlay ??
+                  (!_watchPartyActive || _isPartyLeader);
+
+              if (initialSeekSeconds != null) {
+                await _videoPlayerController!
+                    .seekTo(Duration(milliseconds: (initialSeekSeconds * 1000).round()));
+              } else {
+                final showId = _getAnimeShowId();
+                if (showId != null && _activeReleaseId != null && !_watchPartyActive) {
+                  final lastPos = PlaybackProgressManager().getPosition(showId, _activeReleaseId!);
+                  if (lastPos > 0) {
+                    await _videoPlayerController!.seekTo(Duration(seconds: lastPos));
+                  }
                 }
               }
 
-              _videoPlayerController!.play().then((_) {
-                if (mounted) _startControlsTimer();
-              }).catchError((error) {
-              });
+              if (shouldAutoPlay) {
+                await _videoPlayerController!.play().then((_) {
+                  if (mounted) _startControlsTimer();
+                }).catchError((error) {
+                });
+              }
+
+              if (_watchPartyActive && !_partyInitialized) {
+                _partyInitialized = true;
+                if (_isPartyLeader) {
+                  _loadedPartyVideoUrl =
+                      WatchPartyVideoRef(_activeReleaseId ?? '').encode();
+                } else {
+                  WatchPartyNavigation.markMemberInPartyPlayer(true);
+                  ref
+                      .read(watchPartyProvider.notifier)
+                      .sendSync(const SyncAction(action: SyncActionType.syncRequest));
+                  _startPartyPlaybackSync();
+                }
+              }
+
+              _flushPendingRemoteSync();
             }
           });
           
@@ -364,15 +685,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     
     if (_isPlaying) {
       _videoPlayerController!.pause();
+      _emitPartyPlayState(playing: false);
       _startControlsTimer();
     } else {
       _videoPlayerController!.play();
+      _emitPartyPlayState(playing: true);
       _startControlsTimer();
     }
   }
 
   void _seekTo(Duration position) {
     _videoPlayerController?.seekTo(position);
+    if (mounted) {
+      setState(() => _position = position);
+    }
+    _emitPartySeek(at: position);
   }
 
   void _toggleControls() {
@@ -604,40 +931,62 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     return '${twoDigits(minutes)}:${twoDigits(seconds)}';
   }
 
+  void _resetBrightness() {
+    ScreenBrightness().resetScreenBrightness().catchError((Object e) {
+      print('[VideoPlayerScreen] Error resetting brightness: $e');
+    });
+  }
+
   @override
-  void dispose() async {
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null && route != _route) {
+      _route = route;
+      watchPartyRouteObserver.subscribe(this, route);
+      if (route.isCurrent) {
+        ref.read(watchPartyVideoPlayerVisibleProvider.notifier).state = true;
+      }
+    }
+  }
+
+  @override
+  void didPush() {
+    ref.read(watchPartyVideoPlayerVisibleProvider.notifier).state = true;
+  }
+
+  @override
+  void didPopNext() {
+    ref.read(watchPartyVideoPlayerVisibleProvider.notifier).state = true;
+  }
+
+  @override
+  void didPop() {
+    ref.read(watchPartyVideoPlayerVisibleProvider.notifier).state = false;
+    _handleWatchPartyPlayerExit();
+  }
+
+  @override
+  void dispose() {
+    watchPartyRouteObserver.unsubscribe(this);
+    SystemChrome.setSystemUIChangeCallback(null);
+    SystemChrome.setPreferredOrientations(widget.restoreOrientationsOnExit);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppOrientationSystemUi.sync();
+    });
+
     WakelockPlus.disable();
 
+    _partyActionSub?.cancel();
+    _partySeekDebounce?.cancel();
+    _stopPartyPlaybackSync();
     _controlsTimer?.cancel();
     _positionTimer?.cancel();
     _seekIndicatorTimer?.cancel();
     _videoPlayerController?.dispose();
     _focusNode.dispose();
+    _resetBrightness();
 
-   
-    SystemChrome.setSystemUIChangeCallback(null);
-
-   
-    try {
-      final screenBrightness = ScreenBrightness();
-      await screenBrightness.resetScreenBrightness();
-    } catch (e) {
-      print('[VideoPlayerScreen] Error resetting brightness: $e');
-    }
-
-  
-    if (_originalOrientations != null) {
-      SystemChrome.setPreferredOrientations(_originalOrientations!);
-    } else {
-      
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-    }
-    AppOrientationSystemUi.sync();
     super.dispose();
   }
 
@@ -829,6 +1178,36 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
+  void _showInviteFriendsPopup() {
+    showWatchPartyInviteFriendsSheet(context);
+  }
+
+  void _handleWatchPartyPlayerExit() {
+    if (_watchPartyExitHandled) return;
+    _watchPartyExitHandled = true;
+
+    final party = ref.read(watchPartyProvider);
+    if (!party.isActive) return;
+
+    if (party.isLeader) {
+      final videoUrl = party.partyState?.videoUrl;
+      if (videoUrl != null && videoUrl.isNotEmpty) {
+        ref.read(watchPartyProvider.notifier).notifyStopVideo();
+      }
+      return;
+    }
+
+    if (widget.watchPartyEnabled) {
+      WatchPartyNavigation.markMemberInPartyPlayer(false);
+      WatchPartyAppShell.cancelPendingMemberVideoOpen();
+    }
+  }
+
+  void _exitPlayer() {
+    _handleWatchPartyPlayerExit();
+    Navigator.of(context).pop();
+  }
+
   Widget _buildTopBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -836,7 +1215,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         children: [
           
           GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
+            onTap: _exitPlayer,
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -866,6 +1245,41 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
+            ),
+
+          if (_watchPartyActive)
+            GestureDetector(
+              onTap: _isPartyLeader ? _showInviteFriendsPopup : null,
+              child: Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.55)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isPartyLeader
+                        ? Icons.person_add_alt_1_rounded
+                        : Icons.sync_rounded,
+                    size: 14,
+                    color: AppTheme.primaryColor.withOpacity(0.95),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _isPartyLeader ? 'Leader' : 'Synced',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor.withOpacity(0.95),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             ),
           
           const Spacer(),

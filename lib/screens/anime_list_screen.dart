@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 
 import '../providers/download_providers.dart';
+import '../app_orientation_system_ui.dart';
 import 'video_player_screen.dart';
 
 class AnimeListScreen extends ConsumerStatefulWidget {
@@ -388,12 +389,15 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
           try {
             final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(anime.id);
             if (filePath != null && context.mounted) {
+              final restoreOrientations =
+                  AppOrientationSystemUi.orientationsFromContext(context);
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => VideoPlayerScreen(
                     filePath: filePath,
                     title: '${anime.title} - Episode ${anime.episode}',
                     currentReleaseId: anime.id,
+                    restoreOrientationsOnExit: restoreOrientations,
                   ),
                 ),
               );

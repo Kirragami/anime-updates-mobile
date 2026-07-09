@@ -20,6 +20,11 @@ class AppConstants {
   static const String friendsRemoveEndpoint = '/api/friends/remove';
   static const String friendsDeclineEndpoint = '/api/friends/decline';
   static const String friendsAcceptEndpoint = '/api/friends/accept';
+
+  static const String partyInviteEndpoint = '/api/party/invite';
+  static const String partyEndpoint = '/api/party';
+  static const String watchPartyWsPath = '/ws-party';
+  static String get watchPartyWsUrl => '$baseUrl$watchPartyWsPath';
   
   static const String animeShowEpisodesEndpoint = '/api/anime-show';
   

@@ -67,6 +67,42 @@ class CustomPageTransitions {
     );
   }
 
+  static PageRouteBuilder slideUpFromBottom(
+    Widget page, {
+    double slideFraction = 0.22,
+    Duration duration = const Duration(milliseconds: 380),
+  }) {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => page,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final slideAnimation = Tween<Offset>(
+          begin: Offset(0, slideFraction),
+          end: Offset.zero,
+        ).animate(curved);
+        final fadeAnimation = Tween<double>(begin: 0, end: 1).animate(curved);
+        final scaleAnimation = Tween<double>(begin: 0.96, end: 1).animate(curved);
+
+        return SlideTransition(
+          position: slideAnimation,
+          child: FadeTransition(
+            opacity: fadeAnimation,
+            child: ScaleTransition(
+              scale: scaleAnimation,
+              child: child,
+            ),
+          ),
+        );
+      },
+      transitionDuration: duration,
+      reverseTransitionDuration: const Duration(milliseconds: 300),
+    );
+  }
+
   static PageRouteBuilder slideFromBottom(Widget page) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,

@@ -12,7 +12,11 @@ import 'services/fcm_registration_service.dart';
 import 'services/auth_storage.dart';
 import 'services/notification_service.dart';
 import 'services/local_notification_service.dart';
+import 'services/app_shell_delivery.dart';
+import 'services/watch_party_app_shell.dart';
 import 'providers/friends_providers.dart';
+import 'providers/watch_party_provider.dart';
+import 'models/watch_party_models.dart';
 import 'services/active_downloads_manager.dart';
 import 'services/completed_downloads_manager.dart';
 import 'services/download_event_dispatcher.dart';
@@ -20,6 +24,7 @@ import 'services/playback_progress_manager.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'config/firebase_config.dart';
+import 'widgets/watch_party_floating_panel.dart';
 
 /// Background handler for push notifications
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -93,11 +98,27 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   RemoteMessage? _pendingNotificationMessage;
   String? _pendingNotificationPayload;
+  AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
+  WatchPartyInvitePayload? _pendingBackgroundWatchPartyInvite;
+
+  late final AppShellDeliveryCoordinator _appShellDelivery =
+      AppShellDeliveryCoordinator(
+    navigatorKey: _navigatorKey,
+    isMounted: () => mounted,
+    lifecycleState: () => _lifecycleState,
+  );
+
+  WatchPartyAppShell? _watchPartyAppShell;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _watchPartyAppShell = WatchPartyAppShell(
+      coordinator: _appShellDelivery,
+      ref: () => ref,
+    );
+    WatchPartyAppShell.bind(_watchPartyAppShell!);
     _initLocalNotifications();
     _initFCM();
     _initNavigationChannel();
@@ -115,14 +136,34 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
 
   @override
   void dispose() {
+    WatchPartyAppShell.unbind();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _onForegroundReady() {
+    final pendingInvite = _pendingBackgroundWatchPartyInvite;
+    if (pendingInvite != null && _appShellDelivery.isForegroundInteractive) {
+      _pendingBackgroundWatchPartyInvite = null;
+      WatchPartyAppShell.deliverInvite(pendingInvite);
+    }
+
+    _appShellDelivery.scheduleFlush();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycleState = state;
+    if (_appShellDelivery.isForegroundInteractive) {
+      _onForegroundReady();
+    }
   }
 
   @override
   void didChangeMetrics() {
     super.didChangeMetrics();
     AppOrientationSystemUi.sync();
+    _appShellDelivery.scheduleFlush();
   }
 
   Future<void> _initNavigationChannel() async {
@@ -130,7 +171,6 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
     
     navigationChannel.setMethodCallHandler((MethodCall call) async {
       if (call.method == 'navigateToDownloadManager') {
-        // Navigate to download manager screen when notification is tapped
         if (_navigatorKey.currentContext != null) {
           _navigateToDownloadManager();
         }
@@ -139,10 +179,8 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
   }
 
   void _navigateToDownloadManager() {
-    // Navigate to download manager screen
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_navigatorKey.currentContext != null) {
-        // Check if we're not already on the download manager screen
         var currentRoute = ModalRoute.of(_navigatorKey.currentContext!);
         if (currentRoute?.settings.name != '/download-manager') {
           Navigator.of(_navigatorKey.currentContext!).push(
@@ -193,7 +231,6 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
   Future<void> _initFCM() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-    // Request notification permission (required on Android 13+ and iOS)
     NotificationSettings settings = await messaging.requestPermission(
       alert: true,
       badge: true,
@@ -202,35 +239,51 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
 
     print('User granted permission: ${settings.authorizationStatus}');
 
-    // Get the FCM token for display
     String? token = await messaging.getToken();
     print("Current FCM Token: $token");
 
-    // Save the current token locally
     if (token != null) {
       await AuthStorage.saveFcmToken(token);
     }
 
-    // Register the stored FCM token with backend (only if user is logged in)
     FcmRegistrationService.registerStoredFcmToken();
 
     setState(() {
       _firebaseToken = token;
     });
 
-    // Listen for token refreshes
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       print("FCM Token refreshed: $newToken");
-      // Save the new token locally
       await AuthStorage.saveFcmToken(newToken);
-      // Re-register with backend when token refreshes (only if user is logged in)
       await FcmRegistrationService.registerFcmTokenWithRetry(newToken, 3);
     }).onError((err) {
       print("Error listening to token refresh: $err");
     });
 
-    // Foreground messages — show as system notifications (FCM won't display them)
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      final watchPartyInvite =
+          NotificationService.parseWatchPartyInvite(message.data);
+      if (watchPartyInvite != null) {
+        if (_appShellDelivery.isForegroundInteractive) {
+          WatchPartyAppShell.deliverInvite(watchPartyInvite);
+        } else {
+          _pendingBackgroundWatchPartyInvite = watchPartyInvite;
+          await LocalNotificationService.showRemoteMessage(message);
+        }
+        return;
+      }
+
+      final watchPartyDecline =
+          NotificationService.parseWatchPartyDecline(message.data);
+      if (watchPartyDecline != null) {
+        if (_appShellDelivery.isForegroundInteractive) {
+          WatchPartyAppShell.deliverInviteDeclined(watchPartyDecline);
+        } else {
+          await LocalNotificationService.showRemoteMessage(message);
+        }
+        return;
+      }
+
       await LocalNotificationService.showRemoteMessage(message);
 
       if (NotificationService.isFriendMessage(message) &&
@@ -239,7 +292,6 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
       }
     });
 
-    // When user taps notification
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print("User tapped notification: ${message.notification?.title}");
       print(message.data);
@@ -255,12 +307,27 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<WatchPartySessionState>(watchPartyProvider, (previous, next) {
+      _watchPartyAppShell?.onPartyStateChanged(previous, next);
+      _appShellDelivery.scheduleFlush();
+    });
+
     return MaterialApp(
       navigatorKey: _navigatorKey,
+      navigatorObservers: [watchPartyRouteObserver],
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: const HomepageScreen(),
+      builder: (context, child) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (child != null) child,
+            WatchPartyFloatingPanel(navigatorKey: _navigatorKey),
+          ],
+        );
+      },
     );
   }
 }

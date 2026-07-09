@@ -8,10 +8,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/completed_download.dart';
 import '../providers/download_providers.dart';
+import '../providers/watch_party_provider.dart';
+import '../services/auth_service.dart';
 import '../services/playback_progress_manager.dart';
+import '../services/watch_party_navigation.dart';
 import '../theme/app_theme.dart';
 import 'anime_detail_screen.dart';
-import 'video_player_screen.dart';
+import 'watch_party_lobby_screen.dart';
 
 const double _kWideLayoutMinWidth = 600;
 const double _kEpisodeTileMaxWidth = 320;
@@ -125,6 +128,7 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
   @override
   Widget build(BuildContext context) {
     final wide = _isWideLayout(context);
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -141,6 +145,31 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _openPartyEpisode(
+    String releaseId, {
+    bool fromRemoteLoad = false,
+  }) async {
+    await WatchPartyNavigation.openEpisode(
+      ref: ref,
+      context: context,
+      releaseId: releaseId,
+      fromRemoteLoad: fromRemoteLoad,
+    );
+  }
+
+  void _openWatchPartyLobby() {
+    if (!AuthService.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Log in to start a watch party')),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const WatchPartyLobbyScreen()),
     );
   }
 
@@ -178,6 +207,40 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
               ),
             ),
             const SizedBox(width: 12),
+            GestureDetector(
+              onTap: _openWatchPartyLobby,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOutCubic,
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withOpacity(0.3),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.groups_rounded,
+                    color: ref.watch(watchPartyProvider).isActive
+                        ? AppTheme.primaryColor
+                        : AppTheme.primaryColor.withOpacity(0.85),
+                    size: 18,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             GestureDetector(
               onTap: _toggleSearch,
               child: AnimatedContainer(
@@ -874,19 +937,18 @@ class _DownloadedEpisodesScreenState extends ConsumerState<DownloadedEpisodesScr
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
               onTap: () async {
-                final filePath =
-                    await ref.read(completedDownloadsProvider.notifier).getFilePath(episode.releaseId);
-                if (!mounted || filePath == null) return;
-                final nav = Navigator.of(context);
-                nav.push(
-                  MaterialPageRoute(
-                    builder: (context) => VideoPlayerScreen(
-                      filePath: filePath,
-                      title: '${episode.showName} - Episode ${episode.episode}',
-                      currentReleaseId: episode.releaseId,
+                final party = ref.read(watchPartyProvider);
+                if (party.isActive && !party.isLeader) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Only the party leader can pick episodes'),
                     ),
-                  ),
-                );
+                  );
+                  return;
+                }
+
+                await _openPartyEpisode(episode.releaseId);
               },
               child: Padding(
                 padding: const EdgeInsets.all(12),

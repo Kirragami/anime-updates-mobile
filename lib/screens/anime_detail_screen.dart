@@ -12,6 +12,7 @@ import '../services/api_service.dart';
 import '../services/tracking_service.dart';
 import '../providers/download_providers.dart';
 import '../theme/app_theme.dart';
+import '../app_orientation_system_ui.dart';
 import 'video_player_screen.dart';
 
 /// Typography and spacing tuned for phone/tablet portrait vs split wide layout.
@@ -993,11 +994,17 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                 .read(completedDownloadsProvider.notifier)
                                 .getFilePath(episode.id);
                             if (filePath != null && context.mounted) {
+                              final restoreOrientations =
+                                  AppOrientationSystemUi.orientationsFromContext(
+                                context,
+                              );
                               Navigator.of(context).push(MaterialPageRoute(
                                 builder: (_) => VideoPlayerScreen(
                                   filePath: filePath,
-                                  title: '${episode.title} - Episode ${episode.episode}',
+                                  title:
+                                      '${episode.title} - Episode ${episode.episode}',
                                   currentReleaseId: episode.id,
+                                  restoreOrientationsOnExit: restoreOrientations,
                                 ),
                               ));
                             }

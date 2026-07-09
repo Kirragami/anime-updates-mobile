@@ -15,6 +15,7 @@ import '../models/anime_item.dart';
 import '../models/anime_show.dart';
 import '../widgets/anime_show_grid_view.dart';
 import '../providers/download_providers.dart';
+import '../app_orientation_system_ui.dart';
 import 'anime_detail_screen.dart';
 import 'video_player_screen.dart';
 
@@ -333,11 +334,14 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
     try {
       final filePath = await ref.read(completedDownloadsProvider.notifier).getFilePath(anime.id);
       if (filePath != null && context.mounted) {
+        final restoreOrientations =
+            AppOrientationSystemUi.orientationsFromContext(context);
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => VideoPlayerScreen(
               filePath: filePath,
               title: '${anime.title} - Episode ${anime.episode}',
+              restoreOrientationsOnExit: restoreOrientations,
             ),
           ),
         );
