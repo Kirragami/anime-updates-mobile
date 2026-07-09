@@ -40,6 +40,16 @@ class WatchPartyAppShell {
     _instance?.reset();
   }
 
+  /// Drops any queued member auto-open without replaying it later.
+  static void cancelPendingMemberVideoOpen() {
+    _instance?._cancelPendingMemberVideoOpen();
+  }
+
+  /// Marks the current auto-open token as handled and clears the queue.
+  static void acknowledgePendingMemberVideoOpen() {
+    _instance?._acknowledgePendingMemberVideoOpen();
+  }
+
   final AppShellDeliveryCoordinator _coordinator;
   final WidgetRef Function() _ref;
 
@@ -84,6 +94,16 @@ class WatchPartyAppShell {
       return;
     }
 
+    if (!next.canRejoinLeaderPlayback) {
+      _acknowledgePendingMemberVideoOpen();
+      return;
+    }
+
+    if (WatchPartyNavigation.isMemberInPartyPlayer) {
+      _acknowledgePendingMemberVideoOpen();
+      return;
+    }
+
     final token = next.memberVideoOpenToken;
     if (token <= _lastHandledMemberVideoOpenToken) return;
 
@@ -107,23 +127,44 @@ class WatchPartyAppShell {
       return true;
     }
 
+    if (!party.canRejoinLeaderPlayback) {
+      _lastHandledMemberVideoOpenToken = token;
+      return true;
+    }
+
+    if (WatchPartyNavigation.isMemberInPartyPlayer) {
+      _lastHandledMemberVideoOpenToken = token;
+      return true;
+    }
+
     final targetReleaseId = party.memberVideoOpenReleaseId ?? releaseId;
-    final opened = await WatchPartyNavigation.openMemberVideoFromLeader(
+    await WatchPartyNavigation.openMemberVideoFromLeader(
       ref: _ref(),
       context: context,
       releaseId: targetReleaseId,
       appInForeground: true,
     );
 
-    if (opened) {
-      _lastHandledMemberVideoOpenToken = token;
-    }
+    // Consume token after any open attempt so missing local files do not retry forever.
+    _lastHandledMemberVideoOpenToken = token;
 
-    return opened;
+    return true;
   }
 
   void resetMemberVideoTracking() {
     _lastHandledMemberVideoOpenToken = 0;
+    _coordinator.cancel('watch_party_member_video');
+  }
+
+  void _cancelPendingMemberVideoOpen() {
+    _coordinator.cancel('watch_party_member_video');
+  }
+
+  void _acknowledgePendingMemberVideoOpen() {
+    final token = _ref().read(watchPartyProvider).memberVideoOpenToken;
+    if (token > _lastHandledMemberVideoOpenToken) {
+      _lastHandledMemberVideoOpenToken = token;
+    }
     _coordinator.cancel('watch_party_member_video');
   }
 

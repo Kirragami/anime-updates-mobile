@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/download_providers.dart';
 import '../providers/watch_party_provider.dart';
 import '../screens/watch_party_lobby_screen.dart';
+import '../services/watch_party_navigation.dart';
 import '../theme/app_theme.dart';
 import '../utils/page_transitions.dart';
 
@@ -29,6 +31,7 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
   static const _memberAvatarRadius = 12.0;
   static const _memberBubbleFill = Color(0xFF293352);
   static const _panelAnimDuration = Duration(milliseconds: 340);
+  static const _rejoinButtonSize = 40.0;
 
   late final AnimationController _controller;
   late final Animation<Offset> _slideAnimation;
@@ -36,6 +39,7 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
 
   bool _renderPanel = false;
   bool _hiddenForRoute = false;
+  bool _rejoiningPlayback = false;
   WatchPartySessionState? _frozenPartyState;
 
   @override
@@ -107,7 +111,10 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
       _showPanel(animate: true);
       return;
     }
-    setState(() => _hiddenForRoute = false);
+    setState(() {
+      _hiddenForRoute = false;
+      _rejoiningPlayback = false;
+    });
     await _controller.forward(from: 0);
   }
 
@@ -137,7 +144,10 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
     ref.listen<bool>(watchPartyLobbyVisibleProvider, (_, __) {
       _syncPanelForRouteVisibility();
     });
-    ref.listen<bool>(watchPartyVideoPlayerVisibleProvider, (_, __) {
+    ref.listen<bool>(watchPartyVideoPlayerVisibleProvider, (previous, next) {
+      if (previous == true && next == false && _rejoiningPlayback && mounted) {
+        setState(() => _rejoiningPlayback = false);
+      }
       _syncPanelForRouteVisibility();
     });
 
@@ -150,6 +160,9 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
         );
       } else if (!next.isActive && wasActive) {
         _hidePanelForPartyEnd();
+      } else if (_rejoiningPlayback &&
+          previous?.partyState?.videoUrl != next.partyState?.videoUrl) {
+        setState(() => _rejoiningPlayback = false);
       }
     });
 
@@ -177,6 +190,14 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
     );
     final displayMembers = _displayMembers(members, leaderUsername);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final showRejoinButton = !party.isLeader;
+    final downloads = ref.watch(completedDownloadsProvider);
+    final leaderReleaseId = party.leaderPlaybackReleaseId;
+    final leaderIsWatching = party.canRejoinLeaderPlayback;
+    final canRejoinPlayback = leaderIsWatching &&
+        leaderReleaseId != null &&
+        downloads.containsKey(leaderReleaseId);
+    final showPlayButton = showRejoinButton && canRejoinPlayback;
 
     return Positioned(
       left: 16,
@@ -186,35 +207,92 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
         position: _slideAnimation,
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _openWatchParty,
-            child: SizedBox(
-              height: _pillHeight,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned(
-                    left: 30,
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    child: _buildPill(
-                      title: title,
-                      displayMembers: displayMembers,
-                      leaderUsername: leaderUsername,
-                    ),
+          child: SizedBox(
+            height: _pillHeight,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned(
+                  left: 30,
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: _buildPill(
+                    title: title,
+                    displayMembers: displayMembers,
+                    leaderUsername: leaderUsername,
+                    showPlayButton: showPlayButton,
+                    leaderNotWatching:
+                        showRejoinButton && !leaderIsWatching,
+                    onOpenLobby: _openWatchParty,
                   ),
-                  Positioned(
-                    left: 0,
-                    top: (_pillHeight - _iconSize) / 2,
+                ),
+                Positioned(
+                  left: 0,
+                  top: (_pillHeight - _iconSize) / 2,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _openWatchParty,
                     child: _buildLeadingIcon(),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _rejoinLeaderPlayback(bool canRejoin) async {
+    if (_rejoiningPlayback || !canRejoin) return;
+
+    final context = widget.navigatorKey.currentContext;
+    if (context == null) return;
+
+    setState(() => _rejoiningPlayback = true);
+    try {
+      await WatchPartyNavigation.rejoinLeaderPlayback(
+        ref: ref,
+        context: context,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _rejoiningPlayback = false);
+      }
+    }
+  }
+
+  Widget _buildRejoinButton() {
+    return GestureDetector(
+      onTap: _rejoiningPlayback
+          ? null
+          : () => _rejoinLeaderPlayback(true),
+      child: Container(
+        width: _rejoinButtonSize,
+        height: _rejoinButtonSize,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppTheme.primaryColor.withOpacity(0.28),
+          border: Border.all(
+            color: AppTheme.primaryColor.withOpacity(0.45),
+          ),
+        ),
+        alignment: Alignment.center,
+        child: _rejoiningPlayback
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppTheme.primaryColor.withOpacity(0.95),
+                ),
+              )
+            : Icon(
+                Icons.play_arrow_rounded,
+                color: AppTheme.primaryColor.withOpacity(0.95),
+                size: 26,
+              ),
       ),
     );
   }
@@ -290,10 +368,13 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
     required String title,
     required List<String> displayMembers,
     required String? leaderUsername,
+    required bool showPlayButton,
+    required bool leaderNotWatching,
+    required VoidCallback onOpenLobby,
   }) {
     return Container(
       height: _pillHeight,
-      padding: const EdgeInsets.fromLTRB(50, 12, 16, 12),
+      padding: EdgeInsets.fromLTRB(50, 12, showPlayButton ? 10 : 16, 12),
       decoration: BoxDecoration(
         color: AppTheme.surfaceColor.withOpacity(0.92),
         borderRadius: BorderRadius.circular(_pillHeight / 2),
@@ -306,32 +387,58 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              height: 1.2,
-              decoration: TextDecoration.none,
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onOpenLobby,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                  if (leaderNotWatching) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Leader not watching',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.55),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        height: 1.2,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ] else if (displayMembers.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    _MemberAvatarStack(
+                      displayMembers: displayMembers,
+                      leaderUsername: leaderUsername,
+                      coinEdgeOverlap: _coinEdgeOverlap,
+                      leaderRadius: _leaderAvatarRadius,
+                      memberRadius: _memberAvatarRadius,
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
-          if (displayMembers.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            _MemberAvatarStack(
-              displayMembers: displayMembers,
-              leaderUsername: leaderUsername,
-              coinEdgeOverlap: _coinEdgeOverlap,
-              leaderRadius: _leaderAvatarRadius,
-              memberRadius: _memberAvatarRadius,
-            ),
+          if (showPlayButton) ...[
+            const SizedBox(width: 6),
+            _buildRejoinButton(),
           ],
         ],
       ),

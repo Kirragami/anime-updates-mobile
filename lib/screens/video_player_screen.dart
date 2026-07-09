@@ -15,7 +15,9 @@ import '../services/completed_downloads_manager.dart';
 import '../services/playback_progress_manager.dart';
 import '../services/watch_party_logger.dart';
 import '../services/watch_party_navigation.dart';
+import '../services/watch_party_app_shell.dart';
 import '../services/watch_party_sync_config.dart';
+import '../widgets/watch_party_invite_friends_sheet.dart';
 import '../app_orientation_system_ui.dart';
 
 class VideoPlayerScreen extends ConsumerStatefulWidget {
@@ -84,6 +86,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   bool _applyingRemoteSync = false;
   bool _partyInitialized = false;
   String? _loadedPartyVideoUrl;
+  bool _watchPartyExitHandled = false;
   bool _periodicSyncPending = false;
   Timer? _partySeekDebounce;
   Timer? _partyPlaybackSyncTimer;
@@ -272,13 +275,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     final manager = CompletedDownloadsManager();
     final filePath = await manager.getFilePath(releaseId);
     if (filePath == null || !mounted) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Leader started an episode you have not downloaded'),
-          ),
-        );
-      }
       return;
     }
 
@@ -344,6 +340,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           final videoRef = WatchPartyVideoRef.decode(action.videoUrl);
           if (videoRef != null) {
             _loadPartyEpisode(videoRef.releaseId, action.videoUrl ?? '');
+          }
+          break;
+        case SyncActionType.stopVideo:
+          if (mounted) {
+            Navigator.of(context).pop();
           }
           break;
         case SyncActionType.syncRequest:
@@ -962,6 +963,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   @override
   void didPop() {
     ref.read(watchPartyVideoPlayerVisibleProvider.notifier).state = false;
+    _handleWatchPartyPlayerExit();
   }
 
   @override
@@ -978,9 +980,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _partyActionSub?.cancel();
     _partySeekDebounce?.cancel();
     _stopPartyPlaybackSync();
-    if (widget.watchPartyEnabled && !_isPartyLeader) {
-      WatchPartyNavigation.markMemberInPartyPlayer(false);
-    }
     _controlsTimer?.cancel();
     _positionTimer?.cancel();
     _seekIndicatorTimer?.cancel();
@@ -1179,6 +1178,36 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     );
   }
 
+  void _showInviteFriendsPopup() {
+    showWatchPartyInviteFriendsSheet(context);
+  }
+
+  void _handleWatchPartyPlayerExit() {
+    if (_watchPartyExitHandled) return;
+    _watchPartyExitHandled = true;
+
+    final party = ref.read(watchPartyProvider);
+    if (!party.isActive) return;
+
+    if (party.isLeader) {
+      final videoUrl = party.partyState?.videoUrl;
+      if (videoUrl != null && videoUrl.isNotEmpty) {
+        ref.read(watchPartyProvider.notifier).notifyStopVideo();
+      }
+      return;
+    }
+
+    if (widget.watchPartyEnabled) {
+      WatchPartyNavigation.markMemberInPartyPlayer(false);
+      WatchPartyAppShell.cancelPendingMemberVideoOpen();
+    }
+  }
+
+  void _exitPlayer() {
+    _handleWatchPartyPlayerExit();
+    Navigator.of(context).pop();
+  }
+
   Widget _buildTopBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1186,7 +1215,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         children: [
           
           GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
+            onTap: _exitPlayer,
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -1219,7 +1248,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             ),
 
           if (_watchPartyActive)
-            Container(
+            GestureDetector(
+              onTap: _isPartyLeader ? _showInviteFriendsPopup : null,
+              child: Container(
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
@@ -1231,7 +1262,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.sync_rounded,
+                    _isPartyLeader
+                        ? Icons.person_add_alt_1_rounded
+                        : Icons.sync_rounded,
                     size: 14,
                     color: AppTheme.primaryColor.withOpacity(0.95),
                   ),
@@ -1246,6 +1279,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                   ),
                 ],
               ),
+            ),
             ),
           
           const Spacer(),

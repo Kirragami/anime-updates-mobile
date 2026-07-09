@@ -41,6 +41,19 @@ class WatchPartySessionState {
 
   bool get isActive => partyId != null && partyId!.isNotEmpty;
 
+  /// Members can rejoin when the leader has started an episode.
+  bool get canRejoinLeaderPlayback {
+    if (!isActive || isLeader) return false;
+    final videoUrl = partyState?.videoUrl;
+    return videoUrl != null && videoUrl.isNotEmpty;
+  }
+
+  String? get leaderPlaybackReleaseId {
+    final videoUrl = partyState?.videoUrl;
+    if (videoUrl == null || videoUrl.isEmpty) return null;
+    return WatchPartyVideoRef.decode(videoUrl)?.releaseId;
+  }
+
   WatchPartySessionState copyWith({
     String? partyId,
     bool? isLeader,
@@ -298,6 +311,7 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
         }
         return;
       case SyncActionType.loadVideo:
+      case SyncActionType.stopVideo:
       case SyncActionType.play:
       case SyncActionType.pause:
       case SyncActionType.seek:
@@ -328,6 +342,11 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
         }
         if (!state.isLeader) {
           final releaseId = WatchPartyVideoRef.decode(action.videoUrl)?.releaseId;
+          if (WatchPartyNavigation.isMemberInPartyPlayer) {
+            state = state.copyWith(partyState: updated);
+            WatchPartyAppShell.acknowledgePendingMemberVideoOpen();
+            return;
+          }
           WatchPartyLogger.info(
             'member auto-open signal releaseId=$releaseId token=${state.memberVideoOpenToken + 1}',
           );
@@ -336,6 +355,22 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
             memberVideoOpenReleaseId: releaseId,
             memberVideoOpenToken: state.memberVideoOpenToken + 1,
           );
+          return;
+        }
+        break;
+      case SyncActionType.stopVideo:
+        updated = current.copyWith(
+          clearVideoUrl: true,
+          currentTimeStamp: 0,
+          isPlaying: false,
+        );
+        if (!state.isLeader) {
+          state = state.copyWith(
+            partyState: updated,
+            statusMessage: 'Leader stopped watching',
+            clearMemberVideoOpenReleaseId: true,
+          );
+          WatchPartyAppShell.acknowledgePendingMemberVideoOpen();
           return;
         }
         break;
@@ -369,6 +404,11 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
           final releaseId =
               WatchPartyVideoRef.decode(incomingVideoUrl)?.releaseId;
           if (releaseId != null && incomingVideoUrl != current.videoUrl) {
+            if (WatchPartyNavigation.isMemberInPartyPlayer) {
+              state = state.copyWith(partyState: updated);
+              WatchPartyAppShell.acknowledgePendingMemberVideoOpen();
+              return;
+            }
             WatchPartyLogger.info(
               'SYNC_REQUEST video open releaseId=$releaseId videoUrl=$incomingVideoUrl',
             );
@@ -425,6 +465,39 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
       SyncAction(
         action: SyncActionType.loadVideo,
         videoUrl: encoded,
+        leaderUsername: AuthService.currentUsername,
+      ),
+    );
+  }
+
+  void notifyStopVideo() {
+    if (!state.isLeader) {
+      WatchPartyLogger.warn('notifyStopVideo ignored: not leader');
+      return;
+    }
+
+    final currentVideoUrl = state.partyState?.videoUrl;
+    if (currentVideoUrl == null || currentVideoUrl.isEmpty) {
+      WatchPartyLogger.info('notifyStopVideo skipped: no active video');
+      return;
+    }
+
+    WatchPartyLogger.info('notifyStopVideo clearing videoUrl=$currentVideoUrl');
+
+    final current = state.partyState;
+    if (current != null) {
+      state = state.copyWith(
+        partyState: current.copyWith(
+          clearVideoUrl: true,
+          currentTimeStamp: 0,
+          isPlaying: false,
+        ),
+      );
+    }
+
+    sendSync(
+      SyncAction(
+        action: SyncActionType.stopVideo,
         leaderUsername: AuthService.currentUsername,
       ),
     );

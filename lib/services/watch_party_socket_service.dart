@@ -141,6 +141,10 @@ class WatchPartySocketService {
     final partyId = _partyId;
     final client = _client;
     if (partyId == null || client == null || !_connected) {
+      WatchPartyLogger.warn(
+        'sendSync dropped ${action.action.apiValue}: partyId=$partyId '
+        'connected=$_connected client=${client != null}',
+      );
       return false;
     }
 
@@ -148,9 +152,9 @@ class WatchPartySocketService {
       destination: '/app/party/$partyId/sync',
       body: jsonEncode(action.toJson()),
     );
-    if (kDebugMode) {
-      WatchPartyLogger.info('sent ${action.action.apiValue} to /app/party/$partyId');
-    }
+    WatchPartyLogger.info(
+      'sent ${action.action.apiValue} to /app/party/$partyId connected=$_connected',
+    );
     return true;
   }
 

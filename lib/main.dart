@@ -148,10 +148,6 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
       WatchPartyAppShell.deliverInvite(pendingInvite);
     }
 
-    _watchPartyAppShell?.onPartyStateChanged(
-      null,
-      ref.read(watchPartyProvider),
-    );
     _appShellDelivery.scheduleFlush();
   }
 

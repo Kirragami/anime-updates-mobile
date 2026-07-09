@@ -20,6 +20,8 @@ class WatchPartyNavigation {
     _isMemberInPartyPlayer = inPlayer;
   }
 
+  static bool get isMemberInPartyPlayer => _isMemberInPartyPlayer;
+
   /// Clears navigation guards when the member leaves the party entirely.
   static void resetOnPartyLeave() {
     _isMemberInPartyPlayer = false;
@@ -44,6 +46,11 @@ class WatchPartyNavigation {
       return true;
     }
 
+    if (!party.canRejoinLeaderPlayback) {
+      WatchPartyLogger.info('auto-open skipped: leader not playing');
+      return true;
+    }
+
     if (_isMemberInPartyPlayer) {
       WatchPartyLogger.info(
         'auto-open skipped: member already in party player releaseId=$releaseId',
@@ -57,6 +64,50 @@ class WatchPartyNavigation {
       context: context,
       releaseId: releaseId,
       fromRemoteLoad: true,
+    );
+  }
+
+  /// Manual rejoin from the floating panel (does not use [memberVideoOpenToken]).
+  static Future<bool> rejoinLeaderPlayback({
+    required WidgetRef ref,
+    required BuildContext context,
+  }) async {
+    final party = ref.read(watchPartyProvider);
+    if (!party.isActive || party.isLeader) {
+      return false;
+    }
+
+    if (_isMemberInPartyPlayer) {
+      WatchPartyLogger.info('rejoin skipped: member already in party player');
+      return false;
+    }
+
+    await ref.read(watchPartyProvider.notifier).refreshState();
+    if (!context.mounted) return false;
+
+    final updated = ref.read(watchPartyProvider);
+    final releaseId = updated.leaderPlaybackReleaseId;
+    if (releaseId == null) {
+      return false;
+    }
+
+    final filePath =
+        await ref.read(completedDownloadsProvider.notifier).getFilePath(releaseId);
+    if (!context.mounted) return false;
+    if (filePath == null) {
+      WatchPartyLogger.warn(
+        'rejoin skipped: episode not downloaded releaseId=$releaseId',
+      );
+      return false;
+    }
+
+    WatchPartyLogger.info('manual rejoin releaseId=$releaseId');
+    return openEpisode(
+      ref: ref,
+      context: context,
+      releaseId: releaseId,
+      fromRemoteLoad: true,
+      awaitPlayerClose: false,
     );
   }
 
@@ -109,6 +160,7 @@ class WatchPartyNavigation {
     required BuildContext context,
     required String releaseId,
     required bool fromRemoteLoad,
+    bool awaitPlayerClose = true,
   }) async {
     final party = ref.read(watchPartyProvider);
     if (party.isActive && party.isLeader && !fromRemoteLoad) {
@@ -121,16 +173,14 @@ class WatchPartyNavigation {
 
     if (filePath == null) {
       WatchPartyLogger.warn('episode file missing for releaseId=$releaseId');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            fromRemoteLoad
-                ? 'The leader started an episode you have not downloaded'
-                : 'Could not find the downloaded file',
+      if (!fromRemoteLoad) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not find the downloaded file'),
           ),
-        ),
-      );
-      return true;
+        );
+      }
+      return false;
     }
 
     final downloads = ref.read(completedDownloadsProvider);
@@ -150,9 +200,10 @@ class WatchPartyNavigation {
     final restoreOrientations = AppOrientationSystemUi.orientationsFromContext(context);
 
     WatchPartyLogger.info(
-      'pushing VideoPlayerScreen releaseId=$releaseId watchParty=${activeParty.isActive}',
+      'pushing VideoPlayerScreen releaseId=$releaseId watchParty=${activeParty.isActive} '
+      'awaitClose=$awaitPlayerClose',
     );
-    await Navigator.of(context).push(
+    final navigation = Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => VideoPlayerScreen(
           filePath: filePath,
@@ -163,6 +214,15 @@ class WatchPartyNavigation {
         ),
       ),
     );
+
+    if (!awaitPlayerClose) {
+      if (fromRemoteLoad && !activeParty.isLeader) {
+        navigation.whenComplete(() => markMemberInPartyPlayer(false));
+      }
+      return true;
+    }
+
+    await navigation;
 
     if (fromRemoteLoad && !activeParty.isLeader) {
       markMemberInPartyPlayer(false);

@@ -10,6 +10,7 @@ import '../providers/watch_party_provider.dart';
 import '../services/auth_service.dart';
 import '../services/watch_party_app_shell.dart';
 import '../theme/app_theme.dart';
+import '../widgets/watch_party_invite_friend_tile.dart';
 import 'login_screen.dart';
 
 enum WatchPartyLobbyMode {
@@ -320,7 +321,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
                 final isInviting = partyState.invitingFriendUsernames
                     .contains(friend.username);
 
-                return _FriendInviteTile(
+                return WatchPartyInviteFriendTile(
                   friend: friend,
                   isInviting: isInviting,
                   isPending: isPending,
@@ -390,7 +391,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
 
             return Column(
               children: invitableFriends.map((friend) {
-                return _FriendInviteTile(
+                return WatchPartyInviteFriendTile(
                   friend: friend,
                   isInviting: partyState.invitingFriendUsernames.contains(friend.username),
                   subtitle: 'Tap to invite',
@@ -886,111 +887,6 @@ class _FadeOutStatusBannerState extends State<_FadeOutStatusBanner> {
         ),
       ),
     );
-  }
-}
-
-class _FriendInviteTile extends StatelessWidget {
-  const _FriendInviteTile({
-    required this.friend,
-    required this.isInviting,
-    this.isPending = false,
-    this.isJoined = false,
-    this.subtitle,
-    required this.onInvite,
-    this.onResend,
-  });
-
-  final Tomodachi friend;
-  final bool isInviting;
-  final bool isPending;
-  final bool isJoined;
-  final String? subtitle;
-  final VoidCallback onInvite;
-  final VoidCallback? onResend;
-
-  String get _subtitle {
-    if (subtitle != null) return subtitle!;
-    if (isJoined) return 'In party';
-    if (isPending) return 'Waiting for response';
-    return 'Tap to invite';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final canInvite = !isPending && !isJoined && !isInviting;
-    final canResend = isPending && !isInviting;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.primaryColor.withOpacity(0.25),
-          child: Text(
-            friend.username.isNotEmpty
-                ? friend.username[0].toUpperCase()
-                : '?',
-            style: const TextStyle(
-              color: AppTheme.primaryColor,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        title: Text(
-          friend.username,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          _subtitle,
-          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
-        ),
-        trailing: _buildTrailing(),
-        onTap: canInvite
-            ? onInvite
-            : canResend
-                ? onResend
-                : null,
-      ),
-    );
-  }
-
-  Widget _buildTrailing() {
-    if (isInviting) {
-      return const SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: AppTheme.primaryColor,
-        ),
-      );
-    }
-
-    if (isJoined) {
-      return Icon(
-        Icons.check_circle_rounded,
-        color: Colors.greenAccent.withOpacity(0.95),
-      );
-    }
-
-    if (isPending) {
-      return TextButton(
-        onPressed: onResend,
-        style: TextButton.styleFrom(
-          foregroundColor: Colors.orangeAccent.withOpacity(0.95),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        child: const Text('Pending'),
-      );
-    }
-
-    return Icon(Icons.send_rounded, color: AppTheme.primaryColor.withOpacity(0.9));
   }
 }
 
