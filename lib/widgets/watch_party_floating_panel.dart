@@ -199,7 +199,9 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
         downloads.containsKey(leaderReleaseId);
     final showPlayButton = showRejoinButton && canRejoinPlayback;
 
-    return Positioned(
+    return DefaultTextStyle(
+      style: Theme.of(context).textTheme.bodyMedium!,
+      child: Positioned(
       left: 16,
       right: 16,
       bottom: bottomInset + 14,
@@ -213,17 +215,16 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
               clipBehavior: Clip.none,
               children: [
                 Positioned(
-                  left: 30,
+                  left: 0,
                   right: 0,
                   top: 0,
                   bottom: 0,
                   child: _buildPill(
+                    context: context,
                     title: title,
                     displayMembers: displayMembers,
                     leaderUsername: leaderUsername,
                     showPlayButton: showPlayButton,
-                    leaderNotWatching:
-                        showRejoinButton && !leaderIsWatching,
                     onOpenLobby: _openWatchParty,
                   ),
                 ),
@@ -241,6 +242,7 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -323,8 +325,7 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
       return 'Watch party';
     }
 
-    final displayName = '${name[0].toUpperCase()}${name.substring(1)}';
-    return "$displayName's watch party";
+    return "$name's watch party";
   }
 
   List<String> _displayMembers(Set<String> members, String? leaderUsername) {
@@ -365,16 +366,27 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
   }
 
   Widget _buildPill({
+    required BuildContext context,
     required String title,
     required List<String> displayMembers,
     required String? leaderUsername,
     required bool showPlayButton,
-    required bool leaderNotWatching,
     required VoidCallback onOpenLobby,
   }) {
+    final titleStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+        );
+
     return Container(
       height: _pillHeight,
-      padding: EdgeInsets.fromLTRB(50, 12, showPlayButton ? 10 : 16, 12),
+      padding: EdgeInsets.fromLTRB(
+        _iconSize + 8,
+        12,
+        showPlayButton ? 10 : 16,
+        12,
+      ),
       decoration: BoxDecoration(
         color: AppTheme.surfaceColor.withOpacity(0.92),
         borderRadius: BorderRadius.circular(_pillHeight / 2),
@@ -402,27 +414,9 @@ class _WatchPartyFloatingPanelState extends ConsumerState<WatchPartyFloatingPane
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                      decoration: TextDecoration.none,
-                    ),
+                    style: titleStyle,
                   ),
-                  if (leaderNotWatching) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Leader not watching',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.55),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        height: 1.2,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ] else if (displayMembers.isNotEmpty) ...[
+                  if (displayMembers.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     _MemberAvatarStack(
                       displayMembers: displayMembers,
@@ -553,7 +547,7 @@ class _MemberAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = isLeader ? leaderRadius : memberRadius;
     final initial =
-        username.isNotEmpty ? username[0].toUpperCase() : '?';
+        username.isNotEmpty ? username[0] : '?';
 
     return Container(
       width: radius * 2,
@@ -569,12 +563,11 @@ class _MemberAvatar extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         initial,
-        style: TextStyle(
-          color: AppTheme.primaryColor,
-          fontWeight: FontWeight.bold,
-          fontSize: isLeader ? 12 : 11,
-          decoration: TextDecoration.none,
-        ),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppTheme.primaryColor,
+              fontWeight: FontWeight.bold,
+              fontSize: isLeader ? 12 : 11,
+            ),
       ),
     );
   }

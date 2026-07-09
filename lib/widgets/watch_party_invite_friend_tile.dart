@@ -57,7 +57,7 @@ class WatchPartyInviteFriendTile extends StatelessWidget {
           backgroundColor: AppTheme.primaryColor.withOpacity(0.25),
           child: Text(
             friend.username.isNotEmpty
-                ? friend.username[0].toUpperCase()
+                ? friend.username[0]
                 : '?',
             style: TextStyle(
               color: AppTheme.primaryColor,

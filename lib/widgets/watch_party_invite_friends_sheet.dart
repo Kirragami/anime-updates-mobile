@@ -26,8 +26,8 @@ class _WatchPartyInviteFriendsDialog extends ConsumerWidget {
     final partyState = ref.watch(watchPartyProvider);
     final friendsAsync = ref.watch(tomodachiNotifierProvider);
     final screenSize = MediaQuery.sizeOf(context);
-    final maxHeight = screenSize.height * 0.62;
-    final maxWidth = screenSize.width > 520 ? 380.0 : screenSize.width * 0.88;
+    final maxHeight = screenSize.height * 0.55;
+    final maxWidth = screenSize.width > 520 ? 360.0 : screenSize.width * 0.88;
 
     return Dialog(
       backgroundColor: AppTheme.surfaceColor,
@@ -37,89 +37,19 @@ class _WatchPartyInviteFriendsDialog extends ConsumerWidget {
         constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 8, 8),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Invite friends',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: Colors.white.withOpacity(0.75),
-                    ),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 18, 18, 12),
               child: Text(
-                'Send invites without leaving playback.',
+                'Invite friends',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.68),
-                  fontSize: 13,
-                  height: 1.35,
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-            if (partyState.statusMessage != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
-                child: Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.16),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppTheme.primaryColor.withOpacity(0.35),
-                    ),
-                  ),
-                  child: Text(
-                    partyState.statusMessage!,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-            if (partyState.errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
-                child: Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.errorColor.withOpacity(0.14),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppTheme.errorColor.withOpacity(0.35),
-                    ),
-                  ),
-                  child: Text(
-                    partyState.errorMessage!,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
             Flexible(
               child: _InviteFriendsList(
                 friendsAsync: friendsAsync,
@@ -160,11 +90,7 @@ class _InviteFriendsList extends StatelessWidget {
           child: CircularProgressIndicator(color: AppTheme.primaryColor),
         ),
       ),
-      error: (error, _) => _EmptyState(
-        icon: Icons.error_outline,
-        title: 'Could not load friends',
-        subtitle: error.toString(),
-      ),
+      error: (_, __) => const _ListMessage('Could not load friends'),
       data: (friends) {
         final joinedMemberUsernames =
             partyState.partyState?.members ?? const {};
@@ -175,11 +101,7 @@ class _InviteFriendsList extends StatelessWidget {
             friends.where((friend) => friend.isAccepted).toList();
 
         if (acceptedFriends.isEmpty) {
-          return const _EmptyState(
-            icon: Icons.person_add_alt_1_rounded,
-            title: 'No friends yet',
-            subtitle: 'Add tomodachi first, then come back to invite them.',
-          );
+          return const _ListMessage('No friends yet');
         }
 
         return ListView(
@@ -209,45 +131,22 @@ class _InviteFriendsList extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
+class _ListMessage extends StatelessWidget {
+  const _ListMessage(this.message);
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white38, size: 36),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.65),
-              fontSize: 12,
-              height: 1.35,
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.65),
+          fontSize: 13,
+        ),
       ),
     );
   }

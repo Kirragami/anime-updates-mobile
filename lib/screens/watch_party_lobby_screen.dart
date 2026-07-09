@@ -256,7 +256,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
           icon: Icons.groups_rounded,
           title: 'Start a watch party',
           subtitle:
-              'Invite one or more friends to sync playback on your downloaded episodes.',
+              'Invite your tomodachis to watch together.',
         ),
         const SizedBox(height: 20),
         _buildInviteModeFriendList(
@@ -280,7 +280,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Invite friends',
+          'Invite tomodachis',
           style: TextStyle(
             color: Colors.white.withOpacity(0.9),
             fontSize: 15,
@@ -297,7 +297,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
           ),
           error: (error, _) => _buildEmptyFriends(
             icon: Icons.error_outline,
-            title: 'Could not load friends',
+            title: 'Could not load tomodachis',
             subtitle: error.toString(),
           ),
           data: (friends) {
@@ -307,8 +307,8 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
             if (acceptedFriends.isEmpty) {
               return _buildEmptyFriends(
                 icon: Icons.person_add_alt_1_rounded,
-                title: 'No friends yet',
-                subtitle: 'Add tomodachi first, then come back to invite them.',
+                title: "You don't have any tomodachis :((",
+                subtitle: 'Make some tomodachis first.',
               );
             }
 
@@ -340,7 +340,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
   Widget _buildFriendInviteList({
     required AsyncValue<List<Tomodachi>> friendsAsync,
     required WatchPartySessionState partyState,
-    String title = 'Invite friends',
+    String title = 'Invite tomodachis',
   }) {
     final joinedMemberUsernames = partyState.partyState?.members ?? const {};
     final pendingInviteUsernames =
@@ -367,7 +367,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
           ),
           error: (error, _) => _buildEmptyFriends(
             icon: Icons.error_outline,
-            title: 'Could not load friends',
+            title: 'Could not load tomodachis',
             subtitle: error.toString(),
           ),
           data: (friends) {
@@ -381,10 +381,10 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
               return _buildEmptyFriends(
                 icon: Icons.check_circle_outline_rounded,
                 title: joinedMemberUsernames.isEmpty
-                    ? 'No friends yet'
-                    : 'All friends invited or joined',
+                    ? "You don't have any tomodachis :(("
+                    : 'All your tomodachis are in your party',
                 subtitle: joinedMemberUsernames.isEmpty
-                    ? 'Add tomodachi first, then come back to invite them.'
+                    ? 'Make some tomodachis first.'
                     : 'Everyone available is already in the party or waiting on an invite.',
               );
             }
@@ -441,24 +441,26 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
     }
 
     if (memberUsername == leaderUsername) {
-      return '$memberUsername (leader)';
+      return '$memberUsername';
     }
 
     return memberUsername;
   }
 
-  String _leaderUsername({
+  String _partyTitle({
+    required bool isLeader,
     required String? leaderUsername,
   }) {
-    if (leaderUsername == null || leaderUsername.isEmpty) {
-      return 'the leader';
+    if (isLeader) {
+      return 'My party';
     }
 
-    if (leaderUsername == AuthService.currentUsername) {
-      return AuthService.currentUsername ?? 'You';
+    final name = leaderUsername?.trim();
+    if (name == null || name.isEmpty) {
+      return 'Watch party';
     }
 
-    return leaderUsername;
+    return "$name's party";
   }
 
   String _partyMemberSummary({
@@ -507,7 +509,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
           _buildEmptyFriends(
             icon: Icons.hourglass_top_rounded,
             title: 'Waiting for members',
-            subtitle: 'Invited friends will appear here once they join.',
+            subtitle: 'Invited tomodachis will appear here once they join.',
           )
         else
           ...members.map((memberUsername) {
@@ -543,54 +545,12 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
             ),
           ),
         ],
-        const SizedBox(height: 24),
         if (partyState.isLeader) ...[
-          Text(
-            'Ready to watch',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Go back to downloaded episodes and tap an episode. Everyone in the party will follow your playback.',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.72),
-              fontSize: 13,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.download_done_rounded),
-              label: const Text('Pick an episode'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           _buildFriendInviteList(
             friendsAsync: friendsAsync,
             partyState: partyState,
-            title: 'Invite more friends',
-          ),
-        ] else ...[
-          _buildInfoCard(
-            icon: Icons.sync_rounded,
-            title: 'Synced with the party',
-            subtitle:
-                'When the leader starts an episode, it will open here automatically.',
+            title: 'Invite more tomodachis',
           ),
         ],
       ],
@@ -608,6 +568,10 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
     final memberSummary = _partyMemberSummary(
       memberCount: memberCount,
       onlineCount: onlineCount,
+    );
+    final partyTitle = _partyTitle(
+      isLeader: partyState.isLeader,
+      leaderUsername: leaderUsername,
     );
 
     return Container(
@@ -633,7 +597,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  connected ? 'Connected to party' : 'Connecting..',
+                  partyTitle,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -641,11 +605,7 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  partyState.isLeader
-                      ? 'You are the leader · $memberSummary'
-                      : 'Leader: ${_leaderUsername(
-                          leaderUsername: leaderUsername,
-                        )} · $memberSummary',
+                  connected ? memberSummary : 'Connecting...',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.72),
                     fontSize: 13,
@@ -654,22 +614,6 @@ class _WatchPartyLobbyScreenState extends ConsumerState<WatchPartyLobbyScreen>
               ],
             ),
           ),
-          if (partyState.isLeader)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Leader',
-                style: TextStyle(
-                  color: AppTheme.primaryColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -1034,7 +978,7 @@ Future<void> showWatchPartyInviteDialog(
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         content: Text(
-          '${payload.leaderUsername} invited you to watch downloaded episodes together.',
+          '${payload.leaderUsername} invited you to watch together.',
           style: TextStyle(color: Colors.white.withOpacity(0.82), height: 1.4),
         ),
         actions: [
