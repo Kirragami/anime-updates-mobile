@@ -504,7 +504,7 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
   }
 
   void notifyPlay(double timestampSeconds) {
-    if (!state.isLeader) return;
+    if (!state.isActive) return;
     sendSync(
       SyncAction(
         action: SyncActionType.play,
@@ -515,7 +515,7 @@ class WatchPartyNotifier extends StateNotifier<WatchPartySessionState> {
   }
 
   void notifyPause(double timestampSeconds) {
-    if (!state.isLeader) return;
+    if (!state.isActive) return;
     sendSync(
       SyncAction(
         action: SyncActionType.pause,

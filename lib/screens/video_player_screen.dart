@@ -329,47 +329,45 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       'playing=${action.isPlaying} leader=$_isPartyLeader',
     );
 
-    if (_isPartyLeader && action.action == SyncActionType.syncRequest) {
-      _respondToSyncRequest();
-      return;
-    }
-
-    if (!_isPartyLeader) {
-      switch (action.action) {
-        case SyncActionType.loadVideo:
-          final videoRef = WatchPartyVideoRef.decode(action.videoUrl);
-          if (videoRef != null) {
-            _loadPartyEpisode(videoRef.releaseId, action.videoUrl ?? '');
-          }
-          break;
-        case SyncActionType.stopVideo:
-          if (mounted) {
-            Navigator.of(context).pop();
-          }
-          break;
-        case SyncActionType.syncRequest:
-          final videoRef = WatchPartyVideoRef.decode(action.videoUrl);
-          if (videoRef != null && videoRef.releaseId != _activeReleaseId) {
-            _loadPartyEpisode(videoRef.releaseId, action.videoUrl ?? '');
-          }
-          break;
-        case SyncActionType.play:
-        case SyncActionType.pause:
-        case SyncActionType.seek:
-          _queueOrApplyRemoteSync(action);
-          break;
-        case SyncActionType.leaderChange:
-          ref.read(watchPartyProvider.notifier).refreshState();
-          break;
-        case SyncActionType.join:
-        case SyncActionType.leave:
-          ref.read(watchPartyProvider.notifier).refreshState();
-          break;
-        case SyncActionType.presence:
-          break;
-        case SyncActionType.heartbeat:
-          break;
-      }
+    switch (action.action) {
+      case SyncActionType.play:
+      case SyncActionType.pause:
+      case SyncActionType.seek:
+        _queueOrApplyRemoteSync(action);
+        return;
+      case SyncActionType.loadVideo:
+        if (_isPartyLeader) return;
+        final loadRef = WatchPartyVideoRef.decode(action.videoUrl);
+        if (loadRef != null) {
+          _loadPartyEpisode(loadRef.releaseId, action.videoUrl ?? '');
+        }
+        return;
+      case SyncActionType.stopVideo:
+        if (_isPartyLeader) return;
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+        return;
+      case SyncActionType.syncRequest:
+        if (_isPartyLeader) {
+          _respondToSyncRequest();
+          return;
+        }
+        final videoRef = WatchPartyVideoRef.decode(action.videoUrl);
+        if (videoRef != null && videoRef.releaseId != _activeReleaseId) {
+          _loadPartyEpisode(videoRef.releaseId, action.videoUrl ?? '');
+        }
+        return;
+      case SyncActionType.leaderChange:
+        ref.read(watchPartyProvider.notifier).refreshState();
+        return;
+      case SyncActionType.join:
+      case SyncActionType.leave:
+        ref.read(watchPartyProvider.notifier).refreshState();
+        return;
+      case SyncActionType.presence:
+      case SyncActionType.heartbeat:
+        return;
     }
   }
 
@@ -459,13 +457,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   void _emitPartyPlayState({required bool playing}) {
-    if (!_isPartyLeader || _applyingRemoteSync) return;
+    if (!_watchPartyActive || _applyingRemoteSync) return;
 
     _videoPlayerController?.getPosition().then((pos) {
-      if (!mounted || !_isPartyLeader || _applyingRemoteSync) return;
+      if (!mounted || !_watchPartyActive || _applyingRemoteSync) return;
       final seconds = pos.inMilliseconds / 1000.0;
       WatchPartyLogger.info(
-        'leader emit ${playing ? 'PLAY' : 'PAUSE'} ts=$seconds',
+        'party emit ${playing ? 'PLAY' : 'PAUSE'} ts=$seconds leader=$_isPartyLeader',
       );
       if (playing) {
         ref.read(watchPartyProvider.notifier).notifyPlay(seconds);
