@@ -359,6 +359,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
         AnimeDetailScreen(
           animeShowId: animeShow.id,
           initialImageUrl: animeShow.imageUrl,
+          initiallyTracked: true,
         ),
         fromRight: true,
       ),
