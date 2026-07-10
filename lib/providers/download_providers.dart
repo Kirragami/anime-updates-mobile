@@ -3,19 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/active_download.dart';
 import '../models/completed_download.dart';
 import '../services/active_downloads_manager.dart';
+import '../services/auth_service.dart';
 import '../services/completed_downloads_manager.dart';
+import 'anime_providers.dart';
 
 final activeDownloadsProvider = StateNotifierProvider<ActiveDownloadsNotifier, Map<String, ActiveDownload>>((ref) {
-  return ActiveDownloadsNotifier();
+  return ActiveDownloadsNotifier(ref);
 });
 
 class ActiveDownloadsNotifier extends StateNotifier<Map<String, ActiveDownload>> {
-  final ActiveDownloadsManager _manager = ActiveDownloadsManager();
-  
-  ActiveDownloadsNotifier() : super({}) {
+  ActiveDownloadsNotifier(this.ref) : super({}) {
     _manager.stateNotifier.addListener(_onStateChanged);
     state = _manager.activeDownloads;
   }
+
+  final Ref ref;
+  final ActiveDownloadsManager _manager = ActiveDownloadsManager();
   
   void _onStateChanged() {
     state = _manager.activeDownloads;
@@ -31,6 +34,15 @@ class ActiveDownloadsNotifier extends StateNotifier<Map<String, ActiveDownload>>
     String? imageUrl,
     bool isTracked = false,
   }) async {
+    final showId = animeShowId?.trim() ?? '';
+    final shouldTrack =
+        AuthService.isLoggedIn && !isTracked && showId.isNotEmpty;
+    if (shouldTrack) {
+      ref
+          .read(animeListNotifierProvider.notifier)
+          .updateTrackingForShowId(showId, true);
+    }
+
     await _manager.startDownload(
       releaseId: releaseId,
       magnetUrl: magnetUrl,

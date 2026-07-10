@@ -384,9 +384,12 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   Widget _buildLikeButton() {
     return Consumer(builder: (context, ref, _) {
       final animeListAsync = ref.watch(animeListNotifierProvider);
+      final showId = _animeItem?.animeShowId;
       bool isTracked = _animeItem?.tracked ?? false;
       animeListAsync.whenData((list) {
-        isTracked = list.firstWhere((i) => i.id == _animeItem?.id, orElse: () => _animeItem!).tracked;
+        if (showId != null && showId.isNotEmpty) {
+          isTracked = list.any((item) => item.animeShowId == showId && item.tracked);
+        }
       });
       return LikeButton(
         size: 48,
@@ -1016,6 +1019,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                           extent: t.actionIconExtent,
                           iconSize: t.actionIconGlyphSize,
                           onTap: () async {
+                            final wasTracked = episode.tracked;
                             await ref.read(activeDownloadsProvider.notifier).startDownload(
                               releaseId: episode.id,
                               magnetUrl: episode.downloadUrl,
@@ -1026,6 +1030,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                               imageUrl: episode.imageUrl,
                               isTracked: episode.tracked,
                             );
+                            if (!mounted || wasTracked) return;
+                            setState(() {
+                              _animeItem = _animeItem?.copyWith(tracked: true);
+                            });
                           },
                         ),
             ),
