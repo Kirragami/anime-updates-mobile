@@ -233,12 +233,14 @@ class AnimeDetailScreen extends ConsumerStatefulWidget {
   final AnimeItem? anime;
   final String? animeShowId;
   final String? initialImageUrl;
+  final bool initiallyTracked;
 
   const AnimeDetailScreen({
     super.key,
     this.anime,
     this.animeShowId,
     this.initialImageUrl,
+    this.initiallyTracked = false,
   }) : assert(anime != null || animeShowId != null,
             "Either anime or animeShowId must be provided");
 
@@ -254,10 +256,9 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   late Animation<Offset> _slideAnimation;
   late AnimeItem? _animeItem;
   bool _isLoadingFromShowId = false;
+  late final String _showId;
   late final Future<List<AnimeItem>> _episodesFuture;
-
-  String get _resolvedShowId =>
-      widget.animeShowId ?? widget.anime?.animeShowId ?? _animeItem?.animeShowId ?? '';
+  bool _showIsTracked = false;
 
   @override
   void initState() {
@@ -266,9 +267,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
       _animeItem = widget.anime;
     }
 
-    final showId = _resolvedShowId;
-    _episodesFuture = showId.isNotEmpty
-        ? ApiService().fetchAnimeShowEpisodes(showId)
+    _showId = widget.animeShowId ?? widget.anime?.animeShowId ?? '';
+    _showIsTracked = widget.anime?.tracked ?? widget.initiallyTracked;
+    _episodesFuture = _showId.isNotEmpty
+        ? ApiService().fetchAnimeShowEpisodes(_showId)
         : Future.value(const <AnimeItem>[]);
 
     if (widget.anime == null && widget.animeShowId != null) {
@@ -329,9 +331,11 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
           : await trackingService.trackAnime(animeShowId);
       if (!result['success']) {
         ref.read(animeListNotifierProvider.notifier).updateTrackingForShowId(animeShowId, wasTracked);
+        if (mounted) _setShowTracked(wasTracked);
       }
     } catch (e) {
       ref.read(animeListNotifierProvider.notifier).updateTrackingForShowId(animeShowId, wasTracked);
+      if (mounted) _setShowTracked(wasTracked);
     }
   }
 
@@ -392,16 +396,33 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     );
   }
 
+  bool _resolveShowTracked(WidgetRef ref) {
+    if (_showIsTracked) return true;
+    if (_showId.isEmpty) return _animeItem?.tracked ?? false;
+
+    final trackedInReleases = ref.watch(animeListNotifierProvider).maybeWhen(
+      data: (list) => list.any((item) => item.animeShowId == _showId && item.tracked),
+      orElse: () => false,
+    );
+    if (trackedInReleases) return true;
+
+    final trackedInShows = ref.watch(trackedShowsNotifierProvider).maybeWhen(
+      data: (shows) => shows.any((show) => show.id == _showId),
+      orElse: () => false,
+    );
+    if (trackedInShows) return true;
+
+    return _animeItem?.tracked ?? widget.initiallyTracked;
+  }
+
+  void _setShowTracked(bool tracked) {
+    if (_showIsTracked == tracked) return;
+    setState(() => _showIsTracked = tracked);
+  }
+
   Widget _buildLikeButton() {
     return Consumer(builder: (context, ref, _) {
-      final animeListAsync = ref.watch(animeListNotifierProvider);
-      final showId = _animeItem?.animeShowId;
-      bool isTracked = _animeItem?.tracked ?? false;
-      animeListAsync.whenData((list) {
-        if (showId != null && showId.isNotEmpty) {
-          isTracked = list.any((item) => item.animeShowId == showId && item.tracked);
-        }
-      });
+      final isTracked = _resolveShowTracked(ref);
       return LikeButton(
         size: 48,
         isLiked: isTracked,
@@ -429,14 +450,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
         ),
         onTap: (bool liked) async {
           final willBeTracked = !liked;
+          _setShowTracked(willBeTracked);
           ref.read(animeListNotifierProvider.notifier)
               .updateTrackingForShowId(_animeItem!.animeShowId, willBeTracked);
           _makeTrackingApiCall(_animeItem!.animeShowId, liked, ref);
-          if (mounted) {
-            setState(() {
-              _animeItem = _animeItem?.copyWith(tracked: willBeTracked);
-            });
-          }
           if (!mounted) return liked;
           return willBeTracked;
         },
@@ -1018,8 +1035,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                               Navigator.of(context).push(MaterialPageRoute(
                                 builder: (_) => VideoPlayerScreen(
                                   filePath: filePath,
-                                  title:
-                                      '${episode.title} - Episode ${episode.episode}',
+                                  title: '${episode.title} - Episode ${episode.episode}',
                                   currentReleaseId: episode.id,
                                   restoreOrientationsOnExit: restoreOrientations,
                                 ),
@@ -1033,7 +1049,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                           extent: t.actionIconExtent,
                           iconSize: t.actionIconGlyphSize,
                           onTap: () async {
-                            final wasTracked = episode.tracked;
+                            final isTracked = _resolveShowTracked(ref);
                             await ref.read(activeDownloadsProvider.notifier).startDownload(
                               releaseId: episode.id,
                               magnetUrl: episode.downloadUrl,
@@ -1042,12 +1058,11 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                               episode: episode.episode,
                               animeShowId: episode.animeShowId,
                               imageUrl: episode.imageUrl,
-                              isTracked: episode.tracked,
+                              isTracked: isTracked,
                             );
-                            if (!mounted || wasTracked) return;
-                            setState(() {
-                              _animeItem = _animeItem?.copyWith(tracked: true);
-                            });
+                            if (!isTracked) {
+                              _setShowTracked(true);
+                            }
                           },
                         ),
             ),
