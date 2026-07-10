@@ -264,15 +264,17 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     super.initState();
     if (widget.anime != null) {
       _animeItem = widget.anime;
-    } else if (widget.animeShowId != null) {
-      _isLoadingFromShowId = true;
-      _fetchInitialAnimeItem();
     }
 
     final showId = _resolvedShowId;
     _episodesFuture = showId.isNotEmpty
         ? ApiService().fetchAnimeShowEpisodes(showId)
         : Future.value(const <AnimeItem>[]);
+
+    if (widget.anime == null && widget.animeShowId != null) {
+      _isLoadingFromShowId = true;
+      _fetchInitialAnimeItem();
+    }
 
     _fadeController = AnimationController(duration: const Duration(milliseconds: 800), vsync: this);
     _slideController = AnimationController(duration: const Duration(milliseconds: 600), vsync: this);
