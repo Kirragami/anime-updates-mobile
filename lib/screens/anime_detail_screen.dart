@@ -254,6 +254,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   late Animation<Offset> _slideAnimation;
   late AnimeItem? _animeItem;
   bool _isLoadingFromShowId = false;
+  late final Future<List<AnimeItem>> _episodesFuture;
+
+  String get _resolvedShowId =>
+      widget.animeShowId ?? widget.anime?.animeShowId ?? _animeItem?.animeShowId ?? '';
 
   @override
   void initState() {
@@ -264,6 +268,11 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
       _isLoadingFromShowId = true;
       _fetchInitialAnimeItem();
     }
+
+    final showId = _resolvedShowId;
+    _episodesFuture = showId.isNotEmpty
+        ? ApiService().fetchAnimeShowEpisodes(showId)
+        : Future.value(const <AnimeItem>[]);
 
     _fadeController = AnimationController(duration: const Duration(milliseconds: 800), vsync: this);
     _slideController = AnimationController(duration: const Duration(milliseconds: 600), vsync: this);
@@ -281,7 +290,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
   Future<void> _fetchInitialAnimeItem() async {
     try {
-      final episodes = await ApiService().fetchAnimeShowEpisodes(widget.animeShowId!);
+      final episodes = await _episodesFuture;
       if (episodes.isNotEmpty) {
         setState(() {
           _animeItem = episodes.first;
@@ -421,6 +430,11 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
           ref.read(animeListNotifierProvider.notifier)
               .updateTrackingForShowId(_animeItem!.animeShowId, willBeTracked);
           _makeTrackingApiCall(_animeItem!.animeShowId, liked, ref);
+          if (mounted) {
+            setState(() {
+              _animeItem = _animeItem?.copyWith(tracked: willBeTracked);
+            });
+          }
           if (!mounted) return liked;
           return willBeTracked;
         },
@@ -726,9 +740,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   }) {
     final t = typography;
     return FutureBuilder<List<AnimeItem>>(
-      future: ApiService().fetchAnimeShowEpisodes(
-        widget.animeShowId ?? widget.anime!.animeShowId,
-      ),
+      future: _episodesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Column(
