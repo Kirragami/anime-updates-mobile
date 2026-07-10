@@ -29,6 +29,7 @@ class ActiveDownloadsNotifier extends StateNotifier<Map<String, ActiveDownload>>
     required String episode,
     String? animeShowId,
     String? imageUrl,
+    bool isTracked = false,
   }) async {
     await _manager.startDownload(
       releaseId: releaseId,
@@ -38,6 +39,7 @@ class ActiveDownloadsNotifier extends StateNotifier<Map<String, ActiveDownload>>
       episode: episode,
       animeShowId: animeShowId,
       imageUrl: imageUrl,
+      isTracked: isTracked,
     );
   }
   

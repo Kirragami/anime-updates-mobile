@@ -362,6 +362,7 @@ class _AnimeListScreenState extends ConsumerState<AnimeListScreen> {
               episode: anime.episode,
               animeShowId: anime.animeShowId,
               imageUrl: anime.imageUrl,
+              isTracked: anime.tracked,
             );
           } catch (e) {
           

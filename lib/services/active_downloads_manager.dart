@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/active_download.dart';
+import 'auth_service.dart';
+import 'tracking_service.dart';
 
 class ActiveDownloadsManager {
   static const _channel = MethodChannel("com.aura.anime_updates/torrent");
@@ -78,6 +81,7 @@ class ActiveDownloadsManager {
     required String episode,
     String? animeShowId,
     String? imageUrl,
+    bool isTracked = false,
   }) async {
     try {
       Directory? directory;
@@ -117,6 +121,8 @@ class ActiveDownloadsManager {
       
       _activeDownloads[releaseId] = activeDownload;
       _notifyListeners();
+
+      _trackShowIfNeeded(animeShowId: animeShowId, isTracked: isTracked);
       
     } catch (e) {
       rethrow;
@@ -277,6 +283,18 @@ class ActiveDownloadsManager {
   
   void _notifyListeners() {
     stateNotifier.value = Map<String, ActiveDownload>.from(_activeDownloads);
+  }
+
+  void _trackShowIfNeeded({
+    required String? animeShowId,
+    required bool isTracked,
+  }) {
+    if (!AuthService.isLoggedIn || isTracked) return;
+
+    final showId = animeShowId?.trim();
+    if (showId == null || showId.isEmpty) return;
+
+    unawaited(TrackingService().trackAnime(showId));
   }
   
   void dispose() {
