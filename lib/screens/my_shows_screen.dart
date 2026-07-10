@@ -310,6 +310,7 @@ class _MyShowsScreenState extends ConsumerState<MyShowsScreen>
         episode: anime.episode,
         animeShowId: anime.animeShowId,
         imageUrl: anime.imageUrl,
+        isTracked: anime.tracked,
       );
     } catch (e) {
    

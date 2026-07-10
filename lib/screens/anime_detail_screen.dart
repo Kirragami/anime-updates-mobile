@@ -1024,6 +1024,7 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                               episode: episode.episode,
                               animeShowId: episode.animeShowId,
                               imageUrl: episode.imageUrl,
+                              isTracked: episode.tracked,
                             );
                           },
                         ),
