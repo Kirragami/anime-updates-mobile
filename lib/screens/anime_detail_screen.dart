@@ -9,6 +9,7 @@ import '../models/anime_item.dart';
 import '../providers/auth_provider.dart';
 import '../providers/anime_providers.dart';
 import '../services/api_service.dart';
+import '../services/services.dart';
 import '../services/tracking_service.dart';
 import '../providers/download_providers.dart';
 import '../theme/app_theme.dart';
@@ -278,13 +279,16 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
       _fetchInitialAnimeItem();
     }
 
-    _fadeController = AnimationController(duration: const Duration(milliseconds: 800), vsync: this);
-    _slideController = AnimationController(duration: const Duration(milliseconds: 600), vsync: this);
+    _fadeController = AnimationController(
+        duration: const Duration(milliseconds: 800), vsync: this);
+    _slideController = AnimationController(
+        duration: const Duration(milliseconds: 600), vsync: this);
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
     );
-    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
       CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
     );
 
@@ -323,18 +327,23 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     super.dispose();
   }
 
-  void _makeTrackingApiCall(String animeShowId, bool wasTracked, WidgetRef ref) async {
+  void _makeTrackingApiCall(
+      String animeShowId, bool wasTracked, WidgetRef ref) async {
     try {
       final trackingService = TrackingService();
       final result = wasTracked
           ? await trackingService.untrackAnime(animeShowId)
           : await trackingService.trackAnime(animeShowId);
       if (!result['success']) {
-        ref.read(animeListNotifierProvider.notifier).updateTrackingForShowId(animeShowId, wasTracked);
+        ref
+            .read(animeListNotifierProvider.notifier)
+            .updateTrackingForShowId(animeShowId, wasTracked);
         if (mounted) _setShowTracked(wasTracked);
       }
     } catch (e) {
-      ref.read(animeListNotifierProvider.notifier).updateTrackingForShowId(animeShowId, wasTracked);
+      ref
+          .read(animeListNotifierProvider.notifier)
+          .updateTrackingForShowId(animeShowId, wasTracked);
       if (mounted) _setShowTracked(wasTracked);
     }
   }
@@ -354,7 +363,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
 
   String get _imageUrl {
     if (_animeItem?.imageUrl.isNotEmpty == true) return _animeItem!.imageUrl;
-    if (widget.initialImageUrl?.isNotEmpty == true) return widget.initialImageUrl!;
+    if (widget.initialImageUrl?.isNotEmpty == true)
+      return widget.initialImageUrl!;
     return '';
   }
 
@@ -363,7 +373,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     if (url.isEmpty) {
       return Container(
         color: AppTheme.surfaceColor,
-        child: const Icon(Icons.image_not_supported, size: 60, color: AppTheme.textSecondary),
+        child: const Icon(Icons.image_not_supported,
+            size: 60, color: AppTheme.textSecondary),
       );
     }
     return CachedNetworkImage(
@@ -375,7 +386,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
       placeholder: (_, __) => Container(color: AppTheme.surfaceColor),
       errorWidget: (_, __, ___) => Container(
         color: AppTheme.surfaceColor,
-        child: const Icon(Icons.image_not_supported, size: 60, color: AppTheme.textSecondary),
+        child: const Icon(Icons.image_not_supported,
+            size: 60, color: AppTheme.textSecondary),
       ),
     );
   }
@@ -387,7 +399,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
         child: IconButton(
           icon: Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+                color: Colors.black45, borderRadius: BorderRadius.circular(12)),
             child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
           ),
           onPressed: () => Navigator.of(context).pop(),
@@ -401,15 +414,16 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     if (_showId.isEmpty) return _animeItem?.tracked ?? false;
 
     final trackedInReleases = ref.watch(animeListNotifierProvider).maybeWhen(
-      data: (list) => list.any((item) => item.animeShowId == _showId && item.tracked),
-      orElse: () => false,
-    );
+          data: (list) =>
+              list.any((item) => item.animeShowId == _showId && item.tracked),
+          orElse: () => false,
+        );
     if (trackedInReleases) return true;
 
     final trackedInShows = ref.watch(trackedShowsNotifierProvider).maybeWhen(
-      data: (shows) => shows.any((show) => show.id == _showId),
-      orElse: () => false,
-    );
+          data: (shows) => shows.any((show) => show.id == _showId),
+          orElse: () => false,
+        );
     if (trackedInShows) return true;
 
     return _animeItem?.tracked ?? widget.initiallyTracked;
@@ -440,7 +454,12 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
           decoration: BoxDecoration(
             color: AppTheme.surfaceColor,
             shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))],
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4))
+            ],
             border: Border.all(color: Colors.white.withOpacity(0.08)),
           ),
           child: Icon(
@@ -451,7 +470,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
         onTap: (bool liked) async {
           final willBeTracked = !liked;
           _setShowTracked(willBeTracked);
-          ref.read(animeListNotifierProvider.notifier)
+          ref
+              .read(animeListNotifierProvider.notifier)
               .updateTrackingForShowId(_animeItem!.animeShowId, willBeTracked);
           _makeTrackingApiCall(_animeItem!.animeShowId, liked, ref);
           if (!mounted) return liked;
@@ -482,7 +502,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   }
 
   Widget _buildPortraitLayout(bool isLoggedIn, double layoutWidth) {
-    final t = _DetailTypography.forLayout(context, wideLayout: false, layoutWidth: layoutWidth);
+    final t = _DetailTypography.forLayout(context,
+        wideLayout: false, layoutWidth: layoutWidth);
     const double heroH = 300;
     const double posterH = 220;
     const double posterW = 150;
@@ -508,7 +529,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             fit: StackFit.expand,
                             children: [
                               ImageFiltered(
-                                imageFilter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+                                imageFilter:
+                                    ImageFilter.blur(sigmaX: 22, sigmaY: 22),
                                 child: Transform.scale(
                                   scale: 1.08,
                                   alignment: Alignment.center,
@@ -526,7 +548,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [Colors.transparent, AppTheme.backgroundColor.withOpacity(0.9)],
+                              colors: [
+                                Colors.transparent,
+                                AppTheme.backgroundColor.withOpacity(0.9)
+                              ],
                               stops: const [0.5, 1.0],
                             ),
                           ),
@@ -543,7 +568,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
-                                BoxShadow(color: Colors.black.withOpacity(0.55), blurRadius: 28, offset: const Offset(0, 14)),
+                                BoxShadow(
+                                    color: Colors.black.withOpacity(0.55),
+                                    blurRadius: 28,
+                                    offset: const Offset(0, 14)),
                               ],
                             ),
                             child: ClipRRect(
@@ -559,15 +587,19 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                 ),
                 const SizedBox(height: posterH * 0.22),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: t.titleSectionPaddingH, vertical: t.titleSectionPaddingV),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: t.titleSectionPaddingH,
+                      vertical: t.titleSectionPaddingV),
                   child: SlideTransition(
                     position: _slideAnimation,
                     child: _buildTitleRow(isLoggedIn, t),
                   ),
                 ),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: t.titleSectionPaddingH),
-                  child: const Divider(color: AppTheme.surfaceColor, height: 20),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: t.titleSectionPaddingH),
+                  child:
+                      const Divider(color: AppTheme.surfaceColor, height: 20),
                 ),
               ],
             ),
@@ -581,7 +613,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
-              padding: EdgeInsets.only(bottom: bottomSafe > 0 ? bottomSafe + 12 : 36),
+              padding: EdgeInsets.only(
+                  bottom: bottomSafe > 0 ? bottomSafe + 12 : 36),
               child: const SizedBox.shrink(),
             ),
           ),
@@ -591,7 +624,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
   }
 
   Widget _buildWideLayout(bool isLoggedIn, double totalWidth) {
-    final t = _DetailTypography.forLayout(context, wideLayout: true, layoutWidth: totalWidth);
+    final t = _DetailTypography.forLayout(context,
+        wideLayout: true, layoutWidth: totalWidth);
     final double leftW = totalWidth * 0.35;
     final bool use2Col = totalWidth > 1024;
 
@@ -609,7 +643,10 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                   gradient: LinearGradient(
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
-                    colors: [Colors.transparent, AppTheme.backgroundColor.withOpacity(0.65)],
+                    colors: [
+                      Colors.transparent,
+                      AppTheme.backgroundColor.withOpacity(0.65)
+                    ],
                     stops: const [0.65, 1.0],
                   ),
                 ),
@@ -634,7 +671,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
         ),
         Expanded(
           child: Container(
-            decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
+            decoration:
+                const BoxDecoration(gradient: AppTheme.backgroundGradient),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -651,7 +689,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                   ),
                 ),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: t.titleSectionPaddingH),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: t.titleSectionPaddingH),
                   child: const Divider(color: AppTheme.surfaceColor, height: 8),
                 ),
                 Expanded(
@@ -662,7 +701,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                       t.titleSectionPaddingH,
                       28,
                     ),
-                    child: _buildEpisodesSection(twoColumnGrid: use2Col, typography: t),
+                    child: _buildEpisodesSection(
+                        twoColumnGrid: use2Col, typography: t),
                   ),
                 ),
               ],
@@ -680,7 +720,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     if (_isLoadingFromShowId) {
       return Scaffold(
         body: Container(
-          decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
+          decoration:
+              const BoxDecoration(gradient: AppTheme.backgroundGradient),
           child: Stack(
             children: [
               SafeArea(
@@ -706,13 +747,17 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                         Container(
                           width: double.infinity,
                           height: 22,
-                          decoration: BoxDecoration(color: AppTheme.surfaceColor, borderRadius: BorderRadius.circular(8)),
+                          decoration: BoxDecoration(
+                              color: AppTheme.surfaceColor,
+                              borderRadius: BorderRadius.circular(8)),
                         ),
                         const SizedBox(height: 28),
                         Container(
                           width: 110,
                           height: 18,
-                          decoration: BoxDecoration(color: AppTheme.surfaceColor, borderRadius: BorderRadius.circular(6)),
+                          decoration: BoxDecoration(
+                              color: AppTheme.surfaceColor,
+                              borderRadius: BorderRadius.circular(6)),
                         ),
                         const SizedBox(height: 16),
                         for (int i = 0; i < 5; i++) ...[
@@ -769,48 +814,69 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                 baseColor: AppTheme.surfaceColor,
                 highlightColor: AppTheme.cardColor,
                 child: Column(
-                  children: List.generate(5, (_) => Padding(
-                    padding: EdgeInsets.only(bottom: t.episodeListGap),
-                    child: Container(
-                      height: t.shimmerEpisodeHeight,
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.15), width: 1),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: t.episodeTilePaddingH, vertical: t.episodeTilePaddingV + 6),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: 110,
-                                    height: t.episodeTitleSize + 1,
-                                    decoration: BoxDecoration(color: AppTheme.cardColor, borderRadius: BorderRadius.circular(6)),
-                                  ),
-                                  SizedBox(height: t.episodeMetaSize > 11 ? 6 : 5),
-                                  Container(
-                                    width: 72,
-                                    height: t.episodeMetaSize,
-                                    decoration: BoxDecoration(color: AppTheme.cardColor, borderRadius: BorderRadius.circular(4)),
-                                  ),
-                                ],
+                  children: List.generate(
+                      5,
+                      (_) => Padding(
+                            padding: EdgeInsets.only(bottom: t.episodeListGap),
+                            child: Container(
+                              height: t.shimmerEpisodeHeight,
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceColor,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color:
+                                        AppTheme.primaryColor.withOpacity(0.15),
+                                    width: 1),
+                              ),
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: t.episodeTilePaddingH,
+                                    vertical: t.episodeTilePaddingV + 6),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: 110,
+                                            height: t.episodeTitleSize + 1,
+                                            decoration: BoxDecoration(
+                                                color: AppTheme.cardColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(6)),
+                                          ),
+                                          SizedBox(
+                                              height: t.episodeMetaSize > 11
+                                                  ? 6
+                                                  : 5),
+                                          Container(
+                                            width: 72,
+                                            height: t.episodeMetaSize,
+                                            decoration: BoxDecoration(
+                                                color: AppTheme.cardColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(4)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      width: t.actionIconExtent,
+                                      height: t.actionIconExtent,
+                                      decoration: BoxDecoration(
+                                          color: AppTheme.cardColor,
+                                          borderRadius:
+                                              BorderRadius.circular(8)),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            Container(
-                              width: t.actionIconExtent,
-                              height: t.actionIconExtent,
-                              decoration: BoxDecoration(color: AppTheme.cardColor, borderRadius: BorderRadius.circular(8)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )),
+                          )),
                 ),
               ),
             ],
@@ -884,7 +950,9 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
       ),
       child: Column(
         children: [
-          Icon(icon, color: iconColor, size: 40 + (t.sectionTitleSize - 17).clamp(0, 6)),
+          Icon(icon,
+              color: iconColor,
+              size: 40 + (t.sectionTitleSize - 17).clamp(0, 6)),
           SizedBox(height: t.sectionHeadingGap),
           Text(
             text,
@@ -925,12 +993,15 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
           decoration: BoxDecoration(
             color: AppTheme.surfaceColor.withOpacity(0.5),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3), width: 1),
+            border: Border.all(
+                color: AppTheme.primaryColor.withOpacity(0.3), width: 1),
           ),
           child: ListTile(
             minVerticalPadding: 0,
             visualDensity: const VisualDensity(horizontal: 0, vertical: -1),
-            contentPadding: EdgeInsets.symmetric(horizontal: t.episodeTilePaddingH, vertical: t.episodeTilePaddingV),
+            contentPadding: EdgeInsets.symmetric(
+                horizontal: t.episodeTilePaddingH,
+                vertical: t.episodeTilePaddingV),
             title: Text(
               'Episode ${episode.episode}',
               style: AppTheme.heading3.copyWith(
@@ -970,7 +1041,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                 value: (progress / 100.0).clamp(0.0, 1.0),
                                 strokeWidth: t.progressRingSize >= 28 ? 3 : 2.5,
                                 backgroundColor: AppTheme.surfaceColor,
-                                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                    AppTheme.primaryColor),
                               ),
                               Text(
                                 '${progress.toInt()}%',
@@ -986,21 +1058,30 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                         SizedBox(width: t.trailingBandWidth < 110 ? 6 : 8),
                         _actionIcon(
                           gradient: AppTheme.primaryGradient,
-                          icon: isDownloading ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          icon: isDownloading
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
                           extent: t.actionIconExtent,
                           iconSize: t.actionIconGlyphSize,
                           onTap: () async {
                             if (isDownloading) {
-                              await ref.read(activeDownloadsProvider.notifier).pauseDownload(episode.id);
+                              await ref
+                                  .read(activeDownloadsProvider.notifier)
+                                  .pauseDownload(episode.id);
                             } else if (isPaused) {
-                              await ref.read(activeDownloadsProvider.notifier).resumeDownload(episode.id);
+                              await ref
+                                  .read(activeDownloadsProvider.notifier)
+                                  .resumeDownload(episode.id);
                             }
                           },
                         ),
                         SizedBox(width: t.trailingBandWidth < 110 ? 4 : 6),
                         _actionIcon(
                           gradient: LinearGradient(
-                            colors: [AppTheme.errorColor, AppTheme.errorColor.withOpacity(0.8)],
+                            colors: [
+                              AppTheme.errorColor,
+                              AppTheme.errorColor.withOpacity(0.8)
+                            ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -1009,9 +1090,13 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                           iconSize: t.actionIconGlyphSize,
                           onTap: () async {
                             if (downloadStatus.isActive) {
-                              await ref.read(activeDownloadsProvider.notifier).cancelDownload(episode.id);
+                              await ref
+                                  .read(activeDownloadsProvider.notifier)
+                                  .cancelDownload(episode.id);
                             } else if (downloadStatus.isCompleted) {
-                              await ref.read(completedDownloadsProvider.notifier).deleteDownload(episode.id);
+                              await ref
+                                  .read(completedDownloadsProvider.notifier)
+                                  .deleteDownload(episode.id);
                             }
                           },
                         ),
@@ -1028,16 +1113,18 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                                 .read(completedDownloadsProvider.notifier)
                                 .getFilePath(episode.id);
                             if (filePath != null && context.mounted) {
-                              final restoreOrientations =
-                                  AppOrientationSystemUi.orientationsFromContext(
+                              final restoreOrientations = AppOrientationSystemUi
+                                  .orientationsFromContext(
                                 context,
                               );
                               Navigator.of(context).push(MaterialPageRoute(
                                 builder: (_) => VideoPlayerScreen(
                                   filePath: filePath,
-                                  title: '${episode.title} - Episode ${episode.episode}',
+                                  title:
+                                      '${episode.title} - Episode ${episode.episode}',
                                   currentReleaseId: episode.id,
-                                  restoreOrientationsOnExit: restoreOrientations,
+                                  restoreOrientationsOnExit:
+                                      restoreOrientations,
                                 ),
                               ));
                             }
@@ -1050,17 +1137,22 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
                           iconSize: t.actionIconGlyphSize,
                           onTap: () async {
                             final isTracked = _resolveShowTracked(ref);
-                            await ref.read(activeDownloadsProvider.notifier).startDownload(
-                              releaseId: episode.id,
-                              magnetUrl: episode.downloadUrl,
-                              fileName: episode.fileName,
-                              showName: episode.title,
-                              episode: episode.episode,
-                              animeShowId: episode.animeShowId,
-                              imageUrl: episode.imageUrl,
-                              isTracked: isTracked,
-                            );
-                            if (!isTracked) {
+                            await ref
+                                .read(activeDownloadsProvider.notifier)
+                                .startDownload(
+                                  releaseId: episode.id,
+                                  magnetUrl: episode.downloadUrl,
+                                  fileName: episode.fileName,
+                                  showName: episode.title,
+                                  episode: episode.episode,
+                                  animeShowId: episode.animeShowId,
+                                  imageUrl: episode.imageUrl,
+                                  isTracked: isTracked,
+                                );
+                            if (!isTracked &&
+                                ref
+                                    .read(userPreferencesServiceProvider)
+                                    .autoTrackOnDownload) {
                               _setShowTracked(true);
                             }
                           },
@@ -1083,7 +1175,8 @@ class _AnimeDetailScreenState extends ConsumerState<AnimeDetailScreen>
     return Container(
       width: extent,
       height: extent,
-      decoration: BoxDecoration(gradient: gradient, borderRadius: BorderRadius.circular(r)),
+      decoration: BoxDecoration(
+          gradient: gradient, borderRadius: BorderRadius.circular(r)),
       child: Material(
         color: Colors.transparent,
         child: InkWell(

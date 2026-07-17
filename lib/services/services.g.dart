@@ -80,5 +80,23 @@ final updateServiceProvider = AutoDisposeProvider<UpdateService>.internal(
 );
 
 typedef UpdateServiceRef = AutoDisposeProviderRef<UpdateService>;
+String _$userPreferencesServiceHash() =>
+    r'ad90371940f7becce87b775aeac6694ff2c23715';
+
+/// See also [userPreferencesService].
+@ProviderFor(userPreferencesService)
+final userPreferencesServiceProvider =
+    AutoDisposeProvider<UserPreferencesService>.internal(
+  userPreferencesService,
+  name: r'userPreferencesServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$userPreferencesServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef UserPreferencesServiceRef
+    = AutoDisposeProviderRef<UserPreferencesService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

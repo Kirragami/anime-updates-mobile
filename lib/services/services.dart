@@ -4,6 +4,7 @@ import 'auth_service.dart';
 import 'download_service.dart';
 import 'speed_limit_service.dart';
 import 'update_service.dart';
+import 'user_preferences_service.dart';
 
 part 'services.g.dart';
 
@@ -17,7 +18,12 @@ DownloadService downloadService(DownloadServiceRef ref) => DownloadService();
 AuthService authService(AuthServiceRef ref) => AuthService();
 
 @riverpod
-SpeedLimitService speedLimitService(SpeedLimitServiceRef ref) => SpeedLimitService();
+SpeedLimitService speedLimitService(SpeedLimitServiceRef ref) =>
+    SpeedLimitService();
 
 @riverpod
-UpdateService updateService(UpdateServiceRef ref) => UpdateService(); 
+UpdateService updateService(UpdateServiceRef ref) => UpdateService();
+
+@riverpod
+UserPreferencesService userPreferencesService(UserPreferencesServiceRef ref) =>
+    UserPreferencesService();
