@@ -21,6 +21,7 @@ import 'services/active_downloads_manager.dart';
 import 'services/completed_downloads_manager.dart';
 import 'services/download_event_dispatcher.dart';
 import 'services/playback_progress_manager.dart';
+import 'services/user_preferences_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'config/firebase_config.dart';
@@ -33,10 +34,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print(message.data);
 }
 
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Firebase
   await Firebase.initializeApp(
     options: FirebaseConfig.firebaseOptions,
@@ -47,24 +47,26 @@ Future<void> main() async {
   await AuthService.restoreSession();
   print("session restore done");
 
+  await UserPreferencesService().initialize();
+
   // Initialize new download management system
   final downloadEventDispatcher = DownloadEventDispatcher();
   downloadEventDispatcher.initialize();
-  
+
   final activeDownloadsManager = ActiveDownloadsManager();
   final completedDownloadsManager = CompletedDownloadsManager();
-  
+
   // Initialize managers with native data
   await activeDownloadsManager.initialize();
   await completedDownloadsManager.initialize();
-  
+
   // Initialize playback progress
   final playbackProgressManager = PlaybackProgressManager();
   await playbackProgressManager.initialize();
-  
+
   // Start listening to events
   downloadEventDispatcher.startListening();
-  
+
   print("Download management system initialized successfully");
   print("Active downloads: ${activeDownloadsManager.activeCount}");
   print("Completed downloads: ${completedDownloadsManager.completedCount}");
@@ -81,7 +83,7 @@ Future<void> main() async {
 
   // Register stored FCM token in background
   FcmRegistrationService.registerStoredFcmToken();
-  
+
   runApp(const ProviderScope(child: AnimeUpdatesApp()));
 }
 
@@ -122,7 +124,8 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
     _initLocalNotifications();
     _initFCM();
     _initNavigationChannel();
-    WidgetsBinding.instance.addPostFrameCallback((_) => AppOrientationSystemUi.sync());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => AppOrientationSystemUi.sync());
   }
 
   Future<void> _initLocalNotifications() async {
@@ -167,8 +170,9 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
   }
 
   Future<void> _initNavigationChannel() async {
-    const navigationChannel = MethodChannel('com.aura.anime_updates/navigation');
-    
+    const navigationChannel =
+        MethodChannel('com.aura.anime_updates/navigation');
+
     navigationChannel.setMethodCallHandler((MethodCall call) async {
       if (call.method == 'navigateToDownloadManager') {
         if (_navigatorKey.currentContext != null) {
@@ -298,7 +302,8 @@ class _AnimeUpdatesAppState extends ConsumerState<AnimeUpdatesApp>
       _scheduleNotificationNavigation(message);
     });
 
-    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    RemoteMessage? initialMessage =
+        await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) {
       print('App launched from notification: ${initialMessage.data}');
       _scheduleNotificationNavigation(initialMessage);

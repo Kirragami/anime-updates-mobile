@@ -21,10 +21,12 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _notificationsEnabled = true;
   bool _pushNotificationsEnabled = true;
-  double _downloadSpeedLimit = 0.0; 
+  double _downloadSpeedLimit = 0.0;
   final TextEditingController _speedController = TextEditingController();
   bool _isLoadingSpeedLimit = true;
-  
+  bool _autoTrackOnDownload = false;
+  bool _isLoadingAutoTrackPreference = true;
+
   bool _isCheckingUpdate = false;
   bool _updateAvailable = false;
   String _updateStatus = '';
@@ -35,6 +37,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void initState() {
     super.initState();
     _loadSpeedLimit();
+    _loadAutoTrackPreference();
   }
 
   Future<void> _loadSpeedLimit() async {
@@ -57,7 +60,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     try {
       final speedLimitService = ref.read(speedLimitServiceProvider);
       await speedLimitService.setSpeedLimit(_downloadSpeedLimit);
-    } catch (e) {
+    } catch (e) {}
+  }
+
+  Future<void> _loadAutoTrackPreference() async {
+    try {
+      final preferences = ref.read(userPreferencesServiceProvider);
+      await preferences.initialize();
+      if (!mounted) return;
+      setState(() {
+        _autoTrackOnDownload = preferences.autoTrackOnDownload;
+        _isLoadingAutoTrackPreference = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingAutoTrackPreference = false);
+    }
+  }
+
+  Future<void> _setAutoTrackOnDownload(bool value) async {
+    final previousValue = _autoTrackOnDownload;
+    setState(() => _autoTrackOnDownload = value);
+
+    try {
+      await ref
+          .read(userPreferencesServiceProvider)
+          .setAutoTrackOnDownload(value);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _autoTrackOnDownload = previousValue);
+      }
     }
   }
 
@@ -144,7 +176,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildProfileHeader(dynamic user) {
-    return  Container(
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Row(
         children: [
@@ -216,13 +248,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ],
         ),
-        // const SizedBox(height: 20),
-        // _buildSettingsGroup(
-        //   'Download Settings',
-        //   [
-        //     _buildDownloadSpeedItem(),
-        //   ],
-        // ),
+        const SizedBox(height: 20),
+        _buildSettingsGroup(
+          'Download Settings',
+          [
+            _buildSettingsItem(
+              icon: Icons.favorite_outline,
+              title: 'Track Downloaded Shows',
+              subtitle:
+                  'Automatically track a show when downloading an episode',
+              trailing: Switch.adaptive(
+                value: _autoTrackOnDownload,
+                onChanged: _isLoadingAutoTrackPreference
+                    ? null
+                    : _setAutoTrackOnDownload,
+                activeColor: AppTheme.primaryColor,
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 20),
         _buildSettingsGroup(
           'App Updates',
@@ -337,9 +381,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _isLoadingSpeedLimit 
-                    ? 'Loading speed limit...'
-                    : 'Set maximum download speed in KB/s',
+                  _isLoadingSpeedLimit
+                      ? 'Loading speed limit...'
+                      : 'Set maximum download speed in KB/s',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.6),
                     fontSize: 14,
@@ -446,135 +490,132 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildCustomSlider() {
-  return Row(
-    children: [
-      GestureDetector(
-        onTap: () {
-          if (_downloadSpeedLimit > 0) {
-            setState(() {
-              _downloadSpeedLimit =
-                  (_downloadSpeedLimit - 100).clamp(0, 50000);
-              _speedController.text = _downloadSpeedLimit.toString();
-            });
-            _saveSpeedLimit();
-          }
-        },
-        child: Container(
-          width: 24,
-          height: 24,
-          decoration: const BoxDecoration(
-            color: AppTheme.primaryColor, 
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.remove,
-            color: Colors.white,
-            size: 16,
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: () {
+            if (_downloadSpeedLimit > 0) {
+              setState(() {
+                _downloadSpeedLimit =
+                    (_downloadSpeedLimit - 100).clamp(0, 50000);
+                _speedController.text = _downloadSpeedLimit.toString();
+              });
+              _saveSpeedLimit();
+            }
+          },
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+              color: AppTheme.primaryColor,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.remove,
+              color: Colors.white,
+              size: 16,
+            ),
           ),
         ),
-      ),
-      const SizedBox(width: 12),
+        const SizedBox(width: 12),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final trackWidth = constraints.maxWidth;
+              final percentage = (_downloadSpeedLimit / 50000).clamp(0.0, 1.0);
+              final thumbPosition = percentage * trackWidth;
 
-      Expanded(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final trackWidth = constraints.maxWidth;
-            final percentage = (_downloadSpeedLimit / 50000).clamp(0.0, 1.0);
-            final thumbPosition = percentage * trackWidth;
-
-            return GestureDetector(
-              onTapDown: (details) {
-                final localPosition = details.localPosition;
-                final newPercentage =
-                    (localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                setState(() {
-                  _downloadSpeedLimit =
-                      (newPercentage * 50000).clamp(0, 50000);
-                  _speedController.text = _downloadSpeedLimit.toString();
-                });
-                _saveSpeedLimit();
-              },
-              onPanUpdate: (details) {
-                final localPosition = details.localPosition;
-                final newPercentage =
-                    (localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                setState(() {
-                  _downloadSpeedLimit =
-                      (newPercentage * 50000).clamp(0, 50000);
-                  _speedController.text = _downloadSpeedLimit.toString();
-                });
-                _saveSpeedLimit();
-              },
-              child: SizedBox(
-                height: 40,
-                child: Stack(
-                  alignment: Alignment.centerLeft,
-                  children: [
-                    Container(
-                      height: 6,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(3),
-                        color: Colors.grey.shade300,
-                      ),
-                    ),
-                    Container(
-                      width: thumbPosition,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(3),
-                        color: AppTheme.primaryColor, 
-                      ),
-                    ),
-                    Positioned(
-                      left: (thumbPosition - 12).clamp(0.0, trackWidth - 24), 
-                      top: 8,                 
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primaryColor,
-                          shape: BoxShape.circle,
+              return GestureDetector(
+                onTapDown: (details) {
+                  final localPosition = details.localPosition;
+                  final newPercentage =
+                      (localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                  setState(() {
+                    _downloadSpeedLimit =
+                        (newPercentage * 50000).clamp(0, 50000);
+                    _speedController.text = _downloadSpeedLimit.toString();
+                  });
+                  _saveSpeedLimit();
+                },
+                onPanUpdate: (details) {
+                  final localPosition = details.localPosition;
+                  final newPercentage =
+                      (localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                  setState(() {
+                    _downloadSpeedLimit =
+                        (newPercentage * 50000).clamp(0, 50000);
+                    _speedController.text = _downloadSpeedLimit.toString();
+                  });
+                  _saveSpeedLimit();
+                },
+                child: SizedBox(
+                  height: 40,
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(3),
+                          color: Colors.grey.shade300,
                         ),
                       ),
-                    ),
-                  ],
+                      Container(
+                        width: thumbPosition,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(3),
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                      Positioned(
+                        left: (thumbPosition - 12).clamp(0.0, trackWidth - 24),
+                        top: 8,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: const BoxDecoration(
+                            color: AppTheme.primaryColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        GestureDetector(
+          onTap: () {
+            if (_downloadSpeedLimit < 50000) {
+              setState(() {
+                _downloadSpeedLimit =
+                    (_downloadSpeedLimit + 100).clamp(0, 50000);
+                _speedController.text = _downloadSpeedLimit.toString();
+              });
+              _saveSpeedLimit();
+            }
           },
-        ),
-      ),
-      const SizedBox(width: 12),
-
-      GestureDetector(
-        onTap: () {
-          if (_downloadSpeedLimit < 50000) {
-            setState(() {
-              _downloadSpeedLimit =
-                  (_downloadSpeedLimit + 100).clamp(0, 50000);
-              _speedController.text = _downloadSpeedLimit.toString();
-            });
-            _saveSpeedLimit();
-          }
-        },
-        child: Container(
-          width: 24,
-          height: 24,
-          decoration: const BoxDecoration(
-            color: AppTheme.primaryColor, 
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.add,
-            color: Colors.white,
-            size: 16,
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+              color: AppTheme.primaryColor,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.add,
+              color: Colors.white,
+              size: 16,
+            ),
           ),
         ),
-      ),
-    ],
-  );
-}
-
+      ],
+    );
+  }
 
   Widget _buildLogoutButton() {
     return _buildLogoutSection();
@@ -626,19 +667,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _isCheckingUpdate 
-                        ? 'Checking for updates...' 
-                        : _updateStatus.isEmpty 
-                          ? 'Check for the latest version' 
-                          : _updateStatus,
+                      _isCheckingUpdate
+                          ? 'Checking for updates...'
+                          : _updateStatus.isEmpty
+                              ? 'Check for the latest version'
+                              : _updateStatus,
                       style: TextStyle(
-                        color: _updateAvailable 
-                          ? AppTheme.primaryColor 
-                          : Colors.white.withOpacity(0.6),
+                        color: _updateAvailable
+                            ? AppTheme.primaryColor
+                            : Colors.white.withOpacity(0.6),
                         fontSize: 14,
-                        fontWeight: _updateAvailable 
-                          ? FontWeight.bold 
-                          : FontWeight.w400,
+                        fontWeight: _updateAvailable
+                            ? FontWeight.bold
+                            : FontWeight.w400,
                       ),
                     ),
                   ],
@@ -657,7 +698,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 TextButton(
                   onPressed: _downloadUpdate,
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     minimumSize: const Size(0, 0),
                   ),
                   child: const Text(
@@ -687,7 +729,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 LinearProgressIndicator(
                   value: _downloadProgress,
                   backgroundColor: AppTheme.surfaceColor,
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppTheme.primaryColor),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -750,9 +793,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     try {
       final updateService = ref.read(updateServiceProvider);
-      
+
       final checkResult = await updateService.checkForUpdate();
-      
+
       if (!checkResult['success'] || !checkResult['needUpdate']) {
         setState(() {
           _isDownloading = false;
@@ -760,9 +803,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         });
         return;
       }
-      
+
       final downloadUrl = checkResult['downloadUrl'];
-      
+
       final downloadResult = await updateService.downloadUpdate(
         downloadUrl: downloadUrl,
         onProgress: (received, total) {
@@ -777,18 +820,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (downloadResult['success']) {
         final filePath = downloadResult['filePath'];
         final installResult = await updateService.installUpdate(filePath);
-        
+
         if (installResult['success']) {
         } else {
           if (mounted) {
-            final message = installResult['message'] as String? ?? 'Unknown error';
-            if (message.contains('Permission to install packages is required')) {
+            final message =
+                installResult['message'] as String? ?? 'Unknown error';
+            if (message
+                .contains('Permission to install packages is required')) {
               openAppSettings();
             }
           }
         }
-      } else {
-      }
+      } else {}
     } catch (e) {
     } finally {
       setState(() {
