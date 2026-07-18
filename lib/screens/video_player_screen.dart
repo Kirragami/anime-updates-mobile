@@ -23,7 +23,7 @@ import '../app_orientation_system_ui.dart';
 class VideoPlayerScreen extends ConsumerStatefulWidget {
   final String filePath;
   final String? title;
-  
+
   final String? currentReleaseId;
   final bool watchPartyEnabled;
   final List<DeviceOrientation> restoreOrientationsOnExit;
@@ -53,7 +53,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   Timer? _controlsTimer;
-  Timer? _positionTimer;  
+  Timer? _positionTimer;
   double _volume = 100.0;
   double _brightness = 1.0;
 
@@ -71,7 +71,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   int _consecutiveSeekCount = 0;
   Timer? _seekIndicatorTimer;
 
-
   late String _activeFilePath;
   late String? _activeTitle;
   late String? _activeReleaseId;
@@ -81,6 +80,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   CompletedDownload? _prevEpisode;
   CompletedDownload? _nextEpisode;
   bool _autoAdvancedCalled = false;
+  bool _isRecoveringFromEnd = false;
 
   StreamSubscription<SyncAction>? _partyActionSub;
   bool _applyingRemoteSync = false;
@@ -124,7 +124,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   void _resolveAdjacentEpisodes() {
     final currentId = _activeReleaseId;
-    if (currentId == null) return;
+    if (currentId == null) {
+      _setAdjacentEpisodes();
+      return;
+    }
 
     final manager = CompletedDownloadsManager();
     final all = manager.completedDownloads.values.toList();
@@ -133,6 +136,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     try {
       current = all.firstWhere((e) => e.releaseId == currentId);
     } catch (_) {
+      _setAdjacentEpisodes();
       return;
     }
 
@@ -143,7 +147,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     }).toList();
 
     final currentNum = _extractEpisodeNumber(current.episode);
-    if (currentNum == null) return;
+    if (currentNum == null) {
+      _setAdjacentEpisodes();
+      return;
+    }
 
     final numbered = siblings
         .map((e) => MapEntry(_extractEpisodeNumber(e.episode), e))
@@ -158,12 +165,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       if (entry.key! > currentNum && next == null) next = entry.value;
     }
 
-    if (mounted) {
-      setState(() {
-        _prevEpisode = prev;
-        _nextEpisode = next;
-      });
-    }
+    _setAdjacentEpisodes(previous: prev, next: next);
+  }
+
+  void _setAdjacentEpisodes({
+    CompletedDownload? previous,
+    CompletedDownload? next,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      _prevEpisode = previous;
+      _nextEpisode = next;
+    });
   }
 
   Future<void> _switchToEpisode(CompletedDownload episode) async {
@@ -189,8 +202,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       _autoAdvancedCalled = false;
     });
 
-    try { await old?.stop(); }    catch (_) {}
-    try { await old?.dispose(); } catch (_) {}
+    try {
+      await old?.stop();
+    } catch (_) {}
+    try {
+      await old?.dispose();
+    } catch (_) {}
 
     if (!mounted) return;
 
@@ -206,13 +223,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
   // ─────────────────────────────────────────────────────────────────
 
-
   @override
   void initState() {
     super.initState();
 
     WakelockPlus.enable();
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _focusNode.requestFocus();
@@ -231,7 +247,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       DeviceOrientation.landscapeRight,
     ]);
 
-    SystemChrome.setSystemUIChangeCallback((bool isSystemOverlaysVisible) async {
+    SystemChrome.setSystemUIChangeCallback(
+        (bool isSystemOverlaysVisible) async {
       if (isSystemOverlaysVisible && mounted) {
         await Future.delayed(const Duration(milliseconds: 500));
         if (mounted) {
@@ -296,8 +313,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       _partyInitialized = false;
     });
 
-    try { await old?.stop(); } catch (_) {}
-    try { await old?.dispose(); } catch (_) {}
+    try {
+      await old?.stop();
+    } catch (_) {}
+    try {
+      await old?.dispose();
+    } catch (_) {}
 
     if (!mounted) return;
 
@@ -510,7 +531,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _partyPlaybackSyncTimer = null;
     _periodicSyncPending = false;
   }
-  
+
   Future<void> _getInitialBrightness() async {
     try {
       final screenBrightness = ScreenBrightness();
@@ -525,7 +546,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     bool? autoPlay,
   }) {
     try {
-
       final file = File(_activeFilePath);
 
       final fileUri = file.uri.toString();
@@ -551,21 +571,25 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           setState(() {
             _isInitialized = true;
           });
-          
+
           Future.delayed(const Duration(milliseconds: 500), () async {
             if (mounted && _videoPlayerController != null) {
-              final shouldAutoPlay = autoPlay ??
-                  (!_watchPartyActive || _isPartyLeader);
+              final shouldAutoPlay =
+                  autoPlay ?? (!_watchPartyActive || _isPartyLeader);
 
               if (initialSeekSeconds != null) {
-                await _videoPlayerController!
-                    .seekTo(Duration(milliseconds: (initialSeekSeconds * 1000).round()));
+                await _videoPlayerController!.seekTo(Duration(
+                    milliseconds: (initialSeekSeconds * 1000).round()));
               } else {
                 final showId = _getAnimeShowId();
-                if (showId != null && _activeReleaseId != null && !_watchPartyActive) {
-                  final lastPos = PlaybackProgressManager().getPosition(showId, _activeReleaseId!);
+                if (showId != null &&
+                    _activeReleaseId != null &&
+                    !_watchPartyActive) {
+                  final lastPos = PlaybackProgressManager()
+                      .getPosition(showId, _activeReleaseId!);
                   if (lastPos > 0) {
-                    await _videoPlayerController!.seekTo(Duration(seconds: lastPos));
+                    await _videoPlayerController!
+                        .seekTo(Duration(seconds: lastPos));
                   }
                 }
               }
@@ -573,8 +597,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               if (shouldAutoPlay) {
                 await _videoPlayerController!.play().then((_) {
                   if (mounted) _startControlsTimer();
-                }).catchError((error) {
-                });
+                }).catchError((error) {});
               }
 
               if (_watchPartyActive && !_partyInitialized) {
@@ -584,9 +607,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                       WatchPartyVideoRef(_activeReleaseId ?? '').encode();
                 } else {
                   WatchPartyNavigation.markMemberInPartyPlayer(true);
-                  ref
-                      .read(watchPartyProvider.notifier)
-                      .sendSync(const SyncAction(action: SyncActionType.syncRequest));
+                  ref.read(watchPartyProvider.notifier).sendSync(
+                      const SyncAction(action: SyncActionType.syncRequest));
                   _startPartyPlaybackSync();
                 }
               }
@@ -594,20 +616,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               _flushPendingRemoteSync();
             }
           });
-          
+
           _startPositionUpdates();
         }
       });
     } catch (e, stackTrace) {
-      
       print('[VideoPlayerScreen] Error initializing video player: $e');
-      
+
       print('[VideoPlayerScreen] Stack trace: $stackTrace');
     }
   }
 
   void _startPositionUpdates() {
-  
     _positionTimer?.cancel();
     _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (!mounted || _videoPlayerController == null) {
@@ -615,14 +635,22 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         _positionTimer = null;
         return;
       }
+      if (_isRecoveringFromEnd) return;
 
-      _videoPlayerController!.getPosition().then((position) {
+      final controller = _videoPlayerController!;
+
+      controller.getPosition().then((position) {
         if (mounted) {
+          final displayedPosition = controller.value.isEnded &&
+                  position == Duration.zero &&
+                  _duration > Duration.zero
+              ? _duration
+              : position;
           setState(() {
-            _position = position;
+            _position = displayedPosition;
           });
-          
-          if (_isPlaying && position.inSeconds > 0) {
+
+          if (_isPlaying && displayedPosition.inSeconds > 0) {
             final showId = _getAnimeShowId();
             if (showId != null && _activeReleaseId != null) {
               String? episode;
@@ -633,9 +661,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               } catch (_) {}
 
               PlaybackProgressManager().saveProgress(
-                showId, 
-                _activeReleaseId!, 
-                position.inSeconds,
+                showId,
+                _activeReleaseId!,
+                displayedPosition.inSeconds,
                 episode: episode,
               );
             }
@@ -643,17 +671,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         }
       });
 
-      _videoPlayerController!.getDuration().then((duration) {
-        if (mounted) {
+      controller.getDuration().then((duration) {
+        if (mounted && duration > Duration.zero) {
           setState(() {
             _duration = duration;
           });
         }
       });
 
-      _videoPlayerController!.isPlaying().then((playing) {
+      controller.isPlaying().then((playing) {
         if (!mounted) return;
-        
+
         bool wasPlaying = _isPlaying;
         setState(() {
           _isPlaying = playing == true;
@@ -663,12 +691,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           _startControlsTimer();
         }
 
-        if (playing == false &&
+        if (controller.value.isEnded &&
+            !_isRecoveringFromEnd &&
             !_autoAdvancedCalled &&
             _nextEpisode != null &&
-            _duration.inSeconds > 0 &&
-            _position.inSeconds > 0 &&
-            (_duration - _position).inSeconds.abs() <= 5) {
+            _duration.inSeconds > 0) {
           _autoAdvancedCalled = true;
           timer.cancel();
           _positionTimer = null;
@@ -678,38 +705,94 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     });
   }
 
-  void _togglePlayPause() {
-    if (_videoPlayerController == null) return;
-    
+  Future<void> _togglePlayPause() async {
+    final controller = _videoPlayerController;
+    if (controller == null) return;
+
     if (_isPlaying) {
-      _videoPlayerController!.pause();
+      await controller.pause();
       _emitPartyPlayState(playing: false);
       _startControlsTimer();
     } else {
-      _videoPlayerController!.play();
+      if (controller.value.isEnded) {
+        await _resumeFromEndedAt(controller, Duration.zero);
+      } else {
+        await controller.play();
+      }
       _emitPartyPlayState(playing: true);
       _startControlsTimer();
     }
   }
 
-  void _seekTo(Duration position) {
-    _videoPlayerController?.seekTo(position);
+  Future<void> _seekTo(Duration position) async {
+    final controller = _videoPlayerController;
+    if (controller == null) return;
+
+    final wasEnded = controller.value.isEnded;
+    if (wasEnded) {
+      await _resumeFromEndedAt(controller, position);
+    } else {
+      await controller.seekTo(position);
+    }
     if (mounted) {
       setState(() => _position = position);
     }
     _emitPartySeek(at: position);
   }
 
+  Future<void> _resumeFromEndedAt(
+    VlcPlayerController controller,
+    Duration position,
+  ) async {
+    if (_isRecoveringFromEnd) return;
+
+    setState(() => _isRecoveringFromEnd = true);
+    try {
+      // libVLC does not reliably seek while its media is in the ended state.
+      // Restart the existing controller first, then seek once it is playable.
+      await controller.stop();
+      await controller.play();
+      await _waitForPlayableState(controller);
+      await controller.seekTo(position);
+    } finally {
+      if (mounted) {
+        setState(() => _isRecoveringFromEnd = false);
+      }
+    }
+  }
+
+  Future<void> _waitForPlayableState(VlcPlayerController controller) async {
+    if (!controller.value.isEnded && controller.value.isPlaying) return;
+
+    final completer = Completer<void>();
+    late final VoidCallback listener;
+    listener = () {
+      final value = controller.value;
+      if (!value.isEnded && value.isPlaying && !completer.isCompleted) {
+        controller.removeListener(listener);
+        completer.complete();
+      }
+    };
+
+    controller.addListener(listener);
+    try {
+      await completer.future.timeout(const Duration(seconds: 1));
+    } on TimeoutException {
+      controller.removeListener(listener);
+      // Give the native player a brief opportunity to process play before
+      // attempting the seek, even if it did not emit the expected event.
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
+  }
+
   void _toggleControls() {
     setState(() {
       _isControlsVisible = !_isControlsVisible;
     });
-    
+
     if (_isControlsVisible) {
-      
       _startControlsTimer();
     } else {
-      
       _controlsTimer?.cancel();
     }
   }
@@ -740,26 +823,23 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         DeviceOrientation.landscapeRight,
       ]);
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => AppOrientationSystemUi.sync());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => AppOrientationSystemUi.sync());
   }
-
 
   void _onVerticalDragStart(DragStartDetails details) {
     final screenWidth = MediaQuery.of(context).size.width;
     final x = details.globalPosition.dx;
 
-   
     if (x < screenWidth * 0.3) {
-     
       setState(() {
         _isBrightnessControlVisible = true;
-        _isControlsVisible = false; 
+        _isControlsVisible = false;
         _isGestureActive = true;
         _gestureStartY = details.globalPosition.dy;
         _initialBrightness = _brightness;
       });
     } else if (x > screenWidth * 0.7) {
- 
       setState(() {
         _isVolumeControlVisible = true;
         _isControlsVisible = false;
@@ -772,9 +852,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   void _onVerticalDragUpdate(DragUpdateDetails details) {
     final screenHeight = MediaQuery.of(context).size.height;
-    final deltaY = _gestureStartY - details.globalPosition.dy; 
+    final deltaY = _gestureStartY - details.globalPosition.dy;
     final deltaPercent = (deltaY / screenHeight) * 100;
-    
+
     if (_isBrightnessControlVisible) {
       double newBrightness = _initialBrightness + (deltaPercent / 100);
       newBrightness = newBrightness.clamp(0.0, 1.0);
@@ -797,9 +877,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       _isGestureActive = false;
     });
 
-
     Future.delayed(const Duration(milliseconds: 1000), () {
-      if (mounted && !_isGestureActive) { 
+      if (mounted && !_isGestureActive) {
         setState(() {
           _isBrightnessControlVisible = false;
           _isVolumeControlVisible = false;
@@ -807,7 +886,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       }
     });
   }
-
 
   void _setVolume(double volume) {
     _videoPlayerController?.setVolume(volume.toInt());
@@ -854,18 +932,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   void _updateSeekAmount() {
     final now = DateTime.now();
-    if (_lastSeekTime != null && now.difference(_lastSeekTime!).inMilliseconds < 1000) {
-
+    if (_lastSeekTime != null &&
+        now.difference(_lastSeekTime!).inMilliseconds < 1000) {
       _consecutiveSeekCount++;
     } else {
-     
       _consecutiveSeekCount = 1;
     }
     _lastSeekTime = now;
   }
 
   int _getCurrentSeekAmount() {
-  
     int amount = 10 + (_consecutiveSeekCount - 1) * 5;
     return amount < 10 ? 10 : (amount > 30 ? 30 : amount);
   }
@@ -876,10 +952,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       _seekIndicatorText = text;
     });
 
-    
     _seekIndicatorTimer?.cancel();
 
-    
     _seekIndicatorTimer = Timer(const Duration(milliseconds: 1000), () {
       if (mounted) {
         setState(() {
@@ -888,7 +962,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       }
     });
   }
-
 
   void _adjustVolume(bool increase) {
     double newVolume = _volume;
@@ -901,12 +974,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     setState(() {
       _volume = newVolume;
       _isVolumeControlVisible = true;
-      _isControlsVisible = false; 
+      _isControlsVisible = false;
     });
 
     _setVolume(_volume);
 
-   
     Future.delayed(const Duration(milliseconds: 1000), () {
       if (mounted) {
         setState(() {
@@ -915,7 +987,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       }
     });
   }
-
 
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -1014,10 +1085,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                   _forward();
                   return KeyEventResult.handled;
                 case LogicalKeyboardKey.arrowUp:
-                  _adjustVolume(true); 
+                  _adjustVolume(true);
                   return KeyEventResult.handled;
                 case LogicalKeyboardKey.arrowDown:
-                  _adjustVolume(false); 
+                  _adjustVolume(false);
                   return KeyEventResult.handled;
               }
             }
@@ -1045,7 +1116,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             behavior: HitTestBehavior.opaque,
             child: Stack(
               children: [
-
                 SizedBox.expand(
                   child: _videoPlayerController != null
                       ? VlcPlayer(
@@ -1069,11 +1139,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                           ),
                         ),
                 ),
-
-               
-
-
-           
                 if (_isBrightnessControlVisible)
                   Positioned(
                     left: 0,
@@ -1082,8 +1147,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                     width: MediaQuery.of(context).size.width * 0.3,
                     child: _buildBrightnessControl(),
                   ),
-
-             
                 if (_isVolumeControlVisible)
                   Positioned(
                     right: 0,
@@ -1092,12 +1155,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                     width: MediaQuery.of(context).size.width * 0.3,
                     child: _buildVolumeControl(),
                   ),
-
-           
                 if (_isSeekIndicatorVisible)
                   Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 16),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.7),
                         borderRadius: BorderRadius.circular(12),
@@ -1106,7 +1168,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            _seekIndicatorText.startsWith('-') ? Icons.replay : Icons.forward,
+                            _seekIndicatorText.startsWith('-')
+                                ? Icons.replay
+                                : Icons.forward,
                             color: AppTheme.primaryColor,
                             size: 28,
                           ),
@@ -1123,9 +1187,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                       ),
                     ),
                   ),
-
-
-
                 IgnorePointer(
                   ignoring: !_isControlsVisible,
                   child: AnimatedOpacity(
@@ -1164,12 +1225,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       ),
       child: Column(
         children: [
-          
           _buildTopBar(),
-          
           const Spacer(),
-          
-          
           _buildBottomControls(),
         ],
       ),
@@ -1211,7 +1268,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          
           GestureDetector(
             onTap: _exitPlayer,
             child: Container(
@@ -1227,10 +1283,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               ),
             ),
           ),
-          
           const SizedBox(width: 16),
-          
-          
           if (_activeTitle != null)
             Expanded(
               child: Text(
@@ -1244,45 +1297,43 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-
           if (_watchPartyActive)
             GestureDetector(
               onTap: _isPartyLeader ? _showInviteFriendsPopup : null,
               child: Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.25),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.55)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _isPartyLeader
-                        ? Icons.person_add_alt_1_rounded
-                        : Icons.sync_rounded,
-                    size: 14,
-                    color: AppTheme.primaryColor.withOpacity(0.95),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _isPartyLeader ? 'Leader' : 'Synced',
-                    style: TextStyle(
+                margin: const EdgeInsets.only(right: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: AppTheme.primaryColor.withOpacity(0.55)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isPartyLeader
+                          ? Icons.person_add_alt_1_rounded
+                          : Icons.sync_rounded,
+                      size: 14,
                       color: AppTheme.primaryColor.withOpacity(0.95),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 4),
+                    Text(
+                      _isPartyLeader ? 'Leader' : 'Synced',
+                      style: TextStyle(
+                        color: AppTheme.primaryColor.withOpacity(0.95),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            ),
-          
           const Spacer(),
-          
-          
           GestureDetector(
             onTap: _toggleFullscreen,
             child: Container(
@@ -1309,7 +1360,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          
           Row(
             children: [
               Text(
@@ -1328,7 +1378,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                     inactiveTrackColor: Colors.white.withOpacity(0.3),
                     thumbColor: AppTheme.primaryColor,
                     overlayColor: AppTheme.primaryColor.withOpacity(0.2),
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 8),
                     trackHeight: 3,
                   ),
                   child: Slider(
@@ -1355,14 +1406,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               ),
             ],
           ),
-          
           const SizedBox(height: 16),
-          
-          
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 250),
                 opacity: _prevEpisode != null ? 1.0 : 0.0,
@@ -1383,17 +1430,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                   ),
                 ),
               ),
-
               _buildControlButton(
                 icon: Icons.replay_10,
                 onTap: () {
                   final newPosition = _position - const Duration(seconds: 10);
-                  _seekTo(newPosition < Duration.zero ? Duration.zero : newPosition);
+                  _seekTo(newPosition < Duration.zero
+                      ? Duration.zero
+                      : newPosition);
                 },
               ),
-
               const SizedBox(width: 24),
-
               GestureDetector(
                 onTap: _togglePlayPause,
                 child: Container(
@@ -1417,9 +1463,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                   ),
                 ),
               ),
-
               const SizedBox(width: 24),
-
               _buildControlButton(
                 icon: Icons.forward_10,
                 onTap: () {
@@ -1431,7 +1475,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                   }
                 },
               ),
-              
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 250),
                 opacity: _nextEpisode != null ? 1.0 : 0.0,
@@ -1518,7 +1561,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           ),
           child: Stack(
             children: [
-              
               Container(
                 width: 4,
                 height: 150,
@@ -1527,7 +1569,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              
               Positioned(
                 bottom: 0,
                 left: 0,
@@ -1560,7 +1601,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           ),
           child: Stack(
             children: [
-              
               Container(
                 width: 4,
                 height: 150,
@@ -1569,7 +1609,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              
               Positioned(
                 bottom: 0,
                 left: 0,
@@ -1588,5 +1627,4 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       ),
     );
   }
-
 }
