@@ -9,6 +9,7 @@ import java.io.File
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.aura.anime_updates/torrent"
     private val TORRENT_EVENT_CHANNEL = "com.aura.anime_updates/torrentEvents"
+    private val UPDATE_CHANNEL = "com.aura.anime_updates/updateDownload"
 
     private lateinit var torrentManager: TorrentManager
     private var torrentEventSink: EventChannel.EventSink? = null
@@ -100,6 +101,35 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, UPDATE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "enqueueUpdateDownload" -> {
+                        val downloadUrl = call.argument<String>("downloadUrl")
+                        if (downloadUrl.isNullOrBlank()) {
+                            result.error("INVALID_URL", "A download URL is required", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            result.success(UpdateDownloadManager.enqueue(this, downloadUrl))
+                        } catch (e: Exception) {
+                            result.error("DOWNLOAD_ENQUEUE_FAILED", e.message, null)
+                        }
+                    }
+                    "getUpdateDownloadStatus" -> {
+                        result.success(UpdateDownloadManager.getStatus(this))
+                    }
+                    "openCompletedUpdate" -> {
+                        try {
+                            result.success(UpdateDownloadManager.openCompletedUpdate(this))
+                        } catch (e: Exception) {
+                            result.error("INSTALL_OPEN_FAILED", e.message, null)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, TORRENT_EVENT_CHANNEL)
             .setStreamHandler(object : EventChannel.StreamHandler {

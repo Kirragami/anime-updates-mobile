@@ -1,14 +1,14 @@
 import 'dart:io';
-import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:open_file/open_file.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 import 'dio_client.dart';
 
 class UpdateService {
+  static const MethodChannel _updateDownloadChannel =
+      MethodChannel('com.aura.anime_updates/updateDownload');
   static const String _baseUrl = AppConstants.baseUrl;
   static const String _checkUpdateEndpoint = AppConstants.checkUpdateEndpoint;
   static const String _updateDownloadUrl = AppConstants.updateDownloadUrl;
@@ -30,7 +30,7 @@ class UpdateService {
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
         final needUpdate = data['needUpdate'] as bool? ?? false;
-        
+
         return {
           'success': true,
           'needUpdate': needUpdate,
@@ -51,64 +51,107 @@ class UpdateService {
     }
   }
 
-  Future<Map<String, dynamic>> downloadUpdate({
+  Future<Map<String, dynamic>> queueUpdateDownload({
     required String downloadUrl,
-    required void Function(int, int) onProgress,
-    CancelToken? cancelToken,
   }) async {
+    if (!Platform.isAndroid) {
+      return {
+        'success': false,
+        'message': 'Background APK updates are only supported on Android.',
+      };
+    }
+
     try {
-      final cacheDir = await getTemporaryDirectory();
-      final filePath = '${cacheDir.path}/anime_updates.apk';
-
-
-      final file = File(filePath);
-      if (await file.exists()) {
-        await file.delete();
+      var notificationPermission = await Permission.notification.status;
+      if (notificationPermission.isDenied) {
+        notificationPermission = await Permission.notification.request();
       }
-
-      final dio = Dio();
-      await dio.download(
-        downloadUrl,
-        filePath,
-        onReceiveProgress: onProgress,
-        cancelToken: cancelToken,
-        options: Options(
-          responseType: ResponseType.bytes,
-          followRedirects: true,
-          receiveTimeout: const Duration(minutes: 5),
-        ),
-      );
-
-      if (await file.exists()) {
-        final length = await file.length();
-        if (length == 0) {
-          return {
-            'success': false,
-            'message': 'Downloaded file is empty',
-          };
-        }
-      } else {
+      if (!notificationPermission.isGranted) {
         return {
           'success': false,
-          'message': 'Failed to save downloaded file',
+          'message':
+              'Notification permission is required to notify you when the update is ready.',
         };
       }
 
+      var installPermission = await Permission.requestInstallPackages.status;
+      if (installPermission.isDenied) {
+        installPermission = await Permission.requestInstallPackages.request();
+      }
+      if (!installPermission.isGranted) {
+        return {
+          'success': false,
+          'message':
+              'Permission to install packages is required. Please enable it in Settings.',
+        };
+      }
+
+      final result = await _updateDownloadChannel
+          .invokeMapMethod<String, dynamic>('enqueueUpdateDownload', {
+        'downloadUrl': downloadUrl,
+      });
+      return Map<String, dynamic>.from(result ?? const {});
+    } on PlatformException catch (e) {
       return {
-        'success': true,
-        'filePath': filePath,
+        'success': false,
+        'message': e.message ?? 'Unable to start the update download.',
       };
     } catch (e) {
       return {
         'success': false,
-        'message': 'Download failed: ${e.toString()}',
+        'message': 'Unable to start the update download: ${e.toString()}',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> getUpdateDownloadStatus() async {
+    if (!Platform.isAndroid) {
+      return {'status': 'none'};
+    }
+
+    try {
+      final result = await _updateDownloadChannel
+          .invokeMapMethod<String, dynamic>('getUpdateDownloadStatus');
+      return Map<String, dynamic>.from(result ?? const {'status': 'none'});
+    } on PlatformException {
+      return {'status': 'none'};
+    }
+  }
+
+  Future<Map<String, dynamic>> openCompletedUpdate() async {
+    if (!Platform.isAndroid) {
+      return {
+        'success': false,
+        'message': 'APK installation is only supported on Android.',
+      };
+    }
+
+    try {
+      var installPermission = await Permission.requestInstallPackages.status;
+      if (installPermission.isDenied) {
+        installPermission = await Permission.requestInstallPackages.request();
+      }
+      if (!installPermission.isGranted) {
+        return {
+          'success': false,
+          'message':
+              'Permission to install packages is required. Please enable it in Settings.',
+        };
+      }
+
+      final result = await _updateDownloadChannel
+          .invokeMapMethod<String, dynamic>('openCompletedUpdate');
+      return Map<String, dynamic>.from(result ?? const {});
+    } on PlatformException catch (e) {
+      return {
+        'success': false,
+        'message': e.message ?? 'Unable to open the downloaded update.',
       };
     }
   }
 
   Future<Map<String, dynamic>> installUpdate(String filePath) async {
     try {
-      
       final file = File(filePath);
       if (!await file.exists()) {
         return {
@@ -116,7 +159,7 @@ class UpdateService {
           'message': 'APK file not found',
         };
       }
-      
+
       final length = await file.length();
       if (length == 0) {
         return {
@@ -124,7 +167,6 @@ class UpdateService {
           'message': 'APK file is empty',
         };
       }
-      
 
       final status = await Permission.requestInstallPackages.status;
       if (!status.isGranted) {
@@ -132,14 +174,14 @@ class UpdateService {
         if (!result.isGranted) {
           return {
             'success': false,
-            'message': 'Permission to install packages is required. Please enable it in Settings.',
+            'message':
+                'Permission to install packages is required. Please enable it in Settings.',
           };
         }
       }
 
       final result = await OpenFile.open(filePath);
-      
-      
+
       if (result.type == ResultType.done) {
         return {
           'success': true,

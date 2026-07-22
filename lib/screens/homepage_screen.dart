@@ -40,22 +40,37 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
   Future<void> _checkForUpdateOnLaunch() async {
     try {
       final updateService = ref.read(updateServiceProvider);
+      final downloadStatus = await updateService.getUpdateDownloadStatus();
+      final status = downloadStatus['status'] as String? ?? 'none';
+      if (status == 'queued' || status == 'downloading' || status == 'paused') {
+        return;
+      }
+      if (status == 'completed') {
+        if (!mounted) return;
+        _showUpdateDialog(isReadyToInstall: true);
+        return;
+      }
+
       final result = await updateService.checkForUpdate();
 
       if (result['success'] == true && result['needUpdate'] == true) {
         if (!mounted) return;
-        _showUpdateDialog(result['downloadUrl'] as String);
+        _showUpdateDialog(downloadUrl: result['downloadUrl'] as String);
       }
-    } catch (e) {
-      
-    }
+    } catch (e) {}
   }
 
-  void _showUpdateDialog(String downloadUrl) {
+  void _showUpdateDialog({
+    String? downloadUrl,
+    bool isReadyToInstall = false,
+  }) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => UpdateDialog(downloadUrl: downloadUrl),
+      builder: (context) => UpdateDialog(
+        downloadUrl: downloadUrl,
+        isReadyToInstall: isReadyToInstall,
+      ),
     );
   }
 
@@ -87,17 +102,16 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
                   ],
                 ),
               ),
-             
               Positioned(
                 top: 16,
                 right: 16,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-            
                     Consumer(
                       builder: (context, ref, child) {
-                        final completedDownloads = ref.watch(completedDownloadsProvider);
+                        final completedDownloads =
+                            ref.watch(completedDownloadsProvider);
                         final hasCompleted = completedDownloads.isNotEmpty;
                         if (!hasCompleted) return const SizedBox.shrink();
                         return IconButton(
@@ -119,12 +133,12 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
                       },
                     ),
                     const SizedBox(width: 8),
-                
                     Consumer(
                       builder: (context, ref, child) {
-                        final activeDownloads = ref.watch(activeDownloadsProvider);
+                        final activeDownloads =
+                            ref.watch(activeDownloadsProvider);
                         final activeCount = activeDownloads.length;
-                        
+
                         return Stack(
                           children: [
                             IconButton(
@@ -318,12 +332,10 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
       builder: (context, ref, child) {
         final completedDownloads = ref.watch(completedDownloadsProvider);
         final hasCompletedDownloads = completedDownloads.length > 0;
-        
+
         if (hasCompletedDownloads) {
-          
           return Column(
             children: [
-     
               Row(
                 children: [
                   _buildNewReleasesButton(context),
@@ -334,7 +346,6 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
             ],
           );
         } else {
-        
           return Row(
             children: [
               _buildNewReleasesButton(context),
@@ -471,7 +482,6 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
             onTap: () {
-          
               final isLoggedIn = AuthService.isLoggedIn;
               if (isLoggedIn) {
                 Navigator.of(context).push(

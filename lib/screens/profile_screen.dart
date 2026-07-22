@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/error_widget.dart' as error_widgets;
 import '../theme/app_theme.dart';
@@ -31,13 +32,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _updateAvailable = false;
   String _updateStatus = '';
   bool _isDownloading = false;
+  bool _updateReadyToInstall = false;
+  bool _isOpeningInstaller = false;
   double _downloadProgress = 0.0;
+  Timer? _updateDownloadStatusTimer;
 
   @override
   void initState() {
     super.initState();
     _loadSpeedLimit();
     _loadAutoTrackPreference();
+    _loadUpdateDownloadStatus();
   }
 
   Future<void> _loadSpeedLimit() async {
@@ -95,6 +100,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   void dispose() {
+    _updateDownloadStatusTimer?.cancel();
     _speedController.dispose();
     super.dispose();
   }
@@ -694,6 +700,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     color: AppTheme.primaryColor,
                   ),
                 )
+              else if (_updateReadyToInstall)
+                TextButton(
+                  onPressed: _isOpeningInstaller ? null : _openCompletedUpdate,
+                  style: TextButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    minimumSize: const Size(0, 0),
+                  ),
+                  child: Text(
+                    _isOpeningInstaller ? 'Opening...' : 'Install',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
               else if (_updateAvailable && !_isDownloading)
                 TextButton(
                   onPressed: _downloadUpdate,
@@ -747,6 +770,76 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Future<void> _loadUpdateDownloadStatus() async {
+    final status =
+        await ref.read(updateServiceProvider).getUpdateDownloadStatus();
+    if (!mounted) return;
+
+    final state = status['status'] as String? ?? 'none';
+    final downloaded = (status['downloadedBytes'] as num?)?.toDouble() ?? 0;
+    final total = (status['totalBytes'] as num?)?.toDouble() ?? 0;
+    final isActive =
+        state == 'queued' || state == 'downloading' || state == 'paused';
+
+    setState(() {
+      _isDownloading = isActive;
+      _updateReadyToInstall = state == 'completed';
+      if (total > 0) {
+        _downloadProgress = (downloaded / total).clamp(0.0, 1.0);
+      }
+      switch (state) {
+        case 'queued':
+          _updateStatus = 'Update download queued';
+          break;
+        case 'downloading':
+          _updateStatus = 'Downloading update';
+          break;
+        case 'paused':
+          _updateStatus = 'Update download paused';
+          break;
+        case 'completed':
+          _updateStatus = 'Update ready. Tap the notification to install.';
+          break;
+        case 'failed':
+          _updateStatus = 'Update download failed';
+          break;
+      }
+    });
+
+    if (isActive) {
+      _updateDownloadStatusTimer ??= Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => _loadUpdateDownloadStatus(),
+      );
+    } else {
+      _updateDownloadStatusTimer?.cancel();
+      _updateDownloadStatusTimer = null;
+    }
+  }
+
+  Future<void> _openCompletedUpdate() async {
+    setState(() => _isOpeningInstaller = true);
+    try {
+      final result =
+          await ref.read(updateServiceProvider).openCompletedUpdate();
+      if (!mounted) return;
+      setState(() {
+        _updateStatus = result['success'] == true
+            ? 'Opening the installer...'
+            : result['message'] as String? ??
+                'Unable to open the downloaded update.';
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _updateStatus = 'Unable to open the downloaded update.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningInstaller = false);
+      }
+    }
+  }
+
   Future<void> _checkForUpdate() async {
     setState(() {
       _isCheckingUpdate = true;
@@ -788,6 +881,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _downloadUpdate() async {
     setState(() {
       _isDownloading = true;
+      _updateReadyToInstall = false;
       _downloadProgress = 0.0;
     });
 
@@ -806,38 +900,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       final downloadUrl = checkResult['downloadUrl'];
 
-      final downloadResult = await updateService.downloadUpdate(
+      final downloadResult = await updateService.queueUpdateDownload(
         downloadUrl: downloadUrl,
-        onProgress: (received, total) {
-          if (total != -1) {
-            setState(() {
-              _downloadProgress = received / total;
-            });
-          }
-        },
       );
 
       if (downloadResult['success']) {
-        final filePath = downloadResult['filePath'];
-        final installResult = await updateService.installUpdate(filePath);
-
-        if (installResult['success']) {
-        } else {
-          if (mounted) {
-            final message =
-                installResult['message'] as String? ?? 'Unknown error';
-            if (message
-                .contains('Permission to install packages is required')) {
-              openAppSettings();
-            }
-          }
+        if (mounted) {
+          setState(() {
+            _updateStatus =
+                'Downloading...';
+          });
         }
-      } else {}
-    } catch (e) {
-    } finally {
-      setState(() {
-        _isDownloading = false;
-      });
+        await _loadUpdateDownloadStatus();
+      } else if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _updateStatus = downloadResult['message'] as String? ??
+              'Unable to start download';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _updateStatus = 'Unable to start update download';
+        });
+      }
     }
   }
 
