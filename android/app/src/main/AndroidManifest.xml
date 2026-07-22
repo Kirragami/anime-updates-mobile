@@ -61,6 +61,13 @@
             android:enabled="true"
             android:exported="false" 
             android:foregroundServiceType="dataSync" />
+        <receiver
+            android:name=".UpdateDownloadReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

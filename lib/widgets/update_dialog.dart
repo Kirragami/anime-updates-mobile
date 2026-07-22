@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:dio/dio.dart';
 import '../services/services.dart';
 import '../theme/app_theme.dart';
 
 class UpdateDialog extends ConsumerStatefulWidget {
-  final String downloadUrl;
+  final String? downloadUrl;
+  final bool isReadyToInstall;
 
   const UpdateDialog({
     super.key,
-    required this.downloadUrl,
+    this.downloadUrl,
+    this.isReadyToInstall = false,
   });
 
   @override
@@ -19,19 +19,20 @@ class UpdateDialog extends ConsumerStatefulWidget {
 
 class _UpdateDialogState extends ConsumerState<UpdateDialog> {
   bool _isDownloading = false;
-  double _downloadProgress = 0.0;
-  String _statusText = 'New version available!';
-  final CancelToken _cancelToken = CancelToken();
+  late String _statusText;
 
   @override
-  void dispose() {
-    if (!_cancelToken.isCancelled) {
-      _cancelToken.cancel();
-    }
-    super.dispose();
+  void initState() {
+    super.initState();
+    _statusText = widget.isReadyToInstall
+        ? 'Update downloaded. Install it now?'
+        : 'New version available!';
   }
 
   Future<void> _startDownload() async {
+    final downloadUrl = widget.downloadUrl;
+    if (downloadUrl == null) return;
+
     setState(() {
       _isDownloading = true;
       _statusText = 'Downloading update...';
@@ -39,50 +40,59 @@ class _UpdateDialogState extends ConsumerState<UpdateDialog> {
 
     try {
       final updateService = ref.read(updateServiceProvider);
-      final downloadResult = await updateService.downloadUpdate(
-        downloadUrl: widget.downloadUrl,
-        cancelToken: _cancelToken,
-        onProgress: (received, total) {
-          if (total != -1 && mounted) {
-            setState(() {
-              _downloadProgress = received / total;
-            });
-          }
-        },
+      final downloadResult = await updateService.queueUpdateDownload(
+        downloadUrl: downloadUrl,
       );
 
       if (downloadResult['success'] == true) {
         if (!mounted) return;
-        setState(() {
-          _statusText = 'Installing update...';
-        });
-        final installResult = await updateService.installUpdate(downloadResult['filePath']);
-        if (installResult['success'] != true) {
-          final message = installResult['message'] as String? ?? 'Unknown error';
-          if (message.contains('Permission to install packages is required')) {
-            openAppSettings();
-          }
-          if (mounted) {
-            Navigator.of(context).pop();
-          }
-        }
+        Navigator.of(context).pop();
+        return;
       } else {
         if (!mounted) return;
         setState(() {
           _isDownloading = false;
-          _statusText = 'Download failed.';
+          _statusText = downloadResult['message'] as String? ??
+              'Unable to start download.';
         });
       }
     } catch (e) {
-      if (e is DioException && e.type == DioExceptionType.cancel) {
-        // Download was cancelled on dispose, no action needed
-        return;
-      }
       if (!mounted) return;
       setState(() {
         _isDownloading = false;
         _statusText = 'Error occurred.';
       });
+    }
+  }
+
+  Future<void> _installUpdate() async {
+    setState(() {
+      _isDownloading = true;
+      _statusText = 'Opening installer...';
+    });
+
+    try {
+      final result =
+          await ref.read(updateServiceProvider).openCompletedUpdate();
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        Navigator.of(context).pop();
+        return;
+      }
+
+      setState(() {
+        _isDownloading = false;
+        _statusText = result['message'] as String? ??
+            'Unable to open the update installer.';
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _statusText = 'Unable to open the update installer.';
+        });
+      }
     }
   }
 
@@ -107,9 +117,11 @@ class _UpdateDialogState extends ConsumerState<UpdateDialog> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Update Available',
-                    style: TextStyle(
+                  Text(
+                    widget.isReadyToInstall
+                        ? 'Update Ready'
+                        : 'Update Available',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -122,15 +134,10 @@ class _UpdateDialogState extends ConsumerState<UpdateDialog> {
                   ),
                   if (_isDownloading) ...[
                     const SizedBox(height: 16),
-                    LinearProgressIndicator(
-                      value: _downloadProgress,
+                    const LinearProgressIndicator(
                       backgroundColor: Colors.white24,
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Downloading... ${(_downloadProgress * 100).toInt()}%',
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                     ),
                   ],
                 ],
@@ -158,19 +165,20 @@ class _UpdateDialogState extends ConsumerState<UpdateDialog> {
                       if (!_isDownloading)
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Later', style: TextStyle(color: Colors.white54)),
+                          child: const Text('Later',
+                              style: TextStyle(color: Colors.white54)),
                         ),
-                      if (!_isDownloading)
-                        const SizedBox(width: 8),
+                      if (!_isDownloading) const SizedBox(width: 8),
                       if (!_isDownloading)
                         TextButton(
-                          onPressed: _startDownload,
-                          child: const Text('Download', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold)),
-                        ),
-                      if (_isDownloading)
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel', style: TextStyle(color: Colors.redAccent)),
+                          onPressed: widget.isReadyToInstall
+                              ? _installUpdate
+                              : _startDownload,
+                          child: Text(
+                              widget.isReadyToInstall ? 'Install' : 'Download',
+                              style: const TextStyle(
+                                  color: AppTheme.primaryColor,
+                                  fontWeight: FontWeight.bold)),
                         ),
                     ],
                   ),
