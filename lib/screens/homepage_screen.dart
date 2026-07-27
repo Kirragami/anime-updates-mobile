@@ -55,13 +55,17 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
 
       if (result['success'] == true && result['needUpdate'] == true) {
         if (!mounted) return;
-        _showUpdateDialog(downloadUrl: result['downloadUrl'] as String);
+        _showUpdateDialog(
+          downloadUrl: result['downloadUrl'] as String,
+          targetVersion: result['latestVersion'] as String? ?? '',
+        );
       }
     } catch (e) {}
   }
 
   void _showUpdateDialog({
     String? downloadUrl,
+    String? targetVersion,
     bool isReadyToInstall = false,
   }) {
     showDialog(
@@ -69,6 +73,7 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
       barrierDismissible: false,
       builder: (context) => UpdateDialog(
         downloadUrl: downloadUrl,
+        targetVersion: targetVersion,
         isReadyToInstall: isReadyToInstall,
       ),
     );

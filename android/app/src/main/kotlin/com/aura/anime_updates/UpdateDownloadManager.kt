@@ -9,9 +9,14 @@ import android.os.Environment
 object UpdateDownloadManager {
     private const val PREFS_NAME = "update_download"
     private const val DOWNLOAD_ID_KEY = "download_id"
+    private const val TARGET_VERSION_KEY = "target_version"
     private const val APK_FILE_NAME = "anime_updates_update.apk"
 
-    fun enqueue(context: Context, downloadUrl: String): Map<String, Any> {
+    fun enqueue(
+        context: Context,
+        downloadUrl: String,
+        targetVersion: String,
+    ): Map<String, Any> {
         val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val previousId = prefs.getLong(DOWNLOAD_ID_KEY, -1L)
@@ -31,7 +36,10 @@ object UpdateDownloadManager {
             )
 
         val downloadId = manager.enqueue(request)
-        prefs.edit().putLong(DOWNLOAD_ID_KEY, downloadId).apply()
+        prefs.edit()
+            .putLong(DOWNLOAD_ID_KEY, downloadId)
+            .putString(TARGET_VERSION_KEY, targetVersion)
+            .apply()
 
         return mapOf(
             "success" to true,
@@ -48,6 +56,13 @@ object UpdateDownloadManager {
         }
 
         val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val targetVersion = prefs.getString(TARGET_VERSION_KEY, null)
+        if (targetVersion != null && isInstalledVersionAtLeast(targetVersion)) {
+            manager.remove(downloadId)
+            prefs.edit().clear().apply()
+            return mapOf("status" to "none")
+        }
+
         val query = DownloadManager.Query().setFilterById(downloadId)
         manager.query(query).use { cursor ->
             if (!cursor.moveToFirst()) {
@@ -119,6 +134,23 @@ object UpdateDownloadManager {
         DownloadManager.STATUS_FAILED -> "failed"
         else -> "unknown"
     }
+
+    private fun isInstalledVersionAtLeast(targetVersion: String): Boolean {
+        val installedParts = versionParts(BuildConfig.VERSION_NAME)
+        val targetParts = versionParts(targetVersion)
+        if (installedParts.isEmpty() || targetParts.isEmpty()) return false
+
+        val parts = maxOf(installedParts.size, targetParts.size)
+        for (index in 0 until parts) {
+            val installed = installedParts.getOrElse(index) { 0 }
+            val target = targetParts.getOrElse(index) { 0 }
+            if (installed != target) return installed > target
+        }
+        return true
+    }
+
+    private fun versionParts(version: String): List<Int> =
+        Regex("\\d+").findAll(version).mapNotNull { it.value.toIntOrNull() }.toList()
 
     const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 }

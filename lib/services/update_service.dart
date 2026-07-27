@@ -53,6 +53,7 @@ class UpdateService {
 
   Future<Map<String, dynamic>> queueUpdateDownload({
     required String downloadUrl,
+    required String targetVersion,
   }) async {
     if (!Platform.isAndroid) {
       return {
@@ -89,6 +90,7 @@ class UpdateService {
       final result = await _updateDownloadChannel
           .invokeMapMethod<String, dynamic>('enqueueUpdateDownload', {
         'downloadUrl': downloadUrl,
+        'targetVersion': targetVersion,
       });
       return Map<String, dynamic>.from(result ?? const {});
     } on PlatformException catch (e) {
