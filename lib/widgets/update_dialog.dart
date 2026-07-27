@@ -5,11 +5,13 @@ import '../theme/app_theme.dart';
 
 class UpdateDialog extends ConsumerStatefulWidget {
   final String? downloadUrl;
+  final String? targetVersion;
   final bool isReadyToInstall;
 
   const UpdateDialog({
     super.key,
     this.downloadUrl,
+    this.targetVersion,
     this.isReadyToInstall = false,
   });
 
@@ -31,7 +33,13 @@ class _UpdateDialogState extends ConsumerState<UpdateDialog> {
 
   Future<void> _startDownload() async {
     final downloadUrl = widget.downloadUrl;
-    if (downloadUrl == null) return;
+    final targetVersion = widget.targetVersion;
+    if (downloadUrl == null || targetVersion == null || targetVersion.isEmpty) {
+      setState(() {
+        _statusText = 'Unable to determine the update version.';
+      });
+      return;
+    }
 
     setState(() {
       _isDownloading = true;
@@ -42,6 +50,7 @@ class _UpdateDialogState extends ConsumerState<UpdateDialog> {
       final updateService = ref.read(updateServiceProvider);
       final downloadResult = await updateService.queueUpdateDownload(
         downloadUrl: downloadUrl,
+        targetVersion: targetVersion,
       );
 
       if (downloadResult['success'] == true) {

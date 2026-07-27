@@ -902,13 +902,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       final downloadResult = await updateService.queueUpdateDownload(
         downloadUrl: downloadUrl,
+        targetVersion: checkResult['latestVersion'] as String? ?? '',
       );
 
       if (downloadResult['success']) {
         if (mounted) {
           setState(() {
-            _updateStatus =
-                'Downloading...';
+            _updateStatus = 'Downloading...';
           });
         }
         await _loadUpdateDownloadStatus();

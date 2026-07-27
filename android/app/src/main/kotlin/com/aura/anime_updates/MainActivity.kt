@@ -107,12 +107,23 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "enqueueUpdateDownload" -> {
                         val downloadUrl = call.argument<String>("downloadUrl")
+                        val targetVersion = call.argument<String>("targetVersion")
                         if (downloadUrl.isNullOrBlank()) {
                             result.error("INVALID_URL", "A download URL is required", null)
                             return@setMethodCallHandler
                         }
+                        if (targetVersion.isNullOrBlank()) {
+                            result.error("INVALID_VERSION", "A target version is required", null)
+                            return@setMethodCallHandler
+                        }
                         try {
-                            result.success(UpdateDownloadManager.enqueue(this, downloadUrl))
+                            result.success(
+                                UpdateDownloadManager.enqueue(
+                                    this,
+                                    downloadUrl,
+                                    targetVersion,
+                                ),
+                            )
                         } catch (e: Exception) {
                             result.error("DOWNLOAD_ENQUEUE_FAILED", e.message, null)
                         }
