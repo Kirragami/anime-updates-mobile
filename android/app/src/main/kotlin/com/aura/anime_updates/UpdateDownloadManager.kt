@@ -4,6 +4,7 @@ import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 
 object UpdateDownloadManager {
@@ -11,6 +12,15 @@ object UpdateDownloadManager {
     private const val DOWNLOAD_ID_KEY = "download_id"
     private const val TARGET_VERSION_KEY = "target_version"
     private const val APK_FILE_NAME = "anime_updates_update.apk"
+
+    private val supportedReleaseAbis = linkedSetOf(
+        "arm64-v8a",
+        "armeabi-v7a",
+        "x86_64",
+    )
+
+    fun preferredAbi(): String? =
+        Build.SUPPORTED_ABIS.firstOrNull { supportedReleaseAbis.contains(it) }
 
     fun enqueue(
         context: Context,

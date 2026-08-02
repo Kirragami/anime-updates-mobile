@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:open_file/open_file.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -12,6 +13,11 @@ class UpdateService {
   static const String _baseUrl = AppConstants.baseUrl;
   static const String _checkUpdateEndpoint = AppConstants.checkUpdateEndpoint;
   static const String _updateDownloadUrl = AppConstants.updateDownloadUrl;
+  static const Set<String> _knownAbis = {
+    'arm64-v8a',
+    'armeabi-v7a',
+    'x86_64',
+  };
 
   static String get checkUpdateUrl => '$_baseUrl$_checkUpdateEndpoint';
 
@@ -30,12 +36,14 @@ class UpdateService {
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
         final needUpdate = data['needUpdate'] as bool? ?? false;
+        final baseDownloadUrl =
+            data['downloadUrl'] as String? ?? _updateDownloadUrl;
 
         return {
           'success': true,
           'needUpdate': needUpdate,
           'latestVersion': data['latestVersion'] as String? ?? 'Unknown',
-          'downloadUrl': data['downloadUrl'] as String? ?? _updateDownloadUrl,
+          'downloadUrl': await resolveDownloadUrl(baseDownloadUrl),
         };
       } else {
         return {
@@ -48,6 +56,83 @@ class UpdateService {
         'success': false,
         'message': 'Network error: ${e.toString()}',
       };
+    }
+  }
+
+  Future<String?> getPreferredAbi() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      final abi =
+          await _updateDownloadChannel.invokeMethod<String>('getPreferredAbi');
+      if (abi != null && _knownAbis.contains(abi)) return abi;
+    } on PlatformException {
+      // Fall through to fat APK download.
+    }
+    return null;
+  }
+
+  /// Prefer `/download/{abi}`; fall back to the fat `/download` URL on 404.
+  Future<String> resolveDownloadUrl(String baseDownloadUrl) async {
+    final fatUrl = _normalizeFatDownloadUrl(baseDownloadUrl);
+    final abi = await getPreferredAbi();
+    if (abi == null) return fatUrl;
+
+    final abiUrl = '$fatUrl/$abi';
+    if (await _remoteFileExists(abiUrl)) {
+      return abiUrl;
+    }
+    return fatUrl;
+  }
+
+  String _normalizeFatDownloadUrl(String downloadUrl) {
+    var normalized = downloadUrl.trim();
+    if (normalized.isEmpty) {
+      normalized = _updateDownloadUrl;
+    }
+    normalized = normalized.replaceAll(RegExp(r'/+$'), '');
+
+    for (final abi in _knownAbis) {
+      if (normalized.endsWith('/$abi')) {
+        normalized =
+            normalized.substring(0, normalized.length - abi.length - 1);
+        break;
+      }
+    }
+    return normalized;
+  }
+
+  Future<bool> _remoteFileExists(String url) async {
+    try {
+      final headResponse = await Dio().head(
+        url,
+        options: Options(
+          followRedirects: true,
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+      if (headResponse.statusCode == 200 || headResponse.statusCode == 206) {
+        return true;
+      }
+      if (headResponse.statusCode != 404 && headResponse.statusCode != 405) {
+        return false;
+      }
+    } catch (_) {
+      // Some hosts reject HEAD; try a lightweight GET next.
+    }
+
+    try {
+      final getResponse = await Dio().get<List<int>>(
+        url,
+        options: Options(
+          followRedirects: true,
+          responseType: ResponseType.bytes,
+          headers: const {'Range': 'bytes=0-0'},
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+      return getResponse.statusCode == 200 || getResponse.statusCode == 206;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -87,9 +172,10 @@ class UpdateService {
         };
       }
 
+      final resolvedUrl = await resolveDownloadUrl(downloadUrl);
       final result = await _updateDownloadChannel
           .invokeMapMethod<String, dynamic>('enqueueUpdateDownload', {
-        'downloadUrl': downloadUrl,
+        'downloadUrl': resolvedUrl,
         'targetVersion': targetVersion,
       });
       return Map<String, dynamic>.from(result ?? const {});
