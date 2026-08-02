@@ -128,6 +128,9 @@ class MainActivity : FlutterActivity() {
                             result.error("DOWNLOAD_ENQUEUE_FAILED", e.message, null)
                         }
                     }
+                    "getPreferredAbi" -> {
+                        result.success(UpdateDownloadManager.preferredAbi())
+                    }
                     "getUpdateDownloadStatus" -> {
                         result.success(UpdateDownloadManager.getStatus(this))
                     }

@@ -54,8 +54,22 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   Duration _duration = Duration.zero;
   Timer? _controlsTimer;
   Timer? _positionTimer;
+  Timer? _scrubSeekTimer;
   double _volume = 100.0;
   double _brightness = 1.0;
+
+  /// Live scrubbing: UI follows the thumb immediately; native seeks are throttled.
+  bool _isScrubbing = false;
+  Duration? _pendingScrubSeek;
+  int _seekGeneration = 0;
+  DateTime? _lastNativeSeekAt;
+  DateTime? _ignorePollPositionUntil;
+  DateTime? _ignorePollPlayingUntil;
+  DateTime? _lastProgressSaveAt;
+  Duration? _queuedSeekWhileRecovering;
+
+  static const Duration _nativeSeekMinInterval = Duration(milliseconds: 100);
+  static const Duration _progressSaveInterval = Duration(seconds: 10);
 
   bool _isVolumeControlVisible = false;
   bool _isBrightnessControlVisible = false;
@@ -189,8 +203,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       _loadedPartyVideoUrl = WatchPartyVideoRef(episode.releaseId).encode();
     }
 
+    _persistProgress(force: true);
     _positionTimer?.cancel();
     _positionTimer = null;
+    _scrubSeekTimer?.cancel();
+    _scrubSeekTimer = null;
+    _pendingScrubSeek = null;
+    _isScrubbing = false;
 
     final old = _videoPlayerController;
     setState(() {
@@ -301,6 +320,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _stopPartyPlaybackSync();
     _positionTimer?.cancel();
     _positionTimer = null;
+    _scrubSeekTimer?.cancel();
+    _scrubSeekTimer = null;
+    _pendingScrubSeek = null;
+    _isScrubbing = false;
 
     final old = _videoPlayerController;
     setState(() {
@@ -461,15 +484,23 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       final target = Duration(milliseconds: (timestampSeconds * 1000).round());
       final drift = (_position - target).inMilliseconds.abs();
       if (drift > seekThresholdMs) {
-        await _videoPlayerController!.seekTo(target);
+        _ignorePollPositionUntil =
+            DateTime.now().add(const Duration(milliseconds: 400));
         if (mounted) {
           setState(() => _position = target);
         }
+        await _videoPlayerController!.seekTo(target);
       }
 
       if (shouldPlay && !_isPlaying) {
+        _ignorePollPlayingUntil =
+            DateTime.now().add(const Duration(milliseconds: 500));
+        if (mounted) setState(() => _isPlaying = true);
         await _videoPlayerController!.play();
       } else if (!shouldPlay && _isPlaying) {
+        _ignorePollPlayingUntil =
+            DateTime.now().add(const Duration(milliseconds: 500));
+        if (mounted) setState(() => _isPlaying = false);
         await _videoPlayerController!.pause();
       }
     } finally {
@@ -556,7 +587,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         hwAcc: HwAcc.full,
         options: VlcPlayerOptions(
           advanced: VlcAdvancedOptions([
-            VlcAdvancedOptions.networkCaching(2000),
+            // Local files: shorter file cache keeps seeks/resumes snappy.
+            VlcAdvancedOptions.fileCaching(300),
           ]),
           subtitle: VlcSubtitleOptions([
             VlcSubtitleOptions.boldStyle(true),
@@ -638,60 +670,72 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       if (_isRecoveringFromEnd) return;
 
       final controller = _videoPlayerController!;
+      final now = DateTime.now();
+      final ignorePosition = _isScrubbing ||
+          (_ignorePollPositionUntil != null &&
+              now.isBefore(_ignorePollPositionUntil!));
+      final ignorePlaying = _ignorePollPlayingUntil != null &&
+          now.isBefore(_ignorePollPlayingUntil!);
 
-      controller.getPosition().then((position) {
-        if (mounted) {
-          final displayedPosition = controller.value.isEnded &&
+      Future.wait([
+        ignorePosition
+            ? Future<Duration?>.value(null)
+            : controller.getPosition(),
+        _duration > Duration.zero
+            ? Future<Duration?>.value(null)
+            : controller.getDuration(),
+        ignorePlaying
+            ? Future<bool?>.value(null)
+            : controller.isPlaying(),
+      ]).then((results) {
+        if (!mounted || _isRecoveringFromEnd) return;
+
+        final position = results[0] as Duration?;
+        final duration = results[1] as Duration?;
+        final playing = results[2] as bool?;
+
+        Duration? displayedPosition;
+        if (position != null && !_isScrubbing) {
+          displayedPosition = controller.value.isEnded &&
                   position == Duration.zero &&
                   _duration > Duration.zero
               ? _duration
               : position;
+        }
+
+        final bool? nextPlaying =
+            playing == null ? null : playing == true;
+        final bool playingChanged =
+            nextPlaying != null && nextPlaying != _isPlaying;
+
+        if (displayedPosition != null ||
+            (duration != null && duration > Duration.zero) ||
+            playingChanged) {
           setState(() {
-            _position = displayedPosition;
-          });
-
-          if (_isPlaying && displayedPosition.inSeconds > 0) {
-            final showId = _getAnimeShowId();
-            if (showId != null && _activeReleaseId != null) {
-              String? episode;
-              try {
-                final manager = CompletedDownloadsManager();
-                final download = manager.completedDownloads[_activeReleaseId!];
-                episode = download?.episode;
-              } catch (_) {}
-
-              PlaybackProgressManager().saveProgress(
-                showId,
-                _activeReleaseId!,
-                displayedPosition.inSeconds,
-                episode: episode,
-              );
+            if (displayedPosition != null) {
+              _position = displayedPosition;
             }
-          }
-        }
-      });
-
-      controller.getDuration().then((duration) {
-        if (mounted && duration > Duration.zero) {
-          setState(() {
-            _duration = duration;
+            if (duration != null && duration > Duration.zero) {
+              _duration = duration;
+            }
+            if (nextPlaying != null) {
+              _isPlaying = nextPlaying;
+            }
           });
         }
-      });
 
-      controller.isPlaying().then((playing) {
-        if (!mounted) return;
-
-        bool wasPlaying = _isPlaying;
-        setState(() {
-          _isPlaying = playing == true;
-        });
-
-        if (!wasPlaying && _isPlaying && _isControlsVisible) {
+        if (playingChanged && nextPlaying == true && _isControlsVisible) {
           _startControlsTimer();
         }
 
-        if (controller.value.isEnded &&
+        if (displayedPosition != null &&
+            _isPlaying &&
+            displayedPosition.inSeconds > 0) {
+          _persistProgress(force: false);
+        }
+
+        if (!_isScrubbing &&
+            controller.value.isEnded &&
             !_isRecoveringFromEnd &&
             !_autoAdvancedCalled &&
             _nextEpisode != null &&
@@ -705,46 +749,150 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     });
   }
 
+  void _persistProgress({bool force = true}) {
+    if (!_isInitialized) return;
+    final showId = _getAnimeShowId();
+    if (showId == null || _activeReleaseId == null) return;
+    if (_position.inSeconds <= 0) return;
+
+    final now = DateTime.now();
+    if (!force &&
+        _lastProgressSaveAt != null &&
+        now.difference(_lastProgressSaveAt!) < _progressSaveInterval) {
+      return;
+    }
+    _lastProgressSaveAt = now;
+
+    String? episode;
+    try {
+      final manager = CompletedDownloadsManager();
+      final download = manager.completedDownloads[_activeReleaseId!];
+      episode = download?.episode;
+    } catch (_) {}
+
+    PlaybackProgressManager().saveProgress(
+      showId,
+      _activeReleaseId!,
+      _position.inSeconds,
+      episode: episode,
+    );
+  }
+
   Future<void> _togglePlayPause() async {
     final controller = _videoPlayerController;
     if (controller == null) return;
 
     if (_isPlaying) {
-      await controller.pause();
-      _emitPartyPlayState(playing: false);
+      setState(() => _isPlaying = false);
+      _ignorePollPlayingUntil =
+          DateTime.now().add(const Duration(milliseconds: 500));
       _startControlsTimer();
+      try {
+        await controller.pause();
+      } catch (_) {}
+      // Party emit stays after native pause so timestamp matches paused media.
+      _emitPartyPlayState(playing: false);
+      _persistProgress(force: true);
     } else {
-      if (controller.value.isEnded) {
-        await _resumeFromEndedAt(controller, Duration.zero);
-      } else {
-        await controller.play();
+      setState(() => _isPlaying = true);
+      _ignorePollPlayingUntil =
+          DateTime.now().add(const Duration(milliseconds: 500));
+      _startControlsTimer();
+      try {
+        if (controller.value.isEnded) {
+          await _resumeFromEndedAt(controller, Duration.zero);
+        } else {
+          await controller.play();
+        }
+      } catch (_) {
+        if (mounted) setState(() => _isPlaying = false);
       }
       _emitPartyPlayState(playing: true);
-      _startControlsTimer();
     }
   }
 
-  Future<void> _seekTo(Duration position) async {
+  Duration _clampSeekPosition(Duration position) {
+    if (position < Duration.zero) return Duration.zero;
+    if (_duration > Duration.zero && position > _duration) return _duration;
+    return position;
+  }
+
+  /// [fromScrub] keeps live seeking while dragging, but throttles native seeks.
+  Future<void> _seekTo(Duration position, {bool fromScrub = false}) async {
     final controller = _videoPlayerController;
     if (controller == null) return;
 
-    final wasEnded = controller.value.isEnded;
-    if (wasEnded) {
-      await _resumeFromEndedAt(controller, position);
-    } else {
-      await controller.seekTo(position);
-    }
+    final target = _clampSeekPosition(position);
+
+    // Optimistic thumb/time — never wait on native for UI.
+    _ignorePollPositionUntil =
+        DateTime.now().add(const Duration(milliseconds: 400));
     if (mounted) {
-      setState(() => _position = position);
+      setState(() => _position = target);
     }
-    _emitPartySeek(at: position);
+
+    // Preserve existing party debounce behavior (250ms collapse of seek spam).
+    _emitPartySeek(at: target);
+
+    if (fromScrub) {
+      _pendingScrubSeek = target;
+      final last = _lastNativeSeekAt;
+      final now = DateTime.now();
+      if (last != null && now.difference(last) < _nativeSeekMinInterval) {
+        final wait = _nativeSeekMinInterval - now.difference(last);
+        _scrubSeekTimer?.cancel();
+        _scrubSeekTimer = Timer(wait, () {
+          _scrubSeekTimer = null;
+          final pending = _pendingScrubSeek;
+          if (pending != null && mounted) {
+            _performNativeSeek(pending);
+          }
+        });
+        return;
+      }
+    } else {
+      _scrubSeekTimer?.cancel();
+      _scrubSeekTimer = null;
+      _pendingScrubSeek = null;
+    }
+
+    await _performNativeSeek(target);
+  }
+
+  Future<void> _performNativeSeek(Duration position) async {
+    final controller = _videoPlayerController;
+    if (controller == null) return;
+
+    final generation = ++_seekGeneration;
+    _lastNativeSeekAt = DateTime.now();
+    _pendingScrubSeek = null;
+
+    if (_isRecoveringFromEnd) {
+      _queuedSeekWhileRecovering = position;
+      return;
+    }
+
+    try {
+      if (controller.value.isEnded) {
+        await _resumeFromEndedAt(controller, position);
+      } else {
+        await controller.seekTo(position);
+      }
+    } catch (_) {
+      // Ignore stale native errors; newer seeks supersede.
+    }
+
+    if (generation != _seekGeneration) return;
   }
 
   Future<void> _resumeFromEndedAt(
     VlcPlayerController controller,
     Duration position,
   ) async {
-    if (_isRecoveringFromEnd) return;
+    if (_isRecoveringFromEnd) {
+      _queuedSeekWhileRecovering = position;
+      return;
+    }
 
     setState(() => _isRecoveringFromEnd = true);
     try {
@@ -753,10 +901,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       await controller.stop();
       await controller.play();
       await _waitForPlayableState(controller);
-      await controller.seekTo(position);
+      final latest = _queuedSeekWhileRecovering ?? position;
+      _queuedSeekWhileRecovering = null;
+      await controller.seekTo(latest);
+      if (mounted) {
+        setState(() => _position = latest);
+      }
     } finally {
       if (mounted) {
         setState(() => _isRecoveringFromEnd = false);
+      }
+      final queued = _queuedSeekWhileRecovering;
+      _queuedSeekWhileRecovering = null;
+      if (queued != null && mounted) {
+        await _performNativeSeek(queued);
       }
     }
   }
@@ -1046,11 +1204,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
     WakelockPlus.disable();
 
+    _persistProgress(force: true);
     _partyActionSub?.cancel();
     _partySeekDebounce?.cancel();
     _stopPartyPlaybackSync();
     _controlsTimer?.cancel();
     _positionTimer?.cancel();
+    _scrubSeekTimer?.cancel();
     _seekIndicatorTimer?.cancel();
     _videoPlayerController?.dispose();
     _focusNode.dispose();
@@ -1384,13 +1544,28 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                   ),
                   child: Slider(
                     value: _duration.inMilliseconds > 0
-                        ? _position.inMilliseconds.toDouble()
+                        ? _position.inMilliseconds
+                            .clamp(0, _duration.inMilliseconds)
+                            .toDouble()
                         : 0.0,
                     max: _duration.inMilliseconds > 0
                         ? _duration.inMilliseconds.toDouble()
                         : 100.0,
+                    onChangeStart: (_) {
+                      setState(() => _isScrubbing = true);
+                    },
                     onChanged: (value) {
-                      _seekTo(Duration(milliseconds: value.toInt()));
+                      _seekTo(
+                        Duration(milliseconds: value.toInt()),
+                        fromScrub: true,
+                      );
+                    },
+                    onChangeEnd: (value) {
+                      _isScrubbing = false;
+                      _seekTo(
+                        Duration(milliseconds: value.toInt()),
+                        fromScrub: false,
+                      );
                     },
                   ),
                 ),

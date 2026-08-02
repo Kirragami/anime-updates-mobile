@@ -6,7 +6,6 @@ import '../theme/app_theme.dart';
 import '../constants/app_constants.dart';
 import '../utils/page_transitions.dart';
 import 'register_screen.dart';
-import 'homepage_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   final Widget? destination;
@@ -53,10 +52,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               (route) => route.isFirst,
             );
           } else {
-            Navigator.of(context).pushAndRemoveUntil(
-              CustomPageTransitions.fadeWithScale(const HomepageScreen()),
-              (route) => route.isFirst,
-            );
+            Navigator.of(context).pop();
           }
         }
       } else {
