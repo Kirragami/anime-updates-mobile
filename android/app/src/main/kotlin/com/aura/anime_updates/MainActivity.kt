@@ -138,6 +138,13 @@ class MainActivity : FlutterActivity() {
                             result.error("INSTALL_OPEN_FAILED", e.message, null)
                         }
                     }
+                    "clearUpdateDownload" -> {
+                        try {
+                            result.success(UpdateDownloadManager.clearTrackedDownload(this))
+                        } catch (e: Exception) {
+                            result.error("DOWNLOAD_CLEAR_FAILED", e.message, null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }

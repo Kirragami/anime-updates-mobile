@@ -120,6 +120,16 @@ class UpdateService {
     }
   }
 
+  Future<void> clearUpdateDownload() async {
+    if (!Platform.isAndroid) return;
+
+    try {
+      await _updateDownloadChannel.invokeMethod('clearUpdateDownload');
+    } on PlatformException {
+      // Best-effort cleanup of a completed APK that is no longer needed.
+    }
+  }
+
   Future<Map<String, dynamic>> openCompletedUpdate() async {
     if (!Platform.isAndroid) {
       return {

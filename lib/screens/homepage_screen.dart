@@ -40,6 +40,14 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
   Future<void> _checkForUpdateOnLaunch() async {
     try {
       final updateService = ref.read(updateServiceProvider);
+      final result = await updateService.checkForUpdate();
+
+      // Already on the latest version: drop any leftover APK and never prompt.
+      if (result['success'] == true && result['needUpdate'] != true) {
+        await updateService.clearUpdateDownload();
+        return;
+      }
+
       final downloadStatus = await updateService.getUpdateDownloadStatus();
       final status = downloadStatus['status'] as String? ?? 'none';
       if (status == 'queued' || status == 'downloading' || status == 'paused') {
@@ -50,8 +58,6 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
         _showUpdateDialog(isReadyToInstall: true);
         return;
       }
-
-      final result = await updateService.checkForUpdate();
 
       if (result['success'] == true && result['needUpdate'] == true) {
         if (!mounted) return;
