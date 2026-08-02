@@ -857,8 +857,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             _updateStatus = 'New version available!';
           });
         } else {
+          await updateService.clearUpdateDownload();
+          if (!mounted) return;
           setState(() {
             _updateAvailable = false;
+            _updateReadyToInstall = false;
+            _isDownloading = false;
             _updateStatus = 'Your version is up to date';
           });
         }

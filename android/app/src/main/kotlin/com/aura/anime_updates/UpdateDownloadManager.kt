@@ -126,6 +126,17 @@ object UpdateDownloadManager {
         return mapOf("success" to true)
     }
 
+    fun clearTrackedDownload(context: Context): Map<String, Any> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val downloadId = prefs.getLong(DOWNLOAD_ID_KEY, -1L)
+        if (downloadId != -1L) {
+            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            manager.remove(downloadId)
+        }
+        prefs.edit().clear().apply()
+        return mapOf("success" to true)
+    }
+
     private fun statusName(status: Int): String = when (status) {
         DownloadManager.STATUS_PENDING -> "queued"
         DownloadManager.STATUS_RUNNING -> "downloading"
