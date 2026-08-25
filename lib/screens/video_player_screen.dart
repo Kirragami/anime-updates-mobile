@@ -17,6 +17,7 @@ import '../services/watch_party_logger.dart';
 import '../services/watch_party_navigation.dart';
 import '../services/watch_party_app_shell.dart';
 import '../services/watch_party_sync_config.dart';
+import '../services/usb_stream_server.dart';
 import '../widgets/watch_party_invite_friends_sheet.dart';
 import '../app_orientation_system_ui.dart';
 
@@ -106,6 +107,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   Timer? _partyPlaybackSyncTimer;
   SyncAction? _pendingRemoteSync;
 
+  final UsbStreamServer _usbStream = UsbStreamServer();
+  bool _usbStreaming = false;
+
   bool get _watchPartyActive =>
       widget.watchPartyEnabled && ref.read(watchPartyProvider).isActive;
 
@@ -136,50 +140,52 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     }
   }
 
-  void _resolveAdjacentEpisodes() {
+  List<CompletedDownload> _episodesInCurrentShow() {
     final currentId = _activeReleaseId;
-    if (currentId == null) {
-      _setAdjacentEpisodes();
-      return;
-    }
+    if (currentId == null) return const [];
 
     final manager = CompletedDownloadsManager();
     final all = manager.completedDownloads.values.toList();
-
     CompletedDownload? current;
     try {
       current = all.firstWhere((e) => e.releaseId == currentId);
     } catch (_) {
-      _setAdjacentEpisodes();
-      return;
+      return const [];
     }
 
     final showKey = current.animeShowId ?? current.showName;
-    final siblings = all.where((e) {
-      final key = e.animeShowId ?? e.showName;
-      return key == showKey;
-    }).toList();
-
-    final currentNum = _extractEpisodeNumber(current.episode);
-    if (currentNum == null) {
-      _setAdjacentEpisodes();
-      return;
-    }
-
-    final numbered = siblings
+    final numbered = all
+        .where((e) => (e.animeShowId ?? e.showName) == showKey)
         .map((e) => MapEntry(_extractEpisodeNumber(e.episode), e))
         .where((e) => e.key != null)
         .toList()
       ..sort((a, b) => a.key!.compareTo(b.key!));
 
-    CompletedDownload? prev;
-    CompletedDownload? next;
-    for (final entry in numbered) {
-      if (entry.key! < currentNum) prev = entry.value;
-      if (entry.key! > currentNum && next == null) next = entry.value;
+    final episodes = numbered.map((e) => e.value).toList();
+    if (episodes.every((e) => e.releaseId != currentId)) {
+      episodes.add(current);
+    }
+    return episodes;
+  }
+
+  void _resolveAdjacentEpisodes() {
+    final currentId = _activeReleaseId;
+    final episodes = _episodesInCurrentShow();
+    if (currentId == null || episodes.isEmpty) {
+      _setAdjacentEpisodes();
+      return;
     }
 
-    _setAdjacentEpisodes(previous: prev, next: next);
+    final index = episodes.indexWhere((e) => e.releaseId == currentId);
+    if (index < 0) {
+      _setAdjacentEpisodes();
+      return;
+    }
+
+    _setAdjacentEpisodes(
+      previous: index > 0 ? episodes[index - 1] : null,
+      next: index < episodes.length - 1 ? episodes[index + 1] : null,
+    );
   }
 
   void _setAdjacentEpisodes({
@@ -201,6 +207,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     if (_isPartyLeader) {
       ref.read(watchPartyProvider.notifier).notifyLoadVideo(episode.releaseId);
       _loadedPartyVideoUrl = WatchPartyVideoRef(episode.releaseId).encode();
+    }
+
+    if (_usbStreaming) {
+      setState(() {
+        _activeFilePath = filePath;
+        _activeTitle = '${episode.showName} - Episode ${episode.episode}';
+        _activeReleaseId = episode.releaseId;
+        _autoAdvancedCalled = false;
+      });
+      await _usbStream.playRelease(episode.releaseId);
+      _resolveAdjacentEpisodes();
+      return;
     }
 
     _persistProgress(force: true);
@@ -235,6 +253,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       _activeTitle = '${episode.showName} - Episode ${episode.episode}';
       _activeReleaseId = episode.releaseId;
     });
+
+    if (_usbStreaming) {
+      await _usbStream.playRelease(episode.releaseId);
+    }
 
     _resolveAdjacentEpisodes();
 
@@ -353,6 +375,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           : '${download.showName} - Episode ${download.episode}';
       _activeReleaseId = releaseId;
     });
+
+    if (_usbStreaming) {
+      await _usbStream.playRelease(releaseId);
+      _resolveAdjacentEpisodes();
+      return;
+    }
 
     _resolveAdjacentEpisodes();
     _initializePlayer(initialSeekSeconds: 0, autoPlay: false);
@@ -956,6 +984,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   void _startControlsTimer() {
+    if (_usbStreaming) {
+      _controlsTimer?.cancel();
+      return;
+    }
     _controlsTimer?.cancel();
     _controlsTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && _isPlaying) {
@@ -1215,6 +1247,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _videoPlayerController?.dispose();
     _focusNode.dispose();
     _resetBrightness();
+    _usbStream.playingReleaseId.removeListener(_onUsbPlayingReleaseChanged);
+    unawaited(_usbStream.stop());
 
     super.dispose();
   }
@@ -1277,27 +1311,29 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             child: Stack(
               children: [
                 SizedBox.expand(
-                  child: _videoPlayerController != null
-                      ? VlcPlayer(
-                          controller: _videoPlayerController!,
-                          aspectRatio: 16 / 9,
-                          placeholder: Container(
-                            color: Colors.black,
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: AppTheme.primaryColor,
+                  child: _usbStreaming
+                      ? _buildUsbStreamIdleScreen()
+                      : _videoPlayerController != null
+                          ? VlcPlayer(
+                              controller: _videoPlayerController!,
+                              aspectRatio: 16 / 9,
+                              placeholder: Container(
+                                color: Colors.black,
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: Colors.black,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: AppTheme.primaryColor,
+                                ),
                               ),
                             ),
-                          ),
-                        )
-                      : Container(
-                          color: Colors.black,
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                        ),
                 ),
                 if (_isBrightnessControlVisible)
                   Positioned(
@@ -1423,6 +1459,226 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     Navigator.of(context).pop();
   }
 
+  Future<void> _releaseLocalPlayer() async {
+    _persistProgress(force: true);
+    _positionTimer?.cancel();
+    _positionTimer = null;
+    _scrubSeekTimer?.cancel();
+    _scrubSeekTimer = null;
+    _pendingScrubSeek = null;
+    _isScrubbing = false;
+
+    final old = _videoPlayerController;
+    if (old == null) return;
+
+    setState(() {
+      _videoPlayerController = null;
+      _isInitialized = false;
+      _isPlaying = false;
+    });
+
+    try {
+      await old.stop();
+    } catch (_) {}
+    try {
+      await old.dispose();
+    } catch (_) {}
+  }
+
+  Future<void> _onUsbStreamButtonTap() async {
+    if (_usbStreaming) {
+      await _stopUsbStream();
+      return;
+    }
+
+    try {
+      final items = await _usbPlaylistItems();
+      if (items.isEmpty) {
+        throw StateError('No downloaded episodes to stream');
+      }
+      await _usbStream.start(
+        items: items,
+        currentReleaseId: _activeReleaseId ?? items.first.releaseId,
+      );
+      _usbStream.playingReleaseId.addListener(_onUsbPlayingReleaseChanged);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not start USB stream: $e')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    await _releaseLocalPlayer();
+    if (!mounted) return;
+    setState(() {
+      _usbStreaming = true;
+      _isControlsVisible = true;
+    });
+    _startControlsTimer();
+  }
+
+  Future<List<UsbStreamItem>> _usbPlaylistItems() async {
+    final manager = CompletedDownloadsManager();
+    final items = <UsbStreamItem>[];
+    for (final episode in _episodesInCurrentShow()) {
+      final path = await manager.getFilePath(episode.releaseId);
+      if (path == null) continue;
+      items.add(
+        UsbStreamItem(
+          releaseId: episode.releaseId,
+          filePath: path,
+          title: '${episode.showName} - Episode ${episode.episode}',
+        ),
+      );
+    }
+    return items;
+  }
+
+  void _onUsbPlayingReleaseChanged() {
+    if (!_usbStreaming || !mounted) return;
+    final releaseId = _usbStream.playingReleaseId.value;
+    if (releaseId == null || releaseId == _activeReleaseId) return;
+
+    final download =
+        CompletedDownloadsManager().completedDownloads[releaseId];
+    final itemPath = _usbStream.filePathFor(releaseId);
+    setState(() {
+      _activeReleaseId = releaseId;
+      if (itemPath != null) {
+        _activeFilePath = itemPath;
+      }
+      _activeTitle = download == null
+          ? _activeTitle
+          : '${download.showName} - Episode ${download.episode}';
+    });
+    _resolveAdjacentEpisodes();
+  }
+
+  Future<void> _stopUsbStream() async {
+    _usbStream.playingReleaseId.removeListener(_onUsbPlayingReleaseChanged);
+    await _usbStream.stop();
+    if (!mounted) return;
+    setState(() => _usbStreaming = false);
+    _initializePlayer();
+  }
+
+  Widget _buildUsbStreamIdleScreen() {
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: ValueListenableBuilder<int>(
+          valueListenable: _usbStream.clientCount,
+          builder: (context, count, _) {
+            final connected = count > 0;
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.usb_rounded,
+                      size: 22,
+                      color: Colors.white.withOpacity(connected ? 0.55 : 0.28),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      connected
+                          ? 'Connected'
+                          : 'Waiting for connection',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.55),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    if (_activeTitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _activeTitle!,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.32),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Connect from your PC',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.42),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _usbGuideStep('1', 'Enable USB debugging on this phone'),
+                    _usbGuideStep('2', 'Connect the USB cable'),
+                    _usbGuideStep(
+                      '3',
+                      'On the PC, confirm adb sees the phone:  adb devices',
+                    ),
+                    _usbGuideStep('4', 'Run this command:'),
+                    const SizedBox(height: 8),
+                    const SelectableText(
+                      UsbStreamServer.pcCommand,
+                      style: TextStyle(
+                        color: Color(0x66FFFFFF),
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _usbGuideStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            number,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.28),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.38),
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTopBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1495,6 +1751,24 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             ),
           const Spacer(),
           GestureDetector(
+            onTap: _onUsbStreamButtonTap,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.usb_rounded,
+                color: _usbStreaming
+                    ? Colors.white.withOpacity(0.95)
+                    : Colors.white,
+                size: 24,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
             onTap: _toggleFullscreen,
             child: Container(
               padding: const EdgeInsets.all(8),
@@ -1515,6 +1789,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   Widget _buildBottomControls() {
+    if (_usbStreaming) {
+      return _buildUsbStreamBottomControls();
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1671,6 +1949,46 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUsbStreamBottomControls() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 250),
+            opacity: _prevEpisode != null ? 1.0 : 0.0,
+            child: Visibility(
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
+              visible: _prevEpisode != null,
+              child: _buildEpisodeNavButton(
+                icon: Icons.skip_previous_rounded,
+                onTap: () => _switchToEpisode(_prevEpisode!),
+              ),
+            ),
+          ),
+          const SizedBox(width: 48),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 250),
+            opacity: _nextEpisode != null ? 1.0 : 0.0,
+            child: Visibility(
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
+              visible: _nextEpisode != null,
+              child: _buildEpisodeNavButton(
+                icon: Icons.skip_next_rounded,
+                onTap: () => _switchToEpisode(_nextEpisode!),
+              ),
+            ),
           ),
         ],
       ),
