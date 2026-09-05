@@ -110,11 +110,26 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   final UsbStreamServer _usbStream = UsbStreamServer();
   bool _usbStreaming = false;
 
+  /// Bumped on every media load so in-flight init/seek callbacks cannot
+  /// touch a newer episode (or a player that USB streaming already released).
+  int _mediaLoadGeneration = 0;
+
+  /// True while swapping or creating media. Blocks ended auto-advance and
+  /// remote watch-party control until the new file is actually ready.
+  bool _isLoadingMedia = false;
+
+  /// libVLC can keep `isEnded` true until the replacement media opens.
+  /// Ignore that stale flag so we don't skip through the new episode.
+  bool _ignoreEndedUntilReady = false;
+
   bool get _watchPartyActive =>
       widget.watchPartyEnabled && ref.read(watchPartyProvider).isActive;
 
   bool get _isPartyLeader =>
       _watchPartyActive && ref.read(watchPartyProvider).isLeader;
+
+  bool get _playerReadyForControl =>
+      _videoPlayerController != null && _isInitialized && !_isLoadingMedia;
 
   static int? _extractEpisodeNumber(String episode) {
     final cleaned = episode
@@ -222,31 +237,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     }
 
     _persistProgress(force: true);
-    _positionTimer?.cancel();
-    _positionTimer = null;
-    _scrubSeekTimer?.cancel();
-    _scrubSeekTimer = null;
-    _pendingScrubSeek = null;
-    _isScrubbing = false;
-
-    final old = _videoPlayerController;
-    setState(() {
-      _videoPlayerController = null;
-      _isInitialized = false;
-      _position = Duration.zero;
-      _duration = Duration.zero;
-      _isPlaying = false;
-      _autoAdvancedCalled = false;
-    });
-
-    try {
-      await old?.stop();
-    } catch (_) {}
-    try {
-      await old?.dispose();
-    } catch (_) {}
-
-    if (!mounted) return;
 
     setState(() {
       _activeFilePath = filePath;
@@ -254,13 +244,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       _activeReleaseId = episode.releaseId;
     });
 
-    if (_usbStreaming) {
-      await _usbStream.playRelease(episode.releaseId);
-    }
-
     _resolveAdjacentEpisodes();
-
-    _initializePlayer();
+    await _loadMedia();
   }
   // ─────────────────────────────────────────────────────────────────
 
@@ -340,32 +325,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     WatchPartyNavigation.markMemberInPartyPlayer(true);
 
     _stopPartyPlaybackSync();
-    _positionTimer?.cancel();
-    _positionTimer = null;
-    _scrubSeekTimer?.cancel();
-    _scrubSeekTimer = null;
-    _pendingScrubSeek = null;
-    _isScrubbing = false;
-
-    final old = _videoPlayerController;
-    setState(() {
-      _videoPlayerController = null;
-      _isInitialized = false;
-      _position = Duration.zero;
-      _duration = Duration.zero;
-      _isPlaying = false;
-      _autoAdvancedCalled = false;
-      _partyInitialized = false;
-    });
-
-    try {
-      await old?.stop();
-    } catch (_) {}
-    try {
-      await old?.dispose();
-    } catch (_) {}
-
-    if (!mounted) return;
+    _partyInitialized = false;
 
     final download = manager.completedDownloads[releaseId];
     setState(() {
@@ -383,7 +343,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     }
 
     _resolveAdjacentEpisodes();
-    _initializePlayer(initialSeekSeconds: 0, autoPlay: false);
+    await _loadMedia(initialSeekSeconds: 0, autoPlay: false);
   }
 
   void _handlePartySyncAction(SyncAction action) {
@@ -444,7 +404,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   void _queueOrApplyRemoteSync(SyncAction action) {
-    if (_videoPlayerController == null || !_isInitialized) {
+    if (!_playerReadyForControl) {
       _pendingRemoteSync = action;
       return;
     }
@@ -486,7 +446,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   void _respondToSyncRequest() {
-    if (!_isPartyLeader || _videoPlayerController == null || !_isInitialized) {
+    if (!_isPartyLeader || !_playerReadyForControl) {
       return;
     }
 
@@ -505,7 +465,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     required bool shouldPlay,
     int seekThresholdMs = WatchPartySyncConfig.eventDriftThresholdMs,
   }) async {
-    if (_videoPlayerController == null || !_isInitialized) return;
+    if (!_playerReadyForControl) return;
 
     _applyingRemoteSync = true;
     try {
@@ -568,7 +528,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   void _requestPeriodicPlaybackSync() {
-    if (!_watchPartyActive || _isPartyLeader || !_isInitialized) return;
+    if (!_watchPartyActive || _isPartyLeader || !_playerReadyForControl) {
+      return;
+    }
     _periodicSyncPending = true;
     ref.read(watchPartyProvider.notifier).sendSync(
           const SyncAction(action: SyncActionType.syncRequest),
@@ -600,91 +562,349 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     }
   }
 
+  VlcPlayerOptions _vlcPlayerOptions() {
+    return VlcPlayerOptions(
+      advanced: VlcAdvancedOptions([
+        // Local files: shorter file cache keeps seeks/resumes snappy.
+        VlcAdvancedOptions.fileCaching(300),
+      ]),
+      subtitle: VlcSubtitleOptions([
+        VlcSubtitleOptions.boldStyle(true),
+        VlcSubtitleOptions.fontSize(20),
+        VlcSubtitleOptions.color(VlcSubtitleColor.white),
+      ]),
+    );
+  }
+
+  bool _isControllerInitialized(VlcPlayerController controller) {
+    try {
+      return controller.value.isInitialized;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _resetPlaybackUiForNewMedia() {
+    _positionTimer?.cancel();
+    _positionTimer = null;
+    _scrubSeekTimer?.cancel();
+    _scrubSeekTimer = null;
+    _pendingScrubSeek = null;
+    _isScrubbing = false;
+    _isRecoveringFromEnd = false;
+    _queuedSeekWhileRecovering = null;
+    _ignoreEndedUntilReady = true;
+    _autoAdvancedCalled = false;
+    _position = Duration.zero;
+    _duration = Duration.zero;
+    _isPlaying = false;
+  }
+
   void _initializePlayer({
     double? initialSeekSeconds,
     bool? autoPlay,
   }) {
+    unawaited(_loadMedia(
+      initialSeekSeconds: initialSeekSeconds,
+      autoPlay: autoPlay,
+    ));
+  }
+
+  Future<void> _loadMedia({
+    double? initialSeekSeconds,
+    bool? autoPlay,
+  }) async {
+    final generation = ++_mediaLoadGeneration;
+    _isLoadingMedia = true;
+    _resetPlaybackUiForNewMedia();
+    // Reuse path is never entered from initState, so this setState is safe.
+    if (_videoPlayerController != null && mounted) {
+      setState(() {});
+    }
+
+    final file = File(_activeFilePath);
+    print('[VideoPlayerScreen] Using file URI: ${file.uri}');
+
     try {
-      final file = File(_activeFilePath);
-
-      final fileUri = file.uri.toString();
-      print('[VideoPlayerScreen] Using file URI: $fileUri');
-
-      _videoPlayerController = VlcPlayerController.file(
-        file,
-        hwAcc: HwAcc.full,
-        options: VlcPlayerOptions(
-          advanced: VlcAdvancedOptions([
-            // Local files: shorter file cache keeps seeks/resumes snappy.
-            VlcAdvancedOptions.fileCaching(300),
-          ]),
-          subtitle: VlcSubtitleOptions([
-            VlcSubtitleOptions.boldStyle(true),
-            VlcSubtitleOptions.fontSize(20),
-            VlcSubtitleOptions.color(VlcSubtitleColor.white),
-          ]),
-        ),
-      );
-
-      _videoPlayerController!.addOnInitListener(() {
-        if (mounted) {
-          setState(() {
-            _isInitialized = true;
-          });
-
-          Future.delayed(const Duration(milliseconds: 500), () async {
-            if (mounted && _videoPlayerController != null) {
-              final shouldAutoPlay =
-                  autoPlay ?? (!_watchPartyActive || _isPartyLeader);
-
-              if (initialSeekSeconds != null) {
-                await _videoPlayerController!.seekTo(Duration(
-                    milliseconds: (initialSeekSeconds * 1000).round()));
-              } else {
-                final showId = _getAnimeShowId();
-                if (showId != null &&
-                    _activeReleaseId != null &&
-                    !_watchPartyActive) {
-                  final lastPos = PlaybackProgressManager()
-                      .getPosition(showId, _activeReleaseId!);
-                  if (lastPos > 0) {
-                    await _videoPlayerController!
-                        .seekTo(Duration(seconds: lastPos));
-                  }
-                }
-              }
-
-              if (shouldAutoPlay) {
-                await _videoPlayerController!.play().then((_) {
-                  if (mounted) _startControlsTimer();
-                }).catchError((error) {});
-              }
-
-              if (_watchPartyActive && !_partyInitialized) {
-                _partyInitialized = true;
-                if (_isPartyLeader) {
-                  _loadedPartyVideoUrl =
-                      WatchPartyVideoRef(_activeReleaseId ?? '').encode();
-                } else {
-                  WatchPartyNavigation.markMemberInPartyPlayer(true);
-                  ref.read(watchPartyProvider.notifier).sendSync(
-                      const SyncAction(action: SyncActionType.syncRequest));
-                  _startPartyPlaybackSync();
-                }
-              }
-
-              _flushPendingRemoteSync();
-            }
-          });
-
-          _startPositionUpdates();
+      final existing = _videoPlayerController;
+      if (existing != null) {
+        var ready = _isControllerInitialized(existing);
+        if (!ready) {
+          ready = await _waitUntilControllerInitialized(existing, generation);
         }
-      });
+        if (!mounted || generation != _mediaLoadGeneration) return;
+        if (ready) {
+          await _swapMediaOnController(
+            existing,
+            file,
+            generation: generation,
+            initialSeekSeconds: initialSeekSeconds,
+            autoPlay: autoPlay,
+          );
+          return;
+        }
+
+        try {
+          await existing.stop();
+        } catch (_) {}
+        try {
+          await existing.dispose();
+        } catch (_) {}
+        _videoPlayerController = null;
+      }
+
+      if (!mounted || generation != _mediaLoadGeneration) return;
+      _createPlayerController(
+        file,
+        generation: generation,
+        initialSeekSeconds: initialSeekSeconds,
+        autoPlay: autoPlay,
+      );
     } catch (e, stackTrace) {
       print('[VideoPlayerScreen] Error initializing video player: $e');
-
       print('[VideoPlayerScreen] Stack trace: $stackTrace');
+      if (mounted && generation == _mediaLoadGeneration) {
+        _isLoadingMedia = false;
+      }
     }
+  }
+
+  void _createPlayerController(
+    File file, {
+    required int generation,
+    double? initialSeekSeconds,
+    bool? autoPlay,
+  }) {
+    final controller = VlcPlayerController.file(
+      file,
+      hwAcc: HwAcc.full,
+      autoPlay: false,
+      options: _vlcPlayerOptions(),
+    );
+    _videoPlayerController = controller;
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && generation == _mediaLoadGeneration) {
+          setState(() {});
+        }
+      });
+    }
+
+    controller.addOnInitListener(() {
+      if (!mounted || generation != _mediaLoadGeneration) return;
+      setState(() => _isInitialized = true);
+      unawaited(_preparePlaybackAfterMediaChange(
+        controller,
+        generation: generation,
+        initialSeekSeconds: initialSeekSeconds,
+        autoPlay: autoPlay,
+      ));
+    });
+  }
+
+  Future<void> _swapMediaOnController(
+    VlcPlayerController controller,
+    File file, {
+    required int generation,
+    double? initialSeekSeconds,
+    bool? autoPlay,
+  }) async {
+    try {
+      await controller.setMediaFromFile(
+        file,
+        autoPlay: false,
+        hwAcc: HwAcc.full,
+      );
+    } catch (e) {
+      print('[VideoPlayerScreen] setMediaFromFile failed, recreating: $e');
+      if (!mounted || generation != _mediaLoadGeneration) return;
+      await _recreatePlayerController(
+        file,
+        generation: generation,
+        initialSeekSeconds: initialSeekSeconds,
+        autoPlay: autoPlay,
+      );
+      return;
+    }
+
+    if (!mounted || generation != _mediaLoadGeneration) return;
+    await _preparePlaybackAfterMediaChange(
+      controller,
+      generation: generation,
+      initialSeekSeconds: initialSeekSeconds,
+      autoPlay: autoPlay,
+    );
+  }
+
+  Future<void> _recreatePlayerController(
+    File file, {
+    required int generation,
+    double? initialSeekSeconds,
+    bool? autoPlay,
+  }) async {
+    final old = _videoPlayerController;
+    _videoPlayerController = null;
+    if (mounted) {
+      setState(() => _isInitialized = false);
+    }
+    try {
+      await old?.stop();
+    } catch (_) {}
+    try {
+      await old?.dispose();
+    } catch (_) {}
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted || generation != _mediaLoadGeneration) return;
+    _createPlayerController(
+      file,
+      generation: generation,
+      initialSeekSeconds: initialSeekSeconds,
+      autoPlay: autoPlay,
+    );
+  }
+
+  Future<bool> _waitUntilControllerInitialized(
+    VlcPlayerController controller,
+    int generation,
+  ) async {
+    if (_isControllerInitialized(controller)) return true;
+
+    final completer = Completer<bool>();
+    late final VoidCallback listener;
+    listener = () {
+      if (generation != _mediaLoadGeneration) {
+        controller.removeListener(listener);
+        if (!completer.isCompleted) completer.complete(false);
+        return;
+      }
+      if (_isControllerInitialized(controller) && !completer.isCompleted) {
+        controller.removeListener(listener);
+        completer.complete(true);
+      }
+    };
+    controller.addListener(listener);
+    try {
+      return await completer.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          controller.removeListener(listener);
+          return _isControllerInitialized(controller);
+        },
+      );
+    } catch (_) {
+      controller.removeListener(listener);
+      return false;
+    }
+  }
+
+  Future<void> _waitForMediaOpened(
+    VlcPlayerController controller,
+    int generation,
+  ) async {
+    bool isOpen() {
+      try {
+        final value = controller.value;
+        return !value.isEnded &&
+            (value.isBuffering ||
+                value.isPlaying ||
+                value.duration > Duration.zero);
+      } catch (_) {
+        return false;
+      }
+    }
+
+    if (isOpen()) return;
+
+    final completer = Completer<void>();
+    late final VoidCallback listener;
+    listener = () {
+      if (generation != _mediaLoadGeneration) {
+        controller.removeListener(listener);
+        if (!completer.isCompleted) completer.complete();
+        return;
+      }
+      if (isOpen() && !completer.isCompleted) {
+        controller.removeListener(listener);
+        completer.complete();
+      }
+    };
+    controller.addListener(listener);
+    try {
+      await completer.future.timeout(const Duration(seconds: 2));
+    } on TimeoutException {
+      controller.removeListener(listener);
+    }
+  }
+
+  Future<void> _preparePlaybackAfterMediaChange(
+    VlcPlayerController controller, {
+    required int generation,
+    double? initialSeekSeconds,
+    bool? autoPlay,
+  }) async {
+    await _waitForMediaOpened(controller, generation);
+    if (!mounted || generation != _mediaLoadGeneration) return;
+
+    // libVLC often rejects seek until the replacement media has settled.
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    if (!mounted || generation != _mediaLoadGeneration) return;
+
+    try {
+      final shouldAutoPlay =
+          autoPlay ?? (!_watchPartyActive || _isPartyLeader);
+
+      if (initialSeekSeconds != null) {
+        await controller.seekTo(Duration(
+            milliseconds: (initialSeekSeconds * 1000).round()));
+      } else {
+        final showId = _getAnimeShowId();
+        if (showId != null &&
+            _activeReleaseId != null &&
+            !_watchPartyActive) {
+          final lastPos = PlaybackProgressManager()
+              .getPosition(showId, _activeReleaseId!);
+          if (lastPos > 0) {
+            await controller.seekTo(Duration(seconds: lastPos));
+          }
+        }
+      }
+
+      if (!mounted || generation != _mediaLoadGeneration) return;
+
+      if (shouldAutoPlay) {
+        await controller.play();
+        if (mounted && generation == _mediaLoadGeneration) {
+          _startControlsTimer();
+        }
+      }
+
+      try {
+        await controller.setVolume(_volume.toInt());
+      } catch (_) {}
+    } catch (e) {
+      print('[VideoPlayerScreen] Error preparing playback: $e');
+    }
+
+    if (!mounted || generation != _mediaLoadGeneration) return;
+
+    _ignoreEndedUntilReady = false;
+    _isLoadingMedia = false;
+
+    if (_watchPartyActive && !_partyInitialized) {
+      _partyInitialized = true;
+      if (_isPartyLeader) {
+        _loadedPartyVideoUrl =
+            WatchPartyVideoRef(_activeReleaseId ?? '').encode();
+      } else {
+        WatchPartyNavigation.markMemberInPartyPlayer(true);
+        ref.read(watchPartyProvider.notifier).sendSync(
+            const SyncAction(action: SyncActionType.syncRequest));
+        _startPartyPlaybackSync();
+      }
+    }
+
+    _flushPendingRemoteSync();
+    _startPositionUpdates();
   }
 
   void _startPositionUpdates() {
@@ -763,6 +983,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         }
 
         if (!_isScrubbing &&
+            !_isLoadingMedia &&
+            !_ignoreEndedUntilReady &&
             controller.value.isEnded &&
             !_isRecoveringFromEnd &&
             !_autoAdvancedCalled &&
@@ -808,7 +1030,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   Future<void> _togglePlayPause() async {
     final controller = _videoPlayerController;
-    if (controller == null) return;
+    if (controller == null || _isLoadingMedia) return;
 
     if (_isPlaying) {
       setState(() => _isPlaying = false);
@@ -848,7 +1070,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   /// [fromScrub] keeps live seeking while dragging, but throttles native seeks.
   Future<void> _seekTo(Duration position, {bool fromScrub = false}) async {
     final controller = _videoPlayerController;
-    if (controller == null) return;
+    if (controller == null || _isLoadingMedia) return;
 
     final target = _clampSeekPosition(position);
 
@@ -889,7 +1111,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   Future<void> _performNativeSeek(Duration position) async {
     final controller = _videoPlayerController;
-    if (controller == null) return;
+    if (controller == null || _isLoadingMedia) return;
 
     final generation = ++_seekGeneration;
     _lastNativeSeekAt = DateTime.now();
@@ -1244,7 +1466,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _positionTimer?.cancel();
     _scrubSeekTimer?.cancel();
     _seekIndicatorTimer?.cancel();
-    _videoPlayerController?.dispose();
+    _mediaLoadGeneration++;
+    _isLoadingMedia = false;
+    final controller = _videoPlayerController;
+    _videoPlayerController = null;
+    if (controller != null) {
+      unawaited(() async {
+        try {
+          await controller.stop();
+        } catch (_) {}
+        try {
+          await controller.dispose();
+        } catch (_) {}
+      }());
+    }
     _focusNode.dispose();
     _resetBrightness();
     _usbStream.playingReleaseId.removeListener(_onUsbPlayingReleaseChanged);
@@ -1315,6 +1550,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                       ? _buildUsbStreamIdleScreen()
                       : _videoPlayerController != null
                           ? VlcPlayer(
+                              key: ObjectKey(_videoPlayerController),
                               controller: _videoPlayerController!,
                               aspectRatio: 16 / 9,
                               placeholder: Container(
@@ -1335,6 +1571,19 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                               ),
                             ),
                 ),
+                if (_isLoadingMedia && !_usbStreaming)
+                  const Positioned.fill(
+                    child: IgnorePointer(
+                      child: ColoredBox(
+                        color: Colors.black,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (_isBrightnessControlVisible)
                   Positioned(
                     left: 0,
@@ -1467,6 +1716,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _scrubSeekTimer = null;
     _pendingScrubSeek = null;
     _isScrubbing = false;
+    _mediaLoadGeneration++;
+    _isLoadingMedia = false;
+    _ignoreEndedUntilReady = false;
 
     final old = _videoPlayerController;
     if (old == null) return;
