@@ -797,42 +797,92 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     }
   }
 
-  Future<void> _waitForMediaOpened(
+  Duration? _resolveStartPosition(double? initialSeekSeconds) {
+    if (initialSeekSeconds != null) {
+      final target = Duration(
+        milliseconds: (initialSeekSeconds * 1000).round(),
+      );
+      return target > Duration.zero ? target : null;
+    }
+    if (_watchPartyActive) return null;
+
+    final showId = _getAnimeShowId();
+    if (showId == null || _activeReleaseId == null) return null;
+    final lastPos =
+        PlaybackProgressManager().getPosition(showId, _activeReleaseId!);
+    if (lastPos <= 0) return null;
+    return Duration(seconds: lastPos);
+  }
+
+  /// Completes only on a *new* Playing event after [play] is issued.
+  /// Stale duration/isPlaying from the previous file is ignored.
+  Future<bool> _playAndWaitUntilPlaying(
     VlcPlayerController controller,
     int generation,
   ) async {
-    bool isOpen() {
-      try {
-        final value = controller.value;
-        return !value.isEnded &&
-            (value.isBuffering ||
-                value.isPlaying ||
-                value.duration > Duration.zero);
-      } catch (_) {
-        return false;
-      }
-    }
-
-    if (isOpen()) return;
-
-    final completer = Completer<void>();
+    final completer = Completer<bool>();
     late final VoidCallback listener;
     listener = () {
       if (generation != _mediaLoadGeneration) {
         controller.removeListener(listener);
-        if (!completer.isCompleted) completer.complete();
+        if (!completer.isCompleted) completer.complete(false);
         return;
       }
-      if (isOpen() && !completer.isCompleted) {
+      try {
+        final value = controller.value;
+        if (value.isPlaying && !value.isEnded && !completer.isCompleted) {
+          controller.removeListener(listener);
+          completer.complete(true);
+        }
+      } catch (_) {
         controller.removeListener(listener);
-        completer.complete();
+        if (!completer.isCompleted) completer.complete(false);
       }
     };
+
     controller.addListener(listener);
     try {
-      await completer.future.timeout(const Duration(seconds: 2));
-    } on TimeoutException {
+      // Force a Playing transition. After setMediaFromFile the Dart
+      // controller can still report the previous file as playing/ended.
+      try {
+        final value = controller.value;
+        if (value.isPlaying || value.isEnded) {
+          await controller.stop();
+        }
+      } catch (_) {}
+      await controller.play();
+    } catch (_) {}
+
+    try {
+      return await completer.future.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          controller.removeListener(listener);
+          return false;
+        },
+      );
+    } catch (_) {
       controller.removeListener(listener);
+      return false;
+    }
+  }
+
+  Future<void> _seekAfterPlaying(
+    VlcPlayerController controller,
+    Duration position,
+  ) async {
+    try {
+      if (controller.value.isEnded) {
+        await _resumeFromEndedAt(controller, position);
+        return;
+      }
+      await controller.seekTo(position);
+    } catch (_) {
+      try {
+        await controller.play();
+        await _waitForPlayableState(controller);
+        await controller.seekTo(position);
+      } catch (_) {}
     }
   }
 
@@ -842,39 +892,49 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     double? initialSeekSeconds,
     bool? autoPlay,
   }) async {
-    await _waitForMediaOpened(controller, generation);
-    if (!mounted || generation != _mediaLoadGeneration) return;
-
-    // libVLC often rejects seek until the replacement media has settled.
-    await Future<void>.delayed(const Duration(milliseconds: 150));
-    if (!mounted || generation != _mediaLoadGeneration) return;
+    final shouldAutoPlay =
+        autoPlay ?? (!_watchPartyActive || _isPartyLeader);
+    final startPosition = _resolveStartPosition(initialSeekSeconds);
 
     try {
-      final shouldAutoPlay =
-          autoPlay ?? (!_watchPartyActive || _isPartyLeader);
+      // Watch-party members must open the file without leaking audio before
+      // the leader's pending sync lands.
+      if (!shouldAutoPlay) {
+        try {
+          await controller.setVolume(0);
+        } catch (_) {}
+      }
 
-      if (initialSeekSeconds != null) {
-        await controller.seekTo(Duration(
-            milliseconds: (initialSeekSeconds * 1000).round()));
-      } else {
-        final showId = _getAnimeShowId();
-        if (showId != null &&
-            _activeReleaseId != null &&
-            !_watchPartyActive) {
-          final lastPos = PlaybackProgressManager()
-              .getPosition(showId, _activeReleaseId!);
-          if (lastPos > 0) {
-            await controller.seekTo(Duration(seconds: lastPos));
-          }
+      await _playAndWaitUntilPlaying(controller, generation);
+      if (!mounted || generation != _mediaLoadGeneration) return;
+
+      if (startPosition != null) {
+        _ignorePollPositionUntil =
+            DateTime.now().add(const Duration(milliseconds: 400));
+        if (mounted) {
+          setState(() => _position = startPosition);
         }
+        await _seekAfterPlaying(controller, startPosition);
       }
 
       if (!mounted || generation != _mediaLoadGeneration) return;
 
       if (shouldAutoPlay) {
-        await controller.play();
+        try {
+          if (!controller.value.isPlaying) {
+            await controller.play();
+          }
+        } catch (_) {}
         if (mounted && generation == _mediaLoadGeneration) {
+          setState(() => _isPlaying = true);
           _startControlsTimer();
+        }
+      } else {
+        try {
+          await controller.pause();
+        } catch (_) {}
+        if (mounted && generation == _mediaLoadGeneration) {
+          setState(() => _isPlaying = false);
         }
       }
 
@@ -889,6 +949,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
     _ignoreEndedUntilReady = false;
     _isLoadingMedia = false;
+    if (mounted) setState(() {});
 
     if (_watchPartyActive && !_partyInitialized) {
       _partyInitialized = true;
