@@ -180,23 +180,29 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: EdgeInsets.only(bottom: layout.bottomPadding),
                         children: [
-                          _buildTrackedSection(isLoggedIn, layout),
-                          SizedBox(height: layout.sectionGap),
-                          if (layout.splitSecondarySections)
+                          if (layout.splitTopSections) ...[
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
-                                  child: _buildNewReleasesSection(layout),
+                                  child: _buildTrackedSection(
+                                    isLoggedIn,
+                                    layout.forSplitColumn(isStart: true),
+                                  ),
                                 ),
                                 SizedBox(width: layout.sectionGap),
                                 Expanded(
-                                  child:
-                                      _buildFriendsRecommendedSection(layout),
+                                  child: _buildNewReleasesSection(
+                                    layout.forSplitColumn(isStart: false),
+                                  ),
                                 ),
                               ],
-                            )
-                          else ...[
+                            ),
+                            SizedBox(height: layout.sectionGap),
+                            _buildFriendsRecommendedSection(layout),
+                          ] else ...[
+                            _buildTrackedSection(isLoggedIn, layout),
+                            SizedBox(height: layout.sectionGap),
                             _buildNewReleasesSection(layout),
                             SizedBox(height: layout.sectionGap),
                             _buildFriendsRecommendedSection(layout),
@@ -439,7 +445,7 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
     VoidCallback? onAction,
   }) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: layout.horizontalPadding),
+      padding: layout.sectionInsets,
       child: Row(
         children: [
           Expanded(
@@ -605,7 +611,7 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
       height: layout.carouselHeight,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: layout.horizontalPadding),
+        padding: layout.sectionInsets,
         itemCount: items.length,
         separatorBuilder: (_, __) => SizedBox(width: layout.cardGap),
         itemBuilder: (context, index) {
@@ -639,7 +645,7 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
       height: layout.carouselHeight,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: layout.horizontalPadding),
+        padding: layout.sectionInsets,
         itemCount: layout.skeletonCount,
         separatorBuilder: (_, __) => SizedBox(width: layout.cardGap),
         itemBuilder: (context, index) {
@@ -663,7 +669,7 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
   }) {
     return Container(
       height: layout.carouselHeight,
-      margin: EdgeInsets.symmetric(horizontal: layout.horizontalPadding),
+      margin: layout.sectionInsets,
       padding: EdgeInsets.all(layout.horizontalPadding),
       decoration: BoxDecoration(
         color: AppTheme.surfaceColor.withOpacity(0.55),
@@ -717,8 +723,7 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const NeverScrollableScrollPhysics(),
-              padding:
-                  EdgeInsets.symmetric(horizontal: layout.horizontalPadding),
+              padding: layout.sectionInsets,
               itemCount: layout.skeletonCount,
               separatorBuilder: (_, __) => SizedBox(width: layout.cardGap),
               itemBuilder: (context, index) {
@@ -732,8 +737,8 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
           ),
           Center(
             child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: layout.horizontalPadding + 8,
+              padding: layout.sectionInsets.add(
+                const EdgeInsets.symmetric(horizontal: 8),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -811,6 +816,8 @@ class _HomepageScreenState extends ConsumerState<HomepageScreen> {
 class _HomepageLayout {
   final double maxContentWidth;
   final double horizontalPadding;
+  final double startPadding;
+  final double endPadding;
   final double titleFontSize;
   final double titleLetterSpacing;
   final double sectionTitleSize;
@@ -827,12 +834,14 @@ class _HomepageLayout {
   final double iconSize;
   final int skeletonCount;
   final int previewItemCount;
-  final bool splitSecondarySections;
+  final bool splitTopSections;
   final bool compactHeader;
 
   const _HomepageLayout({
     required this.maxContentWidth,
     required this.horizontalPadding,
+    required this.startPadding,
+    required this.endPadding,
     required this.titleFontSize,
     required this.titleLetterSpacing,
     required this.sectionTitleSize,
@@ -849,12 +858,49 @@ class _HomepageLayout {
     required this.iconSize,
     required this.skeletonCount,
     required this.previewItemCount,
-    required this.splitSecondarySections,
+    required this.splitTopSections,
     required this.compactHeader,
   });
 
+  EdgeInsets get sectionInsets =>
+      EdgeInsets.only(left: startPadding, right: endPadding);
+
   double get carouselHeight =>
       posterHeight + 10 + (cardTitleSize * 1.35 * 2) + 8;
+
+  _HomepageLayout forSplitColumn({required bool isStart}) {
+    final start = isStart ? horizontalPadding : 0.0;
+    final end = isStart ? 0.0 : horizontalPadding;
+    final columnWidth = (maxContentWidth - sectionGap) / 2;
+    final usableWidth = columnWidth - start - end;
+    final count =
+        ((usableWidth + cardGap) / (cardWidth + cardGap)).floor().clamp(2, 6);
+
+    return _HomepageLayout(
+      maxContentWidth: maxContentWidth,
+      horizontalPadding: horizontalPadding,
+      startPadding: start,
+      endPadding: end,
+      titleFontSize: titleFontSize,
+      titleLetterSpacing: titleLetterSpacing,
+      sectionTitleSize: sectionTitleSize,
+      sectionActionSize: sectionActionSize,
+      sectionGap: sectionGap,
+      sectionHeaderGap: sectionHeaderGap,
+      headerToContentGap: headerToContentGap,
+      bottomPadding: bottomPadding,
+      cardWidth: cardWidth,
+      posterHeight: posterHeight,
+      cardGap: cardGap,
+      cardTitleSize: cardTitleSize,
+      overlayMessageSize: overlayMessageSize,
+      iconSize: iconSize,
+      skeletonCount: count,
+      previewItemCount: previewItemCount,
+      splitTopSections: splitTopSections,
+      compactHeader: compactHeader,
+    );
+  }
 
   factory _HomepageLayout.of(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
@@ -893,7 +939,7 @@ class _HomepageLayout {
     late final double overlayMessageSize;
     late final double iconSize;
     late final int previewItemCount;
-    late final bool splitSecondarySections;
+    late final bool splitTopSections;
     late final bool compactHeader;
 
     if (isTvLike) {
@@ -912,7 +958,7 @@ class _HomepageLayout {
       overlayMessageSize = 17;
       iconSize = 34;
       previewItemCount = 10;
-      splitSecondarySections = height >= 640;
+      splitTopSections = isLandscape && height >= 640;
       compactHeader = false;
     } else if (isLargeWide) {
       horizontalPadding = 24;
@@ -930,7 +976,7 @@ class _HomepageLayout {
       overlayMessageSize = 16;
       iconSize = 33;
       previewItemCount = 9;
-      splitSecondarySections = height >= 600;
+      splitTopSections = isLandscape && height >= 600;
       compactHeader = false;
     } else if (isTablet && isLandscape) {
       horizontalPadding = 24;
@@ -948,7 +994,7 @@ class _HomepageLayout {
       overlayMessageSize = 15;
       iconSize = 32;
       previewItemCount = 8;
-      splitSecondarySections = !isCompactLandscape && width >= 1000;
+      splitTopSections = !isCompactLandscape;
       compactHeader = isCompactLandscape;
     } else if (isTablet) {
       horizontalPadding = 24;
@@ -966,7 +1012,7 @@ class _HomepageLayout {
       overlayMessageSize = 16;
       iconSize = 32;
       previewItemCount = 7;
-      splitSecondarySections = false;
+      splitTopSections = false;
       compactHeader = false;
     } else if (isCompactLandscape) {
       horizontalPadding = 16;
@@ -984,7 +1030,7 @@ class _HomepageLayout {
       overlayMessageSize = 13;
       iconSize = 28;
       previewItemCount = 6;
-      splitSecondarySections = false;
+      splitTopSections = false;
       compactHeader = true;
     } else if (width >= 700) {
       // Foldables / large phones in landscape-ish widths.
@@ -1003,7 +1049,7 @@ class _HomepageLayout {
       overlayMessageSize = 15;
       iconSize = 31;
       previewItemCount = 7;
-      splitSecondarySections = height >= 560;
+      splitTopSections = isLandscape && height >= 560;
       compactHeader = isLandscape && height < 560;
     } else {
       final narrow = width < 360;
@@ -1022,7 +1068,7 @@ class _HomepageLayout {
       overlayMessageSize = 15;
       iconSize = 31;
       previewItemCount = 5;
-      splitSecondarySections = false;
+      splitTopSections = false;
       compactHeader = false;
     }
 
@@ -1044,6 +1090,8 @@ class _HomepageLayout {
     return _HomepageLayout(
       maxContentWidth: maxContentWidth,
       horizontalPadding: horizontalPadding,
+      startPadding: horizontalPadding,
+      endPadding: horizontalPadding,
       titleFontSize: titleFontSize,
       titleLetterSpacing: titleLetterSpacing,
       sectionTitleSize: sectionTitleSize,
@@ -1060,7 +1108,7 @@ class _HomepageLayout {
       iconSize: iconSize,
       skeletonCount: skeletonCount,
       previewItemCount: previewItemCount,
-      splitSecondarySections: splitSecondarySections,
+      splitTopSections: splitTopSections,
       compactHeader: compactHeader,
     );
   }
