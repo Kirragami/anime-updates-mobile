@@ -18,6 +18,7 @@ import '../services/watch_party_navigation.dart';
 import '../services/watch_party_app_shell.dart';
 import '../services/watch_party_sync_config.dart';
 import '../services/usb_stream_server.dart';
+import '../services/user_preferences_service.dart';
 import '../widgets/watch_party_invite_friends_sheet.dart';
 import '../app_orientation_system_ui.dart';
 
@@ -50,7 +51,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   bool _isInitialized = false;
   bool _isPlaying = false;
   bool _isControlsVisible = true;
-  bool _isFullscreen = false;
+  int _subtitleFontSize = UserPreferencesService.defaultSubtitleFontSize;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   Timer? _controlsTimer;
@@ -284,8 +285,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     });
 
     _getInitialBrightness();
-    _initializePlayer();
+    unawaited(_preparePlayerWithPrefs());
     _setupWatchPartySync();
+  }
+
+  Future<void> _preparePlayerWithPrefs() async {
+    final prefs = UserPreferencesService();
+    await prefs.initialize();
+    if (!mounted) return;
+    _subtitleFontSize = prefs.subtitleFontSize;
+    _initializePlayer();
   }
 
   void _setupWatchPartySync() {
@@ -570,7 +579,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       ]),
       subtitle: VlcSubtitleOptions([
         VlcSubtitleOptions.boldStyle(true),
-        VlcSubtitleOptions.fontSize(20),
+        VlcSubtitleOptions.fontSize(_subtitleFontSize),
         VlcSubtitleOptions.color(VlcSubtitleColor.white),
       ]),
     );
@@ -1281,23 +1290,114 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     });
   }
 
-  void _toggleFullscreen() {
-    setState(() {
-      _isFullscreen = !_isFullscreen;
-    });
+  static const List<int> _subtitleFontSizePresets = [16, 20, 28, 36];
 
-    if (_isFullscreen) {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-      ]);
-    } else {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-    }
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => AppOrientationSystemUi.sync());
+  Future<void> _setSubtitleFontSize(int size) async {
+    if (_subtitleFontSize == size) return;
+
+    setState(() => _subtitleFontSize = size);
+    try {
+      await UserPreferencesService().setSubtitleFontSize(size);
+    } catch (_) {}
+
+    if (!mounted || _usbStreaming) return;
+
+    final seekSeconds = _position.inMilliseconds / 1000.0;
+    final wasPlaying = _isPlaying;
+    final generation = ++_mediaLoadGeneration;
+    _isLoadingMedia = true;
+    _resetPlaybackUiForNewMedia();
+
+    await _recreatePlayerController(
+      File(_activeFilePath),
+      generation: generation,
+      initialSeekSeconds: seekSeconds,
+      autoPlay: wasPlaying,
+    );
+  }
+
+  void _showSubtitleSizeSheet() {
+    _controlsTimer?.cancel();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Subtitle size',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Applies to soft (text) subtitles only',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.45),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ..._subtitleFontSizePresets.map((size) {
+                  final selected = size == _subtitleFontSize;
+                  final label = switch (size) {
+                    16 => 'Small',
+                    20 => 'Medium',
+                    28 => 'Large',
+                    _ => 'Extra large',
+                  };
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      label,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(selected ? 1 : 0.75),
+                        fontSize: 14 + (size - 16) * 0.35,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                    trailing: selected
+                        ? const Icon(Icons.check, color: AppTheme.primaryColor)
+                        : null,
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      unawaited(_setSubtitleFontSize(size));
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    ).whenComplete(() {
+      if (mounted && _isControlsVisible) {
+        _startControlsTimer();
+      }
+    });
   }
 
   void _onVerticalDragStart(DragStartDetails details) {
@@ -2082,15 +2182,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: _toggleFullscreen,
+            onTap: _showSubtitleSizeSheet,
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.5),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+              child: const Icon(
+                Icons.format_size,
                 color: Colors.white,
                 size: 24,
               ),
