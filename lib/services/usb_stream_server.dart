@@ -26,6 +26,29 @@ class UsbStreamItem {
       'http://127.0.0.1:${UsbStreamServer.port}/${Uri.encodeComponent(displayFileName)}';
 }
 
+class UsbPlaybackStatus {
+  final bool connected;
+  final bool isPlaying;
+  final Duration position;
+  final Duration duration;
+  final String? releaseId;
+
+  const UsbPlaybackStatus({
+    required this.connected,
+    required this.isPlaying,
+    required this.position,
+    required this.duration,
+    this.releaseId,
+  });
+
+  static const disconnected = UsbPlaybackStatus(
+    connected: false,
+    isPlaying: false,
+    position: Duration.zero,
+    duration: Duration.zero,
+  );
+}
+
 /// Serves each episode as its own URL and loads the show into VLC as a playlist.
 class UsbStreamServer {
   static const int port = 8765;
@@ -40,6 +63,8 @@ class UsbStreamServer {
 
   final ValueNotifier<int> clientCount = ValueNotifier<int>(0);
   final ValueNotifier<String?> playingReleaseId = ValueNotifier<String?>(null);
+  final ValueNotifier<UsbPlaybackStatus> playbackStatus =
+      ValueNotifier<UsbPlaybackStatus>(UsbPlaybackStatus.disconnected);
 
   HttpServer? _server;
   final Map<String, UsbStreamItem> _items = {};
@@ -50,8 +75,11 @@ class UsbStreamServer {
   Timer? _vlcPollTimer;
   Timer? _vlcPushTimer;
   bool _ignoreVlcPoll = false;
+  Duration? _pendingSeek;
+  bool? _pendingPlay;
 
   bool get isRunning => _server != null;
+  bool get suppressExternalSync => _ignoreVlcPoll;
 
   String? filePathFor(String releaseId) => _items[releaseId]?.filePath;
 
@@ -67,6 +95,8 @@ class UsbStreamServer {
   Future<void> start({
     required List<UsbStreamItem> items,
     required String currentReleaseId,
+    Duration? initialSeek,
+    bool autoPlay = true,
   }) async {
     if (items.isEmpty) {
       throw StateError('No episodes to stream');
@@ -75,10 +105,13 @@ class UsbStreamServer {
     _items
       ..clear()
       ..addEntries(items.map((item) => MapEntry(item.releaseId, item)));
+    _vlcItemIds.clear();
     _currentReleaseId = _items.containsKey(currentReleaseId)
         ? currentReleaseId
         : items.first.releaseId;
     playingReleaseId.value = _currentReleaseId;
+    _pendingSeek = initialSeek;
+    _pendingPlay = autoPlay;
 
     if (_server == null) {
       _server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
@@ -103,7 +136,44 @@ class UsbStreamServer {
       await _ensureVlcPlaylist();
     }
     await _vlcPlayRelease(releaseId);
+    await Future<void>.delayed(const Duration(milliseconds: 150));
     _ignoreVlcPoll = false;
+  }
+
+  Future<void> setPlaying(bool playing) async {
+    _ignoreVlcPoll = true;
+    try {
+      await _setPlayingNow(playing);
+    } finally {
+      _ignoreVlcPoll = false;
+    }
+  }
+
+  Future<void> seekTo(Duration position) async {
+    _ignoreVlcPoll = true;
+    try {
+      await _seekToNow(position);
+    } finally {
+      _ignoreVlcPoll = false;
+    }
+  }
+
+  Future<void> _setPlayingNow(bool playing) async {
+    final forced = playing ? 'pl_forceresume' : 'pl_forcepause';
+    var ok = await _tellVlc(forced, retries: 2);
+    if (!ok) {
+      final status = await _readStatus();
+      if (status != null && status.isPlaying != playing) {
+        await _tellVlc('pl_pause', retries: 2);
+      }
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+  }
+
+  Future<void> _seekToNow(Duration position) async {
+    final seconds = position.inMilliseconds / 1000.0;
+    await _tellVlc('seek', val: '${seconds}s', retries: 3);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
   }
 
   Future<void> stop() async {
@@ -116,7 +186,10 @@ class UsbStreamServer {
     _items.clear();
     _vlcItemIds.clear();
     _currentReleaseId = null;
+    _pendingSeek = null;
+    _pendingPlay = null;
     playingReleaseId.value = null;
+    playbackStatus.value = UsbPlaybackStatus.disconnected;
     final server = _server;
     _server = null;
     if (server != null) {
@@ -135,6 +208,7 @@ class UsbStreamServer {
         if (current != null) {
           await _vlcPlayRelease(current);
         }
+        await _applyPendingStartState();
         timer.cancel();
         _vlcPushTimer = null;
       } else if (attempts >= 20) {
@@ -145,8 +219,26 @@ class UsbStreamServer {
 
     _vlcPollTimer?.cancel();
     _vlcPollTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      unawaited(_pollVlcCurrent());
+      unawaited(_pollVlc());
     });
+  }
+
+  Future<void> _applyPendingStartState() async {
+    _ignoreVlcPoll = true;
+    try {
+      final seek = _pendingSeek;
+      final play = _pendingPlay;
+      _pendingSeek = null;
+      _pendingPlay = null;
+      if (seek != null && seek > Duration.zero) {
+        await _seekToNow(seek);
+      }
+      if (play != null) {
+        await _setPlayingNow(play);
+      }
+    } finally {
+      _ignoreVlcPoll = false;
+    }
   }
 
   Future<void> _dropClients() async {
@@ -395,8 +487,43 @@ class UsbStreamServer {
     return _vlcItemIds.isNotEmpty;
   }
 
+  Future<void> _pollVlc() async {
+    if (_server == null) return;
+    final status = await _readStatus();
+    if (status != null) {
+      playbackStatus.value = status;
+    }
+    if (!_ignoreVlcPoll) {
+      await _pollVlcCurrent();
+    }
+  }
+
+  Future<UsbPlaybackStatus?> _readStatus() async {
+    final xml = await _vlcGet('/requests/status.xml');
+    if (xml == null) return null;
+
+    final state =
+        RegExp(r'<state>([^<]+)</state>').firstMatch(xml)?.group(1) ?? '';
+    final time = int.tryParse(
+          RegExp(r'<time>([^<]+)</time>').firstMatch(xml)?.group(1) ?? '',
+        ) ??
+        0;
+    final length = int.tryParse(
+          RegExp(r'<length>([^<]+)</length>').firstMatch(xml)?.group(1) ?? '',
+        ) ??
+        0;
+
+    return UsbPlaybackStatus(
+      connected: true,
+      isPlaying: state == 'playing',
+      position: Duration(seconds: time),
+      duration: Duration(seconds: length),
+      releaseId: _currentReleaseId,
+    );
+  }
+
   Future<void> _pollVlcCurrent() async {
-    if (_ignoreVlcPoll || _server == null) return;
+    if (_server == null) return;
     final xml = await _vlcGet('/requests/playlist.xml');
     if (xml == null) return;
 
@@ -424,11 +551,13 @@ class UsbStreamServer {
     String command, {
     String? input,
     String? id,
+    String? val,
     int retries = 4,
   }) async {
     final params = <String, String>{'command': command};
     if (input != null) params['input'] = input;
     if (id != null) params['id'] = id;
+    if (val != null) params['val'] = val;
 
     for (var attempt = 0; attempt < retries; attempt++) {
       if (attempt > 0) {
