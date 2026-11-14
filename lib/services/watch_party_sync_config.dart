@@ -15,4 +15,7 @@ class WatchPartySyncConfig {
 
   /// Apply leader seeks immediately when drift exceeds this (scrub, play, pause).
   static const eventDriftThresholdMs = 750;
+
+  /// USB/VLC seeks are slower; ignore smaller drift so we don't fight the PC.
+  static const usbEventDriftThresholdMs = 1500;
 }

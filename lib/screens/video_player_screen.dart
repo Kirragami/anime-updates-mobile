@@ -52,6 +52,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   bool _isPlaying = false;
   bool _isControlsVisible = true;
   int _subtitleFontSize = UserPreferencesService.defaultSubtitleFontSize;
+  bool _experimentalFeatures = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   Timer? _controlsTimer;
@@ -110,6 +111,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   final UsbStreamServer _usbStream = UsbStreamServer();
   bool _usbStreaming = false;
+  DateTime? _usbIgnorePartyEmitUntil;
+
+  bool get _canSkipUsbEpisode =>
+      !_usbStreaming || !_watchPartyActive || _isPartyLeader;
 
   /// Bumped on every media load so in-flight init/seek callbacks cannot
   /// touch a newer episode (or a player that USB streaming already released).
@@ -129,8 +134,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   bool get _isPartyLeader =>
       _watchPartyActive && ref.read(watchPartyProvider).isLeader;
 
+  bool get _usbVlcReady =>
+      _usbStreaming && (_usbStream.playbackStatus.value.connected);
+
   bool get _playerReadyForControl =>
-      _videoPlayerController != null && _isInitialized && !_isLoadingMedia;
+      _usbVlcReady ||
+      (_videoPlayerController != null && _isInitialized && !_isLoadingMedia);
 
   static int? _extractEpisodeNumber(String episode) {
     final cleaned = episode
@@ -294,6 +303,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     await prefs.initialize();
     if (!mounted) return;
     _subtitleFontSize = prefs.subtitleFontSize;
+    _experimentalFeatures = prefs.experimentalFeatures;
     _initializePlayer();
   }
 
@@ -346,7 +356,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     });
 
     if (_usbStreaming) {
-      await _usbStream.playRelease(releaseId);
+      if (_isPartyLeader) {
+        await _usbStream.playRelease(releaseId);
+      } else {
+        final items = await _usbPlaylistItems(onlyReleaseId: releaseId);
+        if (items.isEmpty) return;
+        await _usbStream.start(
+          items: items,
+          currentReleaseId: releaseId,
+          initialSeek: Duration.zero,
+          autoPlay: false,
+        );
+      }
       _resolveAdjacentEpisodes();
       return;
     }
@@ -434,7 +455,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       case SyncActionType.seek:
         final threshold = _periodicSyncPending
             ? WatchPartySyncConfig.periodicDriftThresholdMs
-            : WatchPartySyncConfig.eventDriftThresholdMs;
+            : (_usbStreaming
+                ? WatchPartySyncConfig.usbEventDriftThresholdMs
+                : WatchPartySyncConfig.eventDriftThresholdMs);
         _periodicSyncPending = false;
         _applyRemotePlayback(
           timestampSeconds: action.timestamp,
@@ -486,19 +509,31 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         if (mounted) {
           setState(() => _position = target);
         }
-        await _videoPlayerController!.seekTo(target);
+        if (_usbStreaming) {
+          await _usbStream.seekTo(target);
+        } else {
+          await _videoPlayerController!.seekTo(target);
+        }
       }
 
       if (shouldPlay && !_isPlaying) {
         _ignorePollPlayingUntil =
             DateTime.now().add(const Duration(milliseconds: 500));
         if (mounted) setState(() => _isPlaying = true);
-        await _videoPlayerController!.play();
+        if (_usbStreaming) {
+          await _usbStream.setPlaying(true);
+        } else {
+          await _videoPlayerController!.play();
+        }
       } else if (!shouldPlay && _isPlaying) {
         _ignorePollPlayingUntil =
             DateTime.now().add(const Duration(milliseconds: 500));
         if (mounted) setState(() => _isPlaying = false);
-        await _videoPlayerController!.pause();
+        if (_usbStreaming) {
+          await _usbStream.setPlaying(false);
+        } else {
+          await _videoPlayerController!.pause();
+        }
       }
     } finally {
       _applyingRemoteSync = false;
@@ -507,6 +542,19 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   void _emitPartyPlayState({required bool playing}) {
     if (!_watchPartyActive || _applyingRemoteSync) return;
+
+    if (_usbStreaming) {
+      final seconds = _position.inMilliseconds / 1000.0;
+      WatchPartyLogger.info(
+        'party emit ${playing ? 'PLAY' : 'PAUSE'} ts=$seconds leader=$_isPartyLeader usb=true',
+      );
+      if (playing) {
+        ref.read(watchPartyProvider.notifier).notifyPlay(seconds);
+      } else {
+        ref.read(watchPartyProvider.notifier).notifyPause(seconds);
+      }
+      return;
+    }
 
     _videoPlayerController?.getPosition().then((pos) {
       if (!mounted || !_watchPartyActive || _applyingRemoteSync) return;
@@ -1070,7 +1118,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   void _persistProgress({bool force = true}) {
-    if (!_isInitialized) return;
+    if (!_isInitialized && !_usbStreaming) return;
     final showId = _getAnimeShowId();
     if (showId == null || _activeReleaseId == null) return;
     if (_position.inSeconds <= 0) return;
@@ -1099,6 +1147,21 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   Future<void> _togglePlayPause() async {
+    if (_usbStreaming) {
+      final playing = !_isPlaying;
+      setState(() => _isPlaying = playing);
+      _startControlsTimer();
+      try {
+        await _usbStream.setPlaying(playing);
+      } catch (_) {
+        if (mounted) setState(() => _isPlaying = !playing);
+        return;
+      }
+      _emitPartyPlayState(playing: playing);
+      if (!playing) _persistProgress(force: true);
+      return;
+    }
+
     final controller = _videoPlayerController;
     if (controller == null || _isLoadingMedia) return;
 
@@ -1139,6 +1202,35 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   /// [fromScrub] keeps live seeking while dragging, but throttles native seeks.
   Future<void> _seekTo(Duration position, {bool fromScrub = false}) async {
+    if (_usbStreaming) {
+      final target = _clampSeekPosition(position);
+      if (mounted) setState(() => _position = target);
+      _emitPartySeek(at: target);
+      if (!fromScrub) {
+        await _usbStream.seekTo(target);
+      } else {
+        _pendingScrubSeek = target;
+        final last = _lastNativeSeekAt;
+        final now = DateTime.now();
+        if (last != null && now.difference(last) < _nativeSeekMinInterval) {
+          final wait = _nativeSeekMinInterval - now.difference(last);
+          _scrubSeekTimer?.cancel();
+          _scrubSeekTimer = Timer(wait, () {
+            _scrubSeekTimer = null;
+            final pending = _pendingScrubSeek;
+            if (pending != null && mounted) {
+              _lastNativeSeekAt = DateTime.now();
+              unawaited(_usbStream.seekTo(pending));
+            }
+          });
+          return;
+        }
+        _lastNativeSeekAt = now;
+        await _usbStream.seekTo(target);
+      }
+      return;
+    }
+
     final controller = _videoPlayerController;
     if (controller == null || _isLoadingMedia) return;
 
@@ -1276,10 +1368,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   void _startControlsTimer() {
-    if (_usbStreaming) {
-      _controlsTimer?.cancel();
-      return;
-    }
     _controlsTimer?.cancel();
     _controlsTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && _isPlaying) {
@@ -1318,77 +1406,104 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   void _showSubtitleSizeSheet() {
     _controlsTimer?.cancel();
-    showModalBottomSheet<void>(
+    final screenSize = MediaQuery.sizeOf(context);
+    final maxWidth = screenSize.width > 520 ? 360.0 : screenSize.width * 0.88;
+
+    showDialog<void>(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(2),
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: AppTheme.surfaceColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Subtitle size',
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Subtitle size',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Applies to soft (text) subtitles only',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.45),
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ..._subtitleFontSizePresets.map((size) {
-                  final selected = size == _subtitleFontSize;
-                  final label = switch (size) {
-                    16 => 'Small',
-                    20 => 'Medium',
-                    28 => 'Large',
-                    _ => 'Extra large',
-                  };
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      label,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(selected ? 1 : 0.75),
-                        fontSize: 14 + (size - 16) * 0.35,
-                        fontWeight:
-                            selected ? FontWeight.w700 : FontWeight.w500,
-                      ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Applies to soft (text) subtitles only',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      height: 1.35,
                     ),
-                    trailing: selected
-                        ? const Icon(Icons.check, color: AppTheme.primaryColor)
-                        : null,
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      unawaited(_setSubtitleFontSize(size));
-                    },
-                  );
-                }),
-              ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: _subtitleFontSizePresets.map((size) {
+                      final selected = size == _subtitleFontSize;
+                      final label = switch (size) {
+                        16 => 'S',
+                        20 => 'M',
+                        28 => 'L',
+                        _ => 'XL',
+                      };
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right:
+                                size == _subtitleFontSizePresets.last ? 0 : 8,
+                          ),
+                          child: Material(
+                            color: selected
+                                ? AppTheme.primaryColor.withOpacity(0.25)
+                                : AppTheme.cardColor.withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () {
+                                Navigator.of(dialogContext).pop();
+                                unawaited(_setSubtitleFontSize(size));
+                              },
+                              child: Container(
+                                height: 44,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: selected
+                                        ? AppTheme.primaryColor
+                                        : Colors.white.withOpacity(0.08),
+                                  ),
+                                ),
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    color: selected
+                                        ? AppTheme.textPrimary
+                                        : AppTheme.textSecondary,
+                                    fontSize: 14,
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1644,6 +1759,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _focusNode.dispose();
     _resetBrightness();
     _usbStream.playingReleaseId.removeListener(_onUsbPlayingReleaseChanged);
+    _usbStream.playbackStatus.removeListener(_onUsbPlaybackStatus);
     unawaited(_usbStream.stop());
 
     super.dispose();
@@ -1904,17 +2020,30 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       return;
     }
 
+    final resumeAt = _position;
+    final wasPlaying = _isPlaying;
+    final joinerOnly = _watchPartyActive && !_isPartyLeader;
+
     try {
-      final items = await _usbPlaylistItems();
+      final items = await _usbPlaylistItems(
+        onlyReleaseId: joinerOnly ? _activeReleaseId : null,
+      );
       if (items.isEmpty) {
         throw StateError('No downloaded episodes to stream');
       }
+      _usbStream.playingReleaseId.addListener(_onUsbPlayingReleaseChanged);
+      _usbStream.playbackStatus.addListener(_onUsbPlaybackStatus);
+      _usbIgnorePartyEmitUntil =
+          DateTime.now().add(const Duration(seconds: 3));
       await _usbStream.start(
         items: items,
         currentReleaseId: _activeReleaseId ?? items.first.releaseId,
+        initialSeek: resumeAt,
+        autoPlay: wasPlaying,
       );
-      _usbStream.playingReleaseId.addListener(_onUsbPlayingReleaseChanged);
     } catch (e) {
+      _usbStream.playingReleaseId.removeListener(_onUsbPlayingReleaseChanged);
+      _usbStream.playbackStatus.removeListener(_onUsbPlaybackStatus);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not start USB stream: $e')),
@@ -1929,12 +2058,26 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       _isControlsVisible = true;
     });
     _startControlsTimer();
+    if (_watchPartyActive && !_isPartyLeader) {
+      _startPartyPlaybackSync();
+      _requestPeriodicPlaybackSync();
+    }
   }
 
-  Future<List<UsbStreamItem>> _usbPlaylistItems() async {
+  Future<List<UsbStreamItem>> _usbPlaylistItems({String? onlyReleaseId}) async {
     final manager = CompletedDownloadsManager();
+    var episodes = _episodesInCurrentShow();
+    if (onlyReleaseId != null) {
+      episodes =
+          episodes.where((e) => e.releaseId == onlyReleaseId).toList();
+      if (episodes.isEmpty) {
+        final one = manager.completedDownloads[onlyReleaseId];
+        if (one != null) episodes = [one];
+      }
+    }
+
     final items = <UsbStreamItem>[];
-    for (final episode in _episodesInCurrentShow()) {
+    for (final episode in episodes) {
       final path = await manager.getFilePath(episode.releaseId);
       if (path == null) continue;
       items.add(
@@ -1953,6 +2096,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     final releaseId = _usbStream.playingReleaseId.value;
     if (releaseId == null || releaseId == _activeReleaseId) return;
 
+    if (_watchPartyActive && !_isPartyLeader) {
+      final expected = _activeReleaseId;
+      if (expected != null) {
+        unawaited(_usbStream.playRelease(expected));
+      }
+      return;
+    }
+
     final download =
         CompletedDownloadsManager().completedDownloads[releaseId];
     final itemPath = _usbStream.filePathFor(releaseId);
@@ -1966,24 +2117,78 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           : '${download.showName} - Episode ${download.episode}';
     });
     _resolveAdjacentEpisodes();
+
+    if (_isPartyLeader) {
+      _loadedPartyVideoUrl = WatchPartyVideoRef(releaseId).encode();
+      ref.read(watchPartyProvider.notifier).notifyLoadVideo(releaseId);
+    }
+  }
+
+  void _onUsbPlaybackStatus() {
+    if (!_usbStreaming || !mounted) return;
+    final status = _usbStream.playbackStatus.value;
+    if (!status.connected) return;
+
+    final playingChanged = status.isPlaying != _isPlaying;
+    final oldPosition = _position;
+
+    setState(() {
+      if (!_isScrubbing) {
+        _position = status.position;
+      }
+      if (status.duration > Duration.zero) {
+        _duration = status.duration;
+      }
+      _isPlaying = status.isPlaying;
+    });
+
+    _flushPendingRemoteSync();
+
+    if (_applyingRemoteSync ||
+        _usbStream.suppressExternalSync ||
+        _isScrubbing) {
+      return;
+    }
+
+    final inStartGrace = _usbIgnorePartyEmitUntil != null &&
+        DateTime.now().isBefore(_usbIgnorePartyEmitUntil!);
+    if (inStartGrace) return;
+
+    if (_watchPartyActive && playingChanged) {
+      _emitPartyPlayState(playing: status.isPlaying);
+    }
+
+    if (_isPartyLeader) {
+      final delta = (status.position - oldPosition).inMilliseconds.abs();
+      if (delta > 2500) {
+        _emitPartySeek(at: status.position);
+      }
+    }
+
+    if (status.isPlaying && status.position.inSeconds > 0) {
+      _persistProgress(force: false);
+    }
   }
 
   Future<void> _stopUsbStream() async {
     _usbStream.playingReleaseId.removeListener(_onUsbPlayingReleaseChanged);
+    _usbStream.playbackStatus.removeListener(_onUsbPlaybackStatus);
+    final seekSeconds = _position.inMilliseconds / 1000.0;
+    final playing = _isPlaying;
     await _usbStream.stop();
     if (!mounted) return;
     setState(() => _usbStreaming = false);
-    _initializePlayer();
+    _initializePlayer(initialSeekSeconds: seekSeconds, autoPlay: playing);
   }
 
   Widget _buildUsbStreamIdleScreen() {
     return ColoredBox(
       color: Colors.black,
       child: Center(
-        child: ValueListenableBuilder<int>(
-          valueListenable: _usbStream.clientCount,
-          builder: (context, count, _) {
-            final connected = count > 0;
+        child: ValueListenableBuilder<UsbPlaybackStatus>(
+          valueListenable: _usbStream.playbackStatus,
+          builder: (context, status, _) {
+            final connected = status.connected;
             return SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
               child: ConstrainedBox(
@@ -2163,24 +2368,26 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               ),
             ),
           const Spacer(),
-          GestureDetector(
-            onTap: _onUsbStreamButtonTap,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.usb_rounded,
-                color: _usbStreaming
-                    ? Colors.white.withOpacity(0.95)
-                    : Colors.white,
-                size: 24,
+          if (_experimentalFeatures || _usbStreaming) ...[
+            GestureDetector(
+              onTap: _onUsbStreamButtonTap,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.usb_rounded,
+                  color: _usbStreaming
+                      ? Colors.white.withOpacity(0.95)
+                      : Colors.white,
+                  size: 24,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
+          ],
           GestureDetector(
             onTap: _showSubtitleSizeSheet,
             child: Container(
@@ -2202,10 +2409,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   Widget _buildBottomControls() {
-    if (_usbStreaming) {
-      return _buildUsbStreamBottomControls();
-    }
-
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -2278,12 +2481,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             children: [
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 250),
-                opacity: _prevEpisode != null ? 1.0 : 0.0,
+                opacity: _prevEpisode != null && _canSkipUsbEpisode ? 1.0 : 0.0,
                 child: Visibility(
                   maintainSize: true,
                   maintainAnimation: true,
                   maintainState: true,
-                  visible: _prevEpisode != null,
+                  visible: _prevEpisode != null && _canSkipUsbEpisode,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2343,12 +2546,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               ),
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 250),
-                opacity: _nextEpisode != null ? 1.0 : 0.0,
+                opacity: _nextEpisode != null && _canSkipUsbEpisode ? 1.0 : 0.0,
                 child: Visibility(
                   maintainSize: true,
                   maintainAnimation: true,
                   maintainState: true,
-                  visible: _nextEpisode != null,
+                  visible: _nextEpisode != null && _canSkipUsbEpisode,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2362,46 +2565,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUsbStreamBottomControls() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 250),
-            opacity: _prevEpisode != null ? 1.0 : 0.0,
-            child: Visibility(
-              maintainSize: true,
-              maintainAnimation: true,
-              maintainState: true,
-              visible: _prevEpisode != null,
-              child: _buildEpisodeNavButton(
-                icon: Icons.skip_previous_rounded,
-                onTap: () => _switchToEpisode(_prevEpisode!),
-              ),
-            ),
-          ),
-          const SizedBox(width: 48),
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 250),
-            opacity: _nextEpisode != null ? 1.0 : 0.0,
-            child: Visibility(
-              maintainSize: true,
-              maintainAnimation: true,
-              maintainState: true,
-              visible: _nextEpisode != null,
-              child: _buildEpisodeNavButton(
-                icon: Icons.skip_next_rounded,
-                onTap: () => _switchToEpisode(_nextEpisode!),
-              ),
-            ),
           ),
         ],
       ),

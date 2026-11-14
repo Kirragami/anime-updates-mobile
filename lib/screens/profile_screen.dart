@@ -27,6 +27,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isLoadingSpeedLimit = true;
   bool _autoTrackOnDownload = false;
   bool _isLoadingAutoTrackPreference = true;
+  bool _experimentalFeatures = false;
+  bool _isLoadingExperimentalPreference = true;
 
   bool _isCheckingUpdate = false;
   bool _updateAvailable = false;
@@ -42,6 +44,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     super.initState();
     _loadSpeedLimit();
     _loadAutoTrackPreference();
+    _loadExperimentalPreference();
     _loadUpdateDownloadStatus();
   }
 
@@ -80,6 +83,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _isLoadingAutoTrackPreference = false);
+    }
+  }
+
+  Future<void> _loadExperimentalPreference() async {
+    try {
+      final preferences = ref.read(userPreferencesServiceProvider);
+      await preferences.initialize();
+      if (!mounted) return;
+      setState(() {
+        _experimentalFeatures = preferences.experimentalFeatures;
+        _isLoadingExperimentalPreference = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingExperimentalPreference = false);
+    }
+  }
+
+  Future<void> _setExperimentalFeatures(bool value) async {
+    final previousValue = _experimentalFeatures;
+    setState(() => _experimentalFeatures = value);
+
+    try {
+      await ref
+          .read(userPreferencesServiceProvider)
+          .setExperimentalFeatures(value);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _experimentalFeatures = previousValue);
+      }
     }
   }
 
@@ -268,6 +301,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 onChanged: _isLoadingAutoTrackPreference
                     ? null
                     : _setAutoTrackOnDownload,
+                activeColor: AppTheme.primaryColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _buildSettingsGroup(
+          'Experimental',
+          [
+            _buildSettingsItem(
+              icon: Icons.science_outlined,
+              title: 'Experimental features',
+              subtitle: 'Show USB streaming in the video player',
+              trailing: Switch.adaptive(
+                value: _experimentalFeatures,
+                onChanged: _isLoadingExperimentalPreference
+                    ? null
+                    : _setExperimentalFeatures,
                 activeColor: AppTheme.primaryColor,
               ),
             ),
